@@ -2,33 +2,20 @@
 import { Sparkles, AlertCircle } from "lucide-react";
 
 interface Props {
-  summary:     string;
-  riskScore:   string;
-  disclaimer:  string;
-  computedAt:  string;
+  summary:    string;
+  riskScore:  string;
+  disclaimer: string;
+  computedAt: string;
 }
 
-/**
- * Splits the structured analyst summary into sentences for cleaner rendering.
- * The summary format is:
- *   "Short-term energy risk is X. This is primarily driven by Y. [Context]. Short-term (24–48h) outlook: Z. ..."
- */
 function parseSummary(text: string): string[] {
-  // Split on sentence boundaries while preserving abbreviations like "24–48h"
-  return text
-    .split(/(?<=\.)\s+(?=[A-Z])/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return text.split(/\.\s+(?=[A-Z])/).map((s) => s.trim().replace(/\.$/, "") + ".").filter(Boolean);
 }
 
 export default function AISummary({ summary, riskScore, disclaimer, computedAt }: Props) {
   const time = new Date(computedAt).toLocaleTimeString("en-US", {
-    hour:         "numeric",
-    minute:       "2-digit",
-    timeZone:     "America/Chicago",
-    timeZoneName: "short",
+    hour: "numeric", minute: "2-digit", timeZone: "America/Chicago", timeZoneName: "short",
   });
-
   const sentences = parseSummary(summary);
 
   return (
@@ -39,45 +26,19 @@ export default function AISummary({ summary, riskScore, disclaimer, computedAt }
         </div>
         <div className="flex-1">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-white">
-              Energy Risk Intelligence Summary
-            </p>
+            <p className="text-sm font-semibold text-white">Energy Risk Intelligence Summary</p>
             <span className="text-xs text-gray-500">{time}</span>
           </div>
 
           {sentences.length > 1 ? (
             <div className="space-y-2">
               {sentences.map((sentence, i) => {
-                // First sentence: the headline risk level — larger + prominent
-                if (i === 0) {
-                  return (
-                    <p key={i} className="text-sm font-semibold text-white leading-relaxed">
-                      {sentence}
-                    </p>
-                  );
-                }
-                // Outlook sentence (starts with "Short-term") — slightly highlighted
-                if (sentence.startsWith("Short-term (24")) {
-                  return (
-                    <p key={i} className="text-xs text-amber-300/80 leading-relaxed font-medium">
-                      {sentence}
-                    </p>
-                  );
-                }
-                // Disclaimer sentence — de-emphasized
-                if (sentence.includes("situational awareness") || sentence.includes("not a trading")) {
-                  return (
-                    <p key={i} className="text-xs text-gray-600 leading-relaxed">
-                      {sentence}
-                    </p>
-                  );
-                }
-                // All other context sentences
-                return (
-                  <p key={i} className="text-sm text-gray-300 leading-relaxed">
-                    {sentence}
-                  </p>
-                );
+                if (i === 0) return <p key={i} className="text-sm font-semibold text-white leading-relaxed">{sentence}</p>;
+                if (sentence.includes("24") && sentence.toLowerCase().includes("outlook"))
+                  return <p key={i} className="text-xs text-amber-300/80 leading-relaxed font-medium">{sentence}</p>;
+                if (sentence.includes("situational awareness") || sentence.includes("not a trading"))
+                  return <p key={i} className="text-xs text-gray-600 leading-relaxed">{sentence}</p>;
+                return <p key={i} className="text-sm text-gray-300 leading-relaxed">{sentence}</p>;
               })}
             </div>
           ) : (

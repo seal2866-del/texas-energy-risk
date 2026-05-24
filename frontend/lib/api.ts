@@ -1,6 +1,5 @@
 /**
  * api.ts — typed fetch wrappers for the FastAPI backend.
- * Falls back gracefully if API is unavailable (returns mock shapes).
  */
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -8,13 +7,10 @@ const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 async function apiFetch<T>(path: string, token?: string): Promise<T> {
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-
   const res = await fetch(`${BASE}${path}`, { headers, cache: "no-store" });
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
   return res.json();
 }
-
-// ── Types ──────────────────────────────────────────────────────
 
 export type RiskScore = "low" | "medium" | "high";
 
@@ -51,8 +47,8 @@ export interface SignalsResponse {
     weather_demand:   Signal;
     gas_supply:       Signal;
   };
-  summary:     string;
-  disclaimer:  string;
+  summary:    string;
+  disclaimer: string;
 }
 
 export interface ERCOTPrice {
@@ -74,27 +70,25 @@ export interface WeatherForecast {
 }
 
 export interface GasRecord {
-  report_date:          string;
-  storage_bcf:          number;
-  storage_5yr_avg_bcf:  number;
-  storage_pct_vs_avg:   number;
-  henry_hub_price:      number;
-  supply_pressure:      string;
-  source:               string;
+  report_date:         string;
+  storage_bcf:         number;
+  storage_5yr_avg_bcf: number;
+  storage_pct_vs_avg:  number;
+  henry_hub_price:     number;
+  supply_pressure:     string;
+  source:              string;
 }
 
 export interface AlertLog {
-  id:              string;
-  channel:         string;
-  severity:        RiskScore;
-  message:         string;
-  sent_at:         string;
-  acknowledged:    boolean;
+  id:           string;
+  channel:      string;
+  severity:     RiskScore;
+  message:      string;
+  sent_at:      string;
+  acknowledged: boolean;
 }
 
-// ── API calls ─────────────────────────────────────────────────
-
-export const getSignals    = (location = "Houston") =>
+export const getSignals = (location = "Houston") =>
   apiFetch<SignalsResponse>(`/api/signals/?location=${location}`);
 
 export const getERCOTPrices = (hours = 24, point = "HB_HOUSTON") =>
@@ -112,10 +106,7 @@ export const getAlertLogs = (token: string) =>
 export const updateAlertPrefs = async (prefs: object, token: string) => {
   const res = await fetch(`${BASE}/api/alerts/preferences`, {
     method:  "PUT",
-    headers: {
-      "Content-Type":  "application/json",
-      Authorization:   `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(prefs),
   });
   return res.json();
