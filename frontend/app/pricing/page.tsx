@@ -28,9 +28,11 @@ const PRO_FEATURES = [
 
 export default function PricingPage() {
   const [loading, setLoading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
 
   const handleUpgrade = async () => {
     setLoading(true);
+    setUpgradeError("");
     try {
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
@@ -38,24 +40,41 @@ export default function PricingPage() {
         return;
       }
 
-      // Call your API to create a Stripe Checkout session
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/stripe/create-checkout`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":  "application/json",
-            Authorization: `Bearer ${data.session.access_token}`,
-          },
-          body: JSON.stringify({
-            price_id:     process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
-            success_url:  `${window.location.origin}/dashboard?upgraded=true`,
-            cancel_url:   `${window.location.origin}/pricing`,
-          }),
-        }
-      );
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const priceId = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
+
+      if (!apiUrl || !priceId) {
+        setUpgradeError("Configuration error: missing API URL or Price ID.");
+        return;
+      }
+
+      const res = await fetch(`${apiUrl}/api/stripe/create-checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+        body: JSON.stringify({
+          price_id:    priceId,
+          success_url: `${window.location.origin}/dashboard?upgraded=true`,
+          cancel_url:  `${window.location.origin}/pricing`,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        setUpgradeError(`Server error ${res.status}: ${errText}`);
+        return;
+      }
+
       const json = await res.json();
-      if (json.url) window.location.href = json.url;
+      if (json.url) {
+        window.location.href = json.url;
+      } else {
+        setUpgradeError("No checkout URL returned. Please try again.");
+      }
+    } catch (err: any) {
+      setUpgradeError(`Network error: ${err.message ?? "Could not reach server."}`);
     } finally {
       setLoading(false);
     }
@@ -145,6 +164,11 @@ export default function PricingPage() {
                 ))}
               </ul>
 
+              {upgradeError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                  {upgradeError}
+                </div>
+              )}
               <button
                 onClick={handleUpgrade}
                 disabled={loading}
