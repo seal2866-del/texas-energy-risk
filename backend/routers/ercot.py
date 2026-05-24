@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from services.external_apis import fetch_ercot_prices
+from services.external_apis import fetch_ercot_prices, fetch_current_ercot_price, fetch_all_hub_prices
 
 router = APIRouter(prefix="/api/ercot", tags=["ERCOT"])
 
@@ -27,9 +27,18 @@ async def get_prices(
 async def get_current_price(
     settlement_point: str = Query(default="HB_HOUSTON"),
 ):
-    prices = await fetch_ercot_prices(hours=2, settlement_point=settlement_point)
+    current = await fetch_current_ercot_price(settlement_point=settlement_point)
     return {
-        "current":    prices[-1] if prices else None,
-        "previous":   prices[-2] if len(prices) >= 2 else None,
+        "current":    current,
+        "disclaimer": "Informational only. Not investment or trading advice.",
+    }
+
+
+@router.get("/prices/hubs")
+async def get_all_hub_prices():
+    """Returns current LMP for all Texas trading hubs."""
+    hubs = await fetch_all_hub_prices()
+    return {
+        "hubs":       hubs,
         "disclaimer": "Informational only. Not investment or trading advice.",
     }
