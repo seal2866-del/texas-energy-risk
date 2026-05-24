@@ -19,12 +19,18 @@ async function apiFetch<T>(path: string, token?: string): Promise<T> {
 export type RiskScore = "low" | "medium" | "high";
 
 export interface Signal {
+  // Standardized fields (Task 8)
+  type:        string;
+  title:       string;
+  message:     string;
+  impact:      string;
+  confidence:  number | null;
+  // Existing fields
   signal_type: string;
   triggered:   boolean;
   severity:    RiskScore;
   value:       number | null;
   threshold:   number | null;
-  message:     string;
   computed_at: string;
 }
 
@@ -32,6 +38,9 @@ export interface SignalsResponse {
   computed_at:    string;
   risk_score:     RiskScore;
   active_signals: number;
+  confidence:     number;
+  explanation:    string;
+  impact:         string;
   signals: {
     price_volatility: Signal;
     weather_demand:   Signal;

@@ -1,5 +1,5 @@
 "use client";
-import { Activity } from "lucide-react";
+import { Activity, ShieldAlert } from "lucide-react";
 import type { RiskScore as RiskScoreType } from "@/lib/api";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
@@ -8,6 +8,9 @@ interface Props {
   activeSignals:  number;
   computedAt:     string;
   summary:        string;
+  confidence?:    number;
+  explanation?:   string;
+  impact?:        string;
 }
 
 const SCORE_CONFIG = {
@@ -16,7 +19,13 @@ const SCORE_CONFIG = {
   high:   { label: "HIGH RISK",   icon: "🔴", ring: "ring-red-500/40",    bar: "bg-red-500"   },
 };
 
-export default function RiskScore({ score, activeSignals, computedAt, summary }: Props) {
+const CONFIDENCE_COLOR = (c: number) =>
+  c >= 75 ? "text-green-400" : c >= 55 ? "text-amber-400" : "text-gray-500";
+
+export default function RiskScore({
+  score, activeSignals, computedAt, summary,
+  confidence, explanation, impact,
+}: Props) {
   const cfg = SCORE_CONFIG[score];
 
   return (
@@ -35,19 +44,31 @@ export default function RiskScore({ score, activeSignals, computedAt, summary }:
               <span className="text-2xl">{cfg.icon}</span>
             </div>
             <div>
+              {/* Task 5 — Confidence score next to risk label */}
               <p className={cn("text-3xl font-black tracking-tight", riskColor(score))}>
                 {cfg.label}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {activeSignals} active signal{activeSignals !== 1 ? "s" : ""}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                {/* Task 7 — "active risk drivers" language */}
+                <p className="text-xs text-gray-500">
+                  {activeSignals} active risk driver{activeSignals !== 1 ? "s" : ""}
+                </p>
+                {confidence !== undefined && (
+                  <>
+                    <span className="text-gray-700">·</span>
+                    <p className={cn("text-xs font-semibold", CONFIDENCE_COLOR(confidence))}>
+                      Confidence: {confidence}%
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
         <Activity className="w-5 h-5 text-gray-600" />
       </div>
 
-      {/* Signal bar */}
+      {/* Signal intensity bar */}
       <div className="mt-5">
         <div className="flex justify-between text-xs text-gray-500 mb-1.5">
           <span>Signal intensity</span>
@@ -61,13 +82,41 @@ export default function RiskScore({ score, activeSignals, computedAt, summary }:
         </div>
       </div>
 
-      {/* Summary */}
-      <p className="mt-4 text-sm text-gray-300 leading-relaxed line-clamp-3">
-        {summary}
-      </p>
+      {/* Task 3 — Dynamic risk explanation by driver */}
+      {explanation && (
+        <p className="mt-4 text-sm text-gray-200 leading-relaxed font-medium">
+          {explanation}
+        </p>
+      )}
+
+      {/* Task 4 — "Why it matters" */}
+      {impact && (
+        <div className={cn(
+          "mt-3 px-3 py-2 rounded-lg border text-xs leading-relaxed",
+          score === "high"
+            ? "bg-red-500/10 border-red-500/20 text-red-300"
+            : score === "medium"
+            ? "bg-amber-500/10 border-amber-500/20 text-amber-300"
+            : "bg-white/3 border-white/8 text-gray-400"
+        )}>
+          <span className="font-semibold uppercase tracking-wide mr-1.5">
+            {score === "high" ? "⚠ Why this matters:" : score === "medium" ? "ℹ Why this matters:" : "✓ Status:"}
+          </span>
+          {impact}
+        </div>
+      )}
+
+      {/* Fallback summary if no structured fields */}
+      {!explanation && (
+        <p className="mt-4 text-sm text-gray-300 leading-relaxed line-clamp-3">
+          {summary}
+        </p>
+      )}
 
       <p className="mt-3 text-xs text-gray-600">
-        Updated {new Date(computedAt).toLocaleTimeString("en-US", { timeZone: "America/Chicago", timeZoneName: "short" })}
+        Updated {new Date(computedAt).toLocaleTimeString("en-US", {
+          timeZone: "America/Chicago", timeZoneName: "short"
+        })}
       </p>
     </div>
   );

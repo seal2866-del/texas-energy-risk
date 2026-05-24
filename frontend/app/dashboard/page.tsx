@@ -141,6 +141,9 @@ export default function DashboardPage() {
                   activeSignals={signals.active_signals}
                   computedAt={signals.computed_at}
                   summary={signals.summary}
+                  confidence={signals.confidence}
+                  explanation={signals.explanation}
+                  impact={signals.impact}
                 />
               )}
 
