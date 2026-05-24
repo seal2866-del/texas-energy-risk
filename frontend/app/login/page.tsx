@@ -53,7 +53,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-[#0a0f1e]">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2 mb-10">
         <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
@@ -174,7 +174,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center"><div className="text-gray-400">Loading...</div></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-gray-400">Loading...</div></div>}>
       <LoginForm />
     </Suspense>
   );
