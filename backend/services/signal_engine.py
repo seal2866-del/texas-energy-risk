@@ -6,8 +6,11 @@ Produces structured signals with titles, confidence scores, and impact statement
 LEGAL NOTE: All output is informational only. No trading,
 procurement, or investment advice is expressed or implied.
 """
-from typing import Dict, Any, List, Tuple
-from datetime import datetime, timezone
+import logging
+from typing import Dict, Any, List, Tuple, Optional
+from datetime import datetime, timezone, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
@@ -19,8 +22,153 @@ TEMP_LOW_THRESHOLD_F      = 28.0
 GAS_STORAGE_PCT_THRESHOLD = -10.0
 
 
+DATA_FRESHNESS_MINUTES = 15   # max age of latest reading before failsafe
+DATA_MIN_REAL_POINTS   = 2    # need at least this many real (non-mock) readings
+MOCK_SOURCES           = {"mock", "mock_data", "generated", "demo", None, ""}
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Task 4 — Data validation layer
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _validate_data(prices: List[Dict]) -> Tuple[bool, str]:
+    """
+    Validates ERCOT price data before signals fire.
+    Returns (is_valid, status_message).
+
+    Requirements:
+    1. At least DATA_MIN_REAL_POINTS consecutive real datapoints
+    2. Latest reading is fresh (< DATA_FRESHNESS_MINUTES old)
+    3. No mock sources
+
+    If any condition fails → signals are suppressed.
+    """
+    if not prices:
+        logger.warning("[VALIDATE] No price data — failsafe active")
+        return False, "no_data"
+
+    # Check for mock contamination
+    real_prices = [
+        p for p in prices
+        if p.get("source") not in MOCK_SOURCES
+    ]
+
+    if len(real_prices) < DATA_MIN_REAL_POINTS:
+        got = len(real_prices)
+        logger.warning(
+            "[VALIDATE] Insufficient real data: %d/%d real readings — failsafe active",
+            got, DATA_MIN_REAL_POINTS
+        )
+        if got == 0:
+            return False, "mock_only"
+        return False, f"building_cache_{got}_of_{DATA_MIN_REAL_POINTS}"
+
+    # Check freshness of latest reading
+    latest = prices[-1]
+    ts_raw = latest.get("timestamp", "")
+    try:
+        ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+        age_minutes = (_utcnow() - ts).total_seconds() / 60
+        if age_minutes > DATA_FRESHNESS_MINUTES:
+            logger.warning(
+                "[VALIDATE] Stale data: latest reading is %.1f minutes old — failsafe active",
+                age_minutes
+            )
+            return False, f"stale_{age_minutes:.0f}m"
+    except Exception as exc:
+        logger.warning("[VALIDATE] Cannot parse timestamp '%s': %s", ts_raw, exc)
+        return False, "bad_timestamp"
+
+    logger.debug(
+        "[VALIDATE] Data valid: %d real readings, latest %.1f minutes old, source=%s",
+        len(real_prices), age_minutes, latest.get("source")
+    )
+    return True, "valid"
+
+
+def _failsafe_response() -> Dict[str, Any]:
+    """
+    Task 8 — Returned when real data is unavailable or invalid.
+    Disables risk score and all signals. Shows monitoring-paused message.
+    """
+    now = _utcnow().isoformat()
+    paused_signal = _signal(
+        signal_type="unavailable",
+        sig_type="UNAVAILABLE",
+        triggered=False,
+        severity="low",
+        confidence=None,
+        title="Monitoring Paused",
+        value=None,
+        threshold=None,
+        message="Live data unavailable. Monitoring paused.",
+        impact="Signals will resume automatically once real-time data is confirmed.",
+    )
+    return {
+        "computed_at":    now,
+        "risk_score":     "low",
+        "active_signals": 0,
+        "confidence":     None,
+        "explanation":    "Live data unavailable. Monitoring paused.",
+        "impact":         "Risk signals are suppressed until real-time data is confirmed.",
+        "data_valid":     False,
+        "data_status":    "unavailable",
+        "signals": {
+            "price_volatility": paused_signal,
+            "weather_demand":   paused_signal,
+            "gas_supply":       paused_signal,
+        },
+        "summary":     "Live data unavailable. Monitoring paused. Signals will resume automatically once real-time ERCOT data is confirmed.",
+        "disclaimer":  (
+            "This information is provided for situational awareness only. "
+            "It does not constitute investment, trading, or procurement advice."
+        ),
+    }
+
+
+def _awaiting_signal(signal_type: str, sig_type: str, status: str) -> Dict[str, Any]:
+    """
+    Returns a non-triggered 'building cache' signal for use while data is accumulating.
+    """
+    reading_count = 0
+    if "building_cache_" in status:
+        try:
+            reading_count = int(status.split("_")[2])
+        except Exception:
+            pass
+
+    if status == "mock_only":
+        message = "Real-time data feed is initializing. Mock data has been excluded."
+        title   = "Awaiting Real-Time Data"
+    elif "building_cache" in status:
+        message = (
+            f"Accumulating real-time readings ({reading_count}/{DATA_MIN_REAL_POINTS} received). "
+            "Signal analysis requires consecutive verified data points."
+        )
+        title = "Building Data Cache"
+    elif "stale" in status:
+        message = "Last real-time reading is older than expected. Waiting for fresh data."
+        title   = "Data Feed Interrupted"
+    else:
+        message = "Live data unavailable. Monitoring paused."
+        title   = "Monitoring Paused"
+
+    return _signal(
+        signal_type=signal_type,
+        sig_type=sig_type,
+        triggered=False,
+        severity="low",
+        confidence=None,
+        title=title,
+        value=None,
+        threshold=None,
+        message=message,
+        impact="Signals will activate automatically once verified data is available.",
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -362,7 +510,28 @@ def compute_risk_score(signals: List[Dict]) -> Tuple[str, int]:
 
 def run_all_signals(prices: List[Dict], forecasts: List[Dict],
                     gas_records: List[Dict]) -> Dict[str, Any]:
-    """Master function — runs all detectors and returns a professional risk snapshot."""
+    """
+    Master function — runs all detectors and returns a professional risk snapshot.
+
+    Task 4/8: Validates data integrity before firing any signal.
+    If data is invalid/unavailable, returns a failsafe response that
+    disables the risk score and shows 'Live data unavailable. Monitoring paused.'
+    """
+    # ── Task 4: Validate data before anything else ────────────────────────────
+    data_valid, data_status = _validate_data(prices)
+
+    logger.info(
+        "[SIGNALS] data_valid=%s data_status=%s prices=%d forecasts=%d gas=%d",
+        data_valid, data_status, len(prices), len(forecasts), len(gas_records)
+    )
+
+    if not data_valid:
+        # Task 8: Return failsafe — no signals, no risk score
+        result = _failsafe_response()
+        result["data_status"] = data_status
+        return result
+
+    # ── Normal path — data is valid ───────────────────────────────────────────
     price_signal   = check_price_volatility(prices)
     weather_signal = check_weather_demand(forecasts)
     gas_signal     = check_gas_supply(gas_records)
@@ -381,6 +550,14 @@ def run_all_signals(prices: List[Dict], forecasts: List[Dict],
     explanation = _generate_explanation(risk_score, all_signals)
     impact      = _generate_impact(risk_score, all_signals)
 
+    # Task 7 — Debug log per signal
+    for sig in all_signals:
+        logger.info(
+            "[SIGNAL DEBUG] type=%s triggered=%s severity=%s value=%s confidence=%s",
+            sig.get("signal_type"), sig.get("triggered"),
+            sig.get("severity"), sig.get("value"), sig.get("confidence")
+        )
+
     return {
         "computed_at":    _utcnow().isoformat(),
         "risk_score":     risk_score,
@@ -388,6 +565,8 @@ def run_all_signals(prices: List[Dict], forecasts: List[Dict],
         "confidence":     confidence,
         "explanation":    explanation,
         "impact":         impact,
+        "data_valid":     True,
+        "data_status":    data_status,
         "signals": {
             "price_volatility": price_signal,
             "weather_demand":   weather_signal,

@@ -28,6 +28,11 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
   const current  = latest?.price_mwh   ?? 0;
   const prev     = previous?.price_mwh ?? current;
 
+  // Source label — show "verified" badge when reading is from live ERCOT CDR
+  const isRealSource    = latest?.source === "ercot_cdr";
+  const hasEnoughData   = prices.length >= 2;
+  const cacheSize       = prices.length;
+
   const { pct, display, reliable } = safePctChange(current, prev);
   const up       = pct !== null ? pct >= 0 : current > prev;
   const outsideNormal = current >= PRICE_HIGH_WARNING;
@@ -62,7 +67,18 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
             ERCOT Price Monitor
           </p>
-          <p className="text-xs text-gray-600 mt-0.5">HB_HOUSTON — Real-time</p>
+          {/* Source verification label */}
+          <p className="text-xs text-gray-600 mt-0.5">
+            {isRealSource
+              ? "HB_HOUSTON — ERCOT Real-Time Market (verified)"
+              : "HB_HOUSTON — Real-time"}
+          </p>
+          {/* Cache-building notice */}
+          {!loading && cacheSize < 2 && (
+            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 text-xs">
+              {cacheSize === 0 ? "Awaiting first reading…" : `${cacheSize}/2 readings — building cache`}
+            </span>
+          )}
           {/* Task 7 — Outside normal range badge */}
           {outsideNormal && (
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/25 text-red-400 text-xs font-semibold">

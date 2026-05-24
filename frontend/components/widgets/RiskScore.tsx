@@ -1,5 +1,5 @@
 "use client";
-import { Activity, ShieldAlert } from "lucide-react";
+import { Activity, WifiOff } from "lucide-react";
 import type { RiskScore as RiskScoreType } from "@/lib/api";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
@@ -8,9 +8,11 @@ interface Props {
   activeSignals:  number;
   computedAt:     string;
   summary:        string;
-  confidence?:    number;
+  confidence?:    number | null;
   explanation?:   string;
   impact?:        string;
+  dataValid?:     boolean;
+  dataStatus?:    string;
 }
 
 const SCORE_CONFIG = {
@@ -22,11 +24,55 @@ const SCORE_CONFIG = {
 const CONFIDENCE_COLOR = (c: number) =>
   c >= 75 ? "text-green-400" : c >= 55 ? "text-amber-400" : "text-gray-500";
 
+function dataStatusLabel(status: string): string {
+  if (status === "mock_only")       return "Real-time feed initializing — mock data excluded";
+  if (status.startsWith("building_cache_")) {
+    const parts = status.split("_");
+    const got   = parts[2] ?? "0";
+    const need  = parts[4] ?? "2";
+    return `Building cache: ${got}/${need} verified readings received`;
+  }
+  if (status.startsWith("stale_"))  return "Data feed interrupted — waiting for fresh reading";
+  if (status === "no_data")         return "No price data received yet";
+  return "Live data unavailable";
+}
+
 export default function RiskScore({
   score, activeSignals, computedAt, summary,
-  confidence, explanation, impact,
+  confidence, explanation, impact, dataValid, dataStatus,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
+
+  // ── Task 8 — Failsafe: data unavailable ─────────────────────────────────
+  if (dataValid === false) {
+    return (
+      <div className="card-glass p-6 border border-white/5">
+        <div className="flex items-start justify-between mb-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+            Texas Energy Risk Score
+          </p>
+          <Activity className="w-5 h-5 text-gray-600" />
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center ring-4 ring-gray-700/40 bg-white/5">
+            <WifiOff className="w-6 h-6 text-gray-500" />
+          </div>
+          <div>
+            <p className="text-lg font-black text-gray-400 tracking-tight">MONITORING PAUSED</p>
+            <p className="text-xs text-gray-600 mt-0.5">Live data unavailable</p>
+          </div>
+        </div>
+        <div className="mt-4 px-3 py-2.5 rounded-lg bg-white/3 border border-white/8 text-xs text-gray-500 leading-relaxed">
+          {dataStatus ? dataStatusLabel(dataStatus) : "Signals will resume automatically once real-time data is confirmed."}
+        </div>
+        <p className="mt-3 text-xs text-gray-600">
+          Last checked {new Date(computedAt).toLocaleTimeString("en-US", {
+            timeZone: "America/Chicago", timeZoneName: "short"
+          })}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("card-glass p-6 border", riskBg(score))}>
@@ -53,7 +99,7 @@ export default function RiskScore({
                 <p className="text-xs text-gray-500">
                   {activeSignals} active risk driver{activeSignals !== 1 ? "s" : ""}
                 </p>
-                {confidence !== undefined && (
+                {confidence != null && (
                   <>
                     <span className="text-gray-700">·</span>
                     <p className={cn("text-xs font-semibold", CONFIDENCE_COLOR(confidence))}>

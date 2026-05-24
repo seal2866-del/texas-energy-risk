@@ -38,9 +38,11 @@ export interface SignalsResponse {
   computed_at:    string;
   risk_score:     RiskScore;
   active_signals: number;
-  confidence:     number;
+  confidence:     number | null;
   explanation:    string;
   impact:         string;
+  data_valid:     boolean;
+  data_status:    string;
   signals: {
     price_volatility: Signal;
     weather_demand:   Signal;
