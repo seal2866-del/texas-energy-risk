@@ -43,7 +43,7 @@ body::before {
   background-repeat:     no-repeat;
   /* Scale slightly to prevent blurred fringe at edges */
   transform:             scale(1.06);
-  filter:                blur(8px) brightness(0.35);
+  filter:                blur(8px) brightness(0.50);
 }
 
 /* ── Layer 2: Dark overlay with blue tint on top of image ────────────────── */
@@ -54,9 +54,9 @@ body::after {
   z-index: -1;
   background: linear-gradient(
     160deg,
-    rgba(5, 10, 22, 0.93) 0%,
-    rgba(8, 15, 32, 0.95) 40%,
-    rgba(6, 12, 26, 0.97) 100%
+    rgba(5, 10, 22, 0.82) 0%,
+    rgba(8, 15, 32, 0.85) 40%,
+    rgba(6, 12, 26, 0.88) 100%
   );
   pointer-events: none;
 }
