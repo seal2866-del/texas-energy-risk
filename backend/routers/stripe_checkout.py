@@ -26,8 +26,8 @@ class _UserInfo:
         self.email = email
 
 
-def _get_user(authorization: str) -> _UserInfo:
-    """Verify the Supabase JWT by calling /auth/v1/user directly.
+async def _get_user(authorization: str) -> _UserInfo:
+    """Verify the Supabase JWT by calling /auth/v1/user directly (async).
     Works with any signing algorithm (HS256, ES256, etc.)."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing token")
@@ -37,14 +37,14 @@ def _get_user(authorization: str) -> _UserInfo:
     service_key  = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
     try:
-        resp = httpx.get(
-            f"{supabase_url}/auth/v1/user",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "apikey": service_key,
-            },
-            timeout=10,
-        )
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{supabase_url}/auth/v1/user",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "apikey": service_key,
+                },
+            )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail=f"Could not reach auth server: {exc}")
 
@@ -61,32 +61,38 @@ async def create_checkout(
     authorization: str = Header(default=""),
 ):
     """Creates a Stripe Checkout session and returns the redirect URL."""
-    user = _get_user(authorization)
+    try:
+        user = await _get_user(authorization)
 
-    # Look up or create Stripe customer
-    sb = get_supabase()
-    sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).limit(1).execute()
-    customer_id = sub.data[0].get("stripe_customer_id") if sub.data else None
+        # Look up or create Stripe customer
+        sb = get_supabase()
+        sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).limit(1).execute()
+        customer_id = sub.data[0].get("stripe_customer_id") if sub.data else None
 
-    if not customer_id:
-        customer = stripe.Customer.create(
-            email=user.email,
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=user.email,
+                metadata={"supabase_user_id": user.id},
+            )
+            customer_id = customer.id
+
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{"price": body.price_id, "quantity": 1}],
+            mode="subscription",
+            success_url=body.success_url,
+            cancel_url=body.cancel_url,
+            customer_update={"address": "auto"},
             metadata={"supabase_user_id": user.id},
         )
-        customer_id = customer.id
 
-    session = stripe.checkout.Session.create(
-        customer=customer_id,
-        payment_method_types=["card"],
-        line_items=[{"price": body.price_id, "quantity": 1}],
-        mode="subscription",
-        success_url=body.success_url,
-        cancel_url=body.cancel_url,
-        customer_update={"address": "auto"},
-        metadata={"supabase_user_id": user.id},
-    )
+        return {"url": session.url}
 
-    return {"url": session.url}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Checkout error: {exc}")
 
 
 @router.post("/create-portal")
@@ -95,15 +101,21 @@ async def create_portal(
     authorization: str = Header(default=""),
 ):
     """Creates a Stripe Billing Portal session so users can manage their subscription."""
-    user = _get_user(authorization)
-    sb = get_supabase()
-    sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).limit(1).execute()
+    try:
+        user = await _get_user(authorization)
+        sb = get_supabase()
+        sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).limit(1).execute()
 
-    if not sub.data or not sub.data[0].get("stripe_customer_id"):
-        raise HTTPException(status_code=404, detail="No Stripe customer found")
+        if not sub.data or not sub.data[0].get("stripe_customer_id"):
+            raise HTTPException(status_code=404, detail="No Stripe customer found")
 
-    session = stripe.billing_portal.Session.create(
-        customer=sub.data["stripe_customer_id"],
-        return_url=return_url,
-    )
-    return {"url": session.url}
+        session = stripe.billing_portal.Session.create(
+            customer=sub.data[0]["stripe_customer_id"],
+            return_url=return_url,
+        )
+        return {"url": session.url}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Portal error: {exc}")
