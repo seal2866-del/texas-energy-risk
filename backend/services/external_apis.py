@@ -237,18 +237,21 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
     try:
         url = "https://api.eia.gov/v2/natural-gas/stor/wkly/data/"
         params = {
-            "api_key":             eia_key,
-            "frequency":           "weekly",
-            "data[0]":             "value",
-            "facets[process][]":   "NG_S_US_NG_TOTAL_WGS_W",
-            "sort[0][column]":     "period",
-            "sort[0][direction]":  "desc",
-            "length":              weeks,
+            "api_key":              eia_key,
+            "frequency":            "weekly",
+            "data[0]":              "value",
+            "facets[duoarea][]":    "NUS",   # National US total
+            "facets[process][]":    "SAT",   # All salt + non-salt (total working gas)
+            "sort[0][column]":      "period",
+            "sort[0][direction]":   "desc",
+            "length":               weeks,
         }
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(url, params=params)
             r.raise_for_status()
-        return _transform_eia(r.json(), weeks)
+        result = _transform_eia(r.json(), weeks)
+        # If EIA returned empty rows, fall back to mock
+        return result if result else mock_data.mock_gas_data(weeks)
     except Exception:
         return mock_data.mock_gas_data(weeks)
 
