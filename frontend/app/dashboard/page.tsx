@@ -79,7 +79,7 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  const EMPTY_SIGNAL = { signal_type: "", triggered: false, severity: "low" as const, value: null, threshold: null, message: "Loading...", computed_at: "" };
+  const EMPTY_SIGNAL = { type: "", signal_type: "", title: "", triggered: false, severity: "low" as const, value: null, threshold: null, message: "Loading...", impact: "", time_horizon: "", confidence: null, computed_at: "" };
 
   return (
     <>
@@ -196,6 +196,31 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+              {/* 6. AI Summary (full width) */}
+              {signals && (
+                <AISummary
+                  summary={signals.summary}
+                  riskScore={signals.risk_score}
+                  disclaimer={signals.disclaimer}
+                  computedAt={signals.computed_at}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
         </div>
       </main>
       <Footer />
