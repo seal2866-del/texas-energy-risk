@@ -144,6 +144,9 @@ export default function DashboardPage() {
                   confidence={signals.confidence}
                   explanation={signals.explanation}
                   impact={signals.impact}
+                  primaryDriver={signals.primary_driver}
+                  riskDirection={signals.risk_direction}
+                  secondaryFactors={signals.secondary_factors}
                   dataValid={signals.data_valid}
                   dataStatus={signals.data_status}
                 />

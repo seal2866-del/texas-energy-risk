@@ -7,7 +7,7 @@ import { formatPrice } from "@/lib/utils";
 interface Props { signal: Signal }
 
 export default function VolatilityAlert({ signal }: Props) {
-  const { triggered, severity, message, value, title, impact, confidence, type } = signal;
+  const { triggered, severity, message, value, title, impact, confidence, time_horizon } = signal;
 
   const isOutsideNormal = !triggered && value !== null && value >= 105; // approaching threshold
 
@@ -104,6 +104,13 @@ export default function VolatilityAlert({ signal }: Props) {
               )}>
                 {confidence}%
               </span>
+            </p>
+          )}
+
+          {/* Task 7 — Time horizon */}
+          {time_horizon && (
+            <p className="mt-2 text-xs text-gray-600 font-mono">
+              {time_horizon}
             </p>
           )}
         </div>

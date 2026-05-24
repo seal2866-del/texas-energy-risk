@@ -82,6 +82,11 @@ export default function WeatherRisk({ forecasts, signal }: Props) {
           {signal.message}
         </div>
       )}
+
+      {/* Task 7 — Time horizon */}
+      {signal.time_horizon && (
+        <p className="mt-3 text-xs text-gray-600 font-mono">{signal.time_horizon}</p>
+      )}
     </div>
   );
 }

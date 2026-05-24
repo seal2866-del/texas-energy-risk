@@ -1,18 +1,21 @@
 "use client";
-import { Activity, WifiOff } from "lucide-react";
+import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap } from "lucide-react";
 import type { RiskScore as RiskScoreType } from "@/lib/api";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
 interface Props {
-  score:          RiskScoreType;
-  activeSignals:  number;
-  computedAt:     string;
-  summary:        string;
-  confidence?:    number | null;
-  explanation?:   string;
-  impact?:        string;
-  dataValid?:     boolean;
-  dataStatus?:    string;
+  score:               RiskScoreType;
+  activeSignals:       number;
+  computedAt:          string;
+  summary:             string;
+  confidence?:         number | null;
+  explanation?:        string;
+  impact?:             string;
+  primaryDriver?:      string;
+  riskDirection?:      "increasing" | "stable" | "decreasing";
+  secondaryFactors?:   string[];
+  dataValid?:          boolean;
+  dataStatus?:         string;
 }
 
 const SCORE_CONFIG = {
@@ -25,25 +28,54 @@ const CONFIDENCE_COLOR = (c: number) =>
   c >= 75 ? "text-green-400" : c >= 55 ? "text-amber-400" : "text-gray-500";
 
 function dataStatusLabel(status: string): string {
-  if (status === "mock_only")       return "Real-time feed initializing — mock data excluded";
+  if (status === "mock_only")              return "Real-time feed initializing — mock data excluded";
   if (status.startsWith("building_cache_")) {
     const parts = status.split("_");
-    const got   = parts[2] ?? "0";
-    const need  = parts[4] ?? "2";
-    return `Building cache: ${got}/${need} verified readings received`;
+    return `Building cache: ${parts[2] ?? "0"}/${parts[4] ?? "2"} verified readings received`;
   }
-  if (status.startsWith("stale_"))  return "Data feed interrupted — waiting for fresh reading";
-  if (status === "no_data")         return "No price data received yet";
+  if (status.startsWith("stale_"))         return "Data feed interrupted — waiting for fresh reading";
+  if (status === "no_data")                return "No price data received yet";
   return "Live data unavailable";
+}
+
+function DirectionBadge({ direction }: { direction: "increasing" | "stable" | "decreasing" }) {
+  const configs = {
+    increasing: {
+      icon:  <TrendingUp className="w-3.5 h-3.5" />,
+      label: "Increasing",
+      cls:   "text-red-400 bg-red-500/10 border-red-500/20",
+    },
+    stable: {
+      icon:  <Minus className="w-3.5 h-3.5" />,
+      label: "Stable",
+      cls:   "text-gray-400 bg-white/5 border-white/10",
+    },
+    decreasing: {
+      icon:  <TrendingDown className="w-3.5 h-3.5" />,
+      label: "Decreasing",
+      cls:   "text-green-400 bg-green-500/10 border-green-500/20",
+    },
+  };
+  const cfg = configs[direction];
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border",
+      cfg.cls
+    )}>
+      {cfg.icon}{cfg.label}
+    </span>
+  );
 }
 
 export default function RiskScore({
   score, activeSignals, computedAt, summary,
-  confidence, explanation, impact, dataValid, dataStatus,
+  confidence, explanation, impact,
+  primaryDriver, riskDirection, secondaryFactors,
+  dataValid, dataStatus,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
 
-  // ── Task 8 — Failsafe: data unavailable ─────────────────────────────────
+  // ── Failsafe: data unavailable ─────────────────────────────────────────────
   if (dataValid === false) {
     return (
       <div className="card-glass p-6 border border-white/5">
@@ -76,6 +108,7 @@ export default function RiskScore({
 
   return (
     <div className={cn("card-glass p-6 border", riskBg(score))}>
+      {/* Header row */}
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">
@@ -90,12 +123,10 @@ export default function RiskScore({
               <span className="text-2xl">{cfg.icon}</span>
             </div>
             <div>
-              {/* Task 5 — Confidence score next to risk label */}
               <p className={cn("text-3xl font-black tracking-tight", riskColor(score))}>
                 {cfg.label}
               </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                {/* Task 7 — "active risk drivers" language */}
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <p className="text-xs text-gray-500">
                   {activeSignals} active risk driver{activeSignals !== 1 ? "s" : ""}
                 </p>
@@ -128,14 +159,44 @@ export default function RiskScore({
         </div>
       </div>
 
-      {/* Task 3 — Dynamic risk explanation by driver */}
+      {/* ── Task 1: Primary Driver ─────────────────────────────────────────── */}
+      {primaryDriver && (
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Primary Driver
+          </span>
+          <span className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border",
+            score === "high"
+              ? "bg-red-500/10 border-red-500/20 text-red-300"
+              : score === "medium"
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-300"
+              : "bg-white/5 border-white/10 text-gray-400"
+          )}>
+            <Zap className="w-3 h-3" />
+            {primaryDriver}
+          </span>
+        </div>
+      )}
+
+      {/* ── Task 2: Risk Direction ─────────────────────────────────────────── */}
+      {riskDirection && (
+        <div className="mt-2.5 flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Risk Direction
+          </span>
+          <DirectionBadge direction={riskDirection} />
+        </div>
+      )}
+
+      {/* ── Task 3: Explanation ────────────────────────────────────────────── */}
       {explanation && (
         <p className="mt-4 text-sm text-gray-200 leading-relaxed font-medium">
           {explanation}
         </p>
       )}
 
-      {/* Task 4 — "Why it matters" */}
+      {/* ── Task 4: Why it matters ─────────────────────────────────────────── */}
       {impact && (
         <div className={cn(
           "mt-3 px-3 py-2 rounded-lg border text-xs leading-relaxed",
@@ -152,11 +213,28 @@ export default function RiskScore({
         </div>
       )}
 
+      {/* ── Task 5: Secondary Factors ─────────────────────────────────────── */}
+      {secondaryFactors && secondaryFactors.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+            Secondary Factors
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {secondaryFactors.map((f, i) => (
+              <span
+                key={i}
+                className="px-2 py-0.5 rounded-full bg-white/5 border border-white/8 text-xs text-gray-500"
+              >
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Fallback summary if no structured fields */}
       {!explanation && (
-        <p className="mt-4 text-sm text-gray-300 leading-relaxed line-clamp-3">
-          {summary}
-        </p>
+        <p className="mt-4 text-sm text-gray-300 leading-relaxed line-clamp-3">{summary}</p>
       )}
 
       <p className="mt-3 text-xs text-gray-600">

@@ -8,6 +8,19 @@ interface Props {
   computedAt:  string;
 }
 
+/**
+ * Splits the structured analyst summary into sentences for cleaner rendering.
+ * The summary format is:
+ *   "Short-term energy risk is X. This is primarily driven by Y. [Context]. Short-term (24–48h) outlook: Z. ..."
+ */
+function parseSummary(text: string): string[] {
+  // Split on sentence boundaries while preserving abbreviations like "24–48h"
+  return text
+    .split(/(?<=\.)\s+(?=[A-Z])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export default function AISummary({ summary, riskScore, disclaimer, computedAt }: Props) {
   const time = new Date(computedAt).toLocaleTimeString("en-US", {
     hour:         "numeric",
@@ -16,6 +29,8 @@ export default function AISummary({ summary, riskScore, disclaimer, computedAt }
     timeZoneName: "short",
   });
 
+  const sentences = parseSummary(summary);
+
   return (
     <div className="card-glass p-6 border border-white/5 col-span-full">
       <div className="flex items-start gap-3">
@@ -23,13 +38,51 @@ export default function AISummary({ summary, riskScore, disclaimer, computedAt }
           <Sparkles className="w-4 h-4 text-violet-400" />
         </div>
         <div className="flex-1">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold text-white">
-              AI-Generated Energy Risk Summary
+              Energy Risk Intelligence Summary
             </p>
             <span className="text-xs text-gray-500">{time}</span>
           </div>
-          <p className="text-sm text-gray-200 leading-relaxed">{summary}</p>
+
+          {sentences.length > 1 ? (
+            <div className="space-y-2">
+              {sentences.map((sentence, i) => {
+                // First sentence: the headline risk level — larger + prominent
+                if (i === 0) {
+                  return (
+                    <p key={i} className="text-sm font-semibold text-white leading-relaxed">
+                      {sentence}
+                    </p>
+                  );
+                }
+                // Outlook sentence (starts with "Short-term") — slightly highlighted
+                if (sentence.startsWith("Short-term (24")) {
+                  return (
+                    <p key={i} className="text-xs text-amber-300/80 leading-relaxed font-medium">
+                      {sentence}
+                    </p>
+                  );
+                }
+                // Disclaimer sentence — de-emphasized
+                if (sentence.includes("situational awareness") || sentence.includes("not a trading")) {
+                  return (
+                    <p key={i} className="text-xs text-gray-600 leading-relaxed">
+                      {sentence}
+                    </p>
+                  );
+                }
+                // All other context sentences
+                return (
+                  <p key={i} className="text-sm text-gray-300 leading-relaxed">
+                    {sentence}
+                  </p>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-200 leading-relaxed">{summary}</p>
+          )}
 
           <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
