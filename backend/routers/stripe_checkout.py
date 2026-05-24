@@ -4,6 +4,7 @@ Creates Stripe Checkout sessions for Pro subscription upgrades.
 """
 import os
 import stripe
+import httpx
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from services.supabase_client import get_supabase
@@ -19,15 +20,39 @@ class CheckoutRequest(BaseModel):
     cancel_url:  str
 
 
-def _get_user(authorization: str):
+class _UserInfo:
+    def __init__(self, id: str, email: str):
+        self.id    = id
+        self.email = email
+
+
+def _get_user(authorization: str) -> _UserInfo:
+    """Verify the Supabase JWT by calling /auth/v1/user directly.
+    Works with any signing algorithm (HS256, ES256, etc.)."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing token")
     token = authorization.split(" ", 1)[1]
-    sb = get_supabase()
+
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    service_key  = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
     try:
-        return sb.auth.get_user(token).user
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        resp = httpx.get(
+            f"{supabase_url}/auth/v1/user",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "apikey": service_key,
+            },
+            timeout=10,
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Could not reach auth server: {exc}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {resp.text}")
+
+    data = resp.json()
+    return _UserInfo(id=data["id"], email=data.get("email", ""))
 
 
 @router.post("/create-checkout")
