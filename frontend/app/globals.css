@@ -1,62 +1,57 @@
+/* @import must be first */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 :root {
   --foreground-rgb: 255, 255, 255;
   --background: #060c1a;
 }
 
-/* ── Body + Background Image ─────────────────────────────────────────────── */
+/* ── Background: html holds the dark fallback, body is transparent ────────── */
 /*
-  The background is layered using a pseudo-element so the image lives
-  completely behind all content. This avoids any repainting cost when
-  cards re-render, and lets us apply blur without affecting child elements.
+  CRITICAL: body must be transparent.
+  If body has a background-color, it paints over ::before and hides the image.
+  The html element provides the dark fallback if the image fails to load.
 */
 
-html, body {
+html {
   min-height: 100%;
+  background-color: var(--background);
 }
 
 body {
   position: relative;
-  background-color: var(--background);
+  min-height: 100vh;
+  background-color: transparent;   /* ← transparent so ::before shows through */
   color: rgb(var(--foreground-rgb));
   font-family: "Inter", system-ui, sans-serif;
   overflow-x: hidden;
 }
 
-/* Task 1-6: Background image layer — pseudo-element keeps blur isolated */
+/* ── Layer 1: Background image (blurred, dimmed) ─────────────────────────── */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
-
-  /* Task 1: The image itself */
-  background-image: url("/grid-bg.jpg");
-
-  /* Task 5: Full coverage on all screen sizes */
-  background-size:     cover;
-  background-position: center;
-  background-repeat:   no-repeat;
-  background-attachment: fixed;
-
-  /* Task 3: Blur to remove sharp detail, add depth */
-  /* Scale up slightly to prevent blurred edges at boundary */
-  filter: blur(8px) brightness(0.35);
-  transform: scale(1.05);
+  z-index: -2;
+  background-image:      url("/grid-bg.jpg");
+  background-size:       cover;
+  background-position:   center;
+  background-repeat:     no-repeat;
+  /* Scale slightly to prevent blurred fringe at edges */
+  transform:             scale(1.06);
+  filter:                blur(8px) brightness(0.35);
 }
 
-/* Task 2 + 6: Dark overlay with blue tint — layered on top of image */
+/* ── Layer 2: Dark overlay with blue tint on top of image ────────────────── */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
-  /* Deep navy base + slight blue tint gradient from bottom */
   background: linear-gradient(
     160deg,
     rgba(5, 10, 22, 0.93) 0%,
@@ -67,32 +62,27 @@ body::after {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar       { width: 6px; }
 ::-webkit-scrollbar-track { background: #060c1a; }
 ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
 
-/* ── Task 7: Glass card — improved depth + contrast against bg ───────────── */
-/*
-  Cards need to read as "elevated" elements above the dark background.
-  We increase background opacity slightly and add a subtle shadow.
-*/
+/* ── Glass cards — elevated above the background ─────────────────────────── */
 .card-glass {
-  background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  backdrop-filter: blur(16px) saturate(120%);
+  background:              rgba(255, 255, 255, 0.055);
+  border:                  1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter:         blur(16px) saturate(120%);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
-  border-radius: 12px;
-  /* Subtle elevation shadow — gives cards a lifted feel */
+  border-radius:           12px;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 4px 16px rgba(0, 0, 0, 0.3),
+    0 1px 2px  rgba(0, 0, 0, 0.45),
+    0 4px 16px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* Pulse animation for active alerts */
 @keyframes pulse-ring {
-  0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-  70%  { transform: scale(1);    box-shadow: 0 0 0 8px rgba(239,68,68,0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  0%   { transform: scale(0.95); box-shadow: 0 0 0 0  rgba(239, 68, 68, 0.5); }
+  70%  { transform: scale(1);    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);   }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0  rgba(239, 68, 68, 0);   }
 }
 .alert-pulse { animation: pulse-ring 2s infinite; }
