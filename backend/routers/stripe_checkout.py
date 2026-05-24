@@ -65,8 +65,8 @@ async def create_checkout(
 
     # Look up or create Stripe customer
     sb = get_supabase()
-    sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).maybe_single().execute()
-    customer_id = sub.data.get("stripe_customer_id") if sub.data else None
+    sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).limit(1).execute()
+    customer_id = sub.data[0].get("stripe_customer_id") if sub.data else None
 
     if not customer_id:
         customer = stripe.Customer.create(
@@ -97,9 +97,9 @@ async def create_portal(
     """Creates a Stripe Billing Portal session so users can manage their subscription."""
     user = _get_user(authorization)
     sb = get_supabase()
-    sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).maybe_single().execute()
+    sub = sb.table("subscriptions").select("stripe_customer_id").eq("user_id", user.id).limit(1).execute()
 
-    if not sub.data or not sub.data.get("stripe_customer_id"):
+    if not sub.data or not sub.data[0].get("stripe_customer_id"):
         raise HTTPException(status_code=404, detail="No Stripe customer found")
 
     session = stripe.billing_portal.Session.create(
