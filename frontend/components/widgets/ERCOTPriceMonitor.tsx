@@ -74,15 +74,21 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
         <div className="text-right">
           {loading ? (
             <div className="h-8 w-24 bg-white/5 rounded animate-pulse" />
+          ) : cacheSize === 0 ? (
+            <p className="text-2xl font-black text-gray-500">
+              &mdash;<span className="text-sm font-normal text-gray-600">/MWh</span>
+            </p>
           ) : (
             <>
               <p className={`text-2xl font-black ${outsideNormal ? "text-red-400" : "text-white"}`}>
                 {formatPrice(current)}<span className="text-sm font-normal text-gray-400">/MWh</span>
               </p>
-              <div className={`flex items-center justify-end gap-1 text-xs mt-0.5 ${!reliable ? "text-amber-400" : up ? "text-green-400" : "text-red-400"}`}>
-                {!reliable ? <Minus className="w-3 h-3" /> : up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {display}
-              </div>
+              {reliable && (
+                <div className={`flex items-center justify-end gap-1 text-xs mt-0.5 ${up ? "text-green-400" : "text-red-400"}`}>
+                  {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  {display}
+                </div>
+              )}
             </>
           )}
         </div>

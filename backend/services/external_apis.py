@@ -81,20 +81,45 @@ _ERCOT_HEADERS = {
 
 
 def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
-    pattern = rf'{re.escape(settlement_point)}[^<]*</td>\s*<td[^>]*>\s*([\d.]+)'
-    match   = re.search(pattern, html, re.IGNORECASE)
-    if match:
-        try:
-            return float(match.group(1))
-        except ValueError:
-            pass
-    pattern2 = rf'{re.escape(settlement_point)}[^\d\n]*?([\d]+\.[\d]+)'
-    match2   = re.search(pattern2, html)
-    if match2:
-        try:
-            return float(match2.group(1))
-        except ValueError:
-            pass
+    if not html or len(html) < 100:
+        logger.warning("[ERCOT] Response too short (%d chars) -- likely an error page", len(html))
+        return None
+
+    # Log a preview for Railway diagnostics
+    preview = html[:400].replace("\n", " ").replace("\r", "")
+    logger.info("[ERCOT] HTML preview (first 400): %s", preview)
+
+    # Pattern 1: standard CDR table  <td>HB_HOUSTON</td><td>45.23</td>
+    p1 = rf'{re.escape(settlement_point)}[^<]*</td>\s*<td[^>]*>\s*([\d]+\.[\d]+)'
+    m1 = re.search(p1, html, re.IGNORECASE)
+    if m1:
+        val = float(m1.group(1))
+        if val > 0:
+            logger.info("[ERCOT] Pattern1 matched %s = %.2f", settlement_point, val)
+            return val
+
+    # Pattern 2: value appears anywhere near the settlement point name
+    p2 = rf'{re.escape(settlement_point)}[^0-9\n]{{0,80}}?([\d]{{1,6}}\.[\d]{{2}})'
+    m2 = re.search(p2, html, re.IGNORECASE | re.DOTALL)
+    if m2:
+        val = float(m2.group(1))
+        if val > 0.5:          # ignore 0.00 false positives
+            logger.info("[ERCOT] Pattern2 matched %s = %.2f", settlement_point, val)
+            return val
+
+    # Pattern 3: JSON-style  "HB_HOUSTON": 45.23  or  "price": 45.23 near the name
+    p3 = rf'{re.escape(settlement_point)}[^}}]{{0,120}}"(?:price|value|lmp)"[^0-9]{{0,20}}([\d]+\.[\d]+)'
+    m3 = re.search(p3, html, re.IGNORECASE | re.DOTALL)
+    if m3:
+        val = float(m3.group(1))
+        if val > 0.5:
+            logger.info("[ERCOT] Pattern3 (JSON) matched %s = %.2f", settlement_point, val)
+            return val
+
+    logger.warning(
+        "[ERCOT] No pattern matched for %s -- HTML snippet: %s",
+        settlement_point, html[:300].replace("\n", " ")
+    )
     return None
 
 
@@ -122,9 +147,15 @@ async def fetch_ercot_prices(
         return mock_data.mock_ercot_prices(hours, settlement_point)
 
     try:
-        async with httpx.AsyncClient(timeout=15, headers=_ERCOT_HEADERS) as client:
+        async with httpx.AsyncClient(timeout=15, headers=_ERCOT_HEADERS, follow_redirects=True) as client:
             r = await client.get(ERCOT_CDR_URL)
-            r.raise_for_status()
+
+        logger.info("[ERCOT] CDR response: status=%d content-type=%s length=%d",
+                    r.status_code, r.headers.get("content-type", "?"), len(r.text))
+
+        if r.status_code != 200:
+            logger.warning("[ERCOT] Non-200 status %d -- returning cache", r.status_code)
+            return _get_cached_prices(settlement_point)
 
         live_price = _parse_ercot_cdr(r.text, settlement_point)
 
