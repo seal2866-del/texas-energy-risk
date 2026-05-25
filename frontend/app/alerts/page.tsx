@@ -87,20 +87,46 @@ function RiskBadge({ level }: { level: string }) {
 
 function SamplePreview() {
   return (
-    <div className="card-glass border border-white/8 rounded-xl p-5 mb-4 opacity-75">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sample Alert Preview</p>
-      <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-4 text-xs space-y-2">
-        <p className="font-bold text-amber-300">TX Energy Risk Alert: Medium Risk Detected</p>
-        <p className="text-gray-400">Short-term Texas energy risk has increased. Primary driver: Weather-driven demand pressure.</p>
-        <div className="grid grid-cols-2 gap-1 text-gray-500 mt-2">
-          <span>Location: Houston</span>
-          <span>Confidence: 72%</span>
-          <span>ERCOT price: $33.10/MWh</span>
-          <span>Forecast high: 98°F</span>
+    <div className="card-glass border border-white/8 rounded-xl overflow-hidden mb-4">
+      <div className="px-5 py-3 border-b border-white/5 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sample Alert — what you will receive</p>
+      </div>
+      <div className="p-5">
+        {/* Email preview card */}
+        <div className="border border-amber-500/25 bg-amber-500/5 rounded-xl overflow-hidden">
+          {/* Email header */}
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 flex items-center gap-2.5">
+            <span className="text-base">⚡</span>
+            <div>
+              <p className="text-xs font-bold text-amber-300 leading-none">TX Energy Risk Alert</p>
+              <p className="text-xs text-amber-400/60 mt-0.5">alerts@txenergyrisk.com</p>
+            </div>
+          </div>
+          {/* Email body */}
+          <div className="px-4 py-4 space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold">⚠ MEDIUM RISK DETECTED</span>
+              <span className="text-xs text-gray-500">Short-term (0–6h) · Houston</span>
+            </div>
+            <p className="text-sm text-gray-200 leading-relaxed">
+              Texas energy risk increased from <span className="text-green-400 font-semibold">Low</span> to <span className="text-amber-400 font-semibold">Medium</span>. Weather-driven demand pressure is the primary driver.
+            </p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs border-t border-white/5 pt-3">
+              <span className="text-gray-500">Primary driver: <span className="text-gray-300">High temp demand</span></span>
+              <span className="text-gray-500">Confidence: <span className="text-gray-300">72%</span></span>
+              <span className="text-gray-500">ERCOT price: <span className="text-gray-300">$33.10/MWh</span></span>
+              <span className="text-gray-500">Forecast high: <span className="text-gray-300">98°F</span></span>
+            </div>
+            <div className="bg-amber-500/8 border border-amber-500/15 rounded-lg px-3 py-2.5">
+              <p className="text-xs text-amber-300/80 font-semibold uppercase tracking-wide mb-1">Why this matters</p>
+              <p className="text-xs text-gray-400 leading-relaxed">Elevated temperatures may increase grid load and introduce pricing uncertainty over the next 6–24 hours.</p>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <span className="inline-block px-3 py-1.5 bg-orange-500/20 border border-orange-500/30 rounded text-xs text-orange-400 font-semibold">View Dashboard →</span>
+            </div>
+          </div>
         </div>
-        <p className="text-gray-600 italic border-t border-white/5 pt-2 mt-2">
-          TX Energy Risk provides informational analytics only. Not investment advice.
-        </p>
       </div>
     </div>
   );
@@ -354,15 +380,15 @@ export default function AlertsPage() {
               {!isPro && (
                 <>
                   <SamplePreview />
-                  <div className="card-glass border border-amber-500/20 bg-amber-500/5 rounded-xl p-5 flex items-start gap-3">
-                    <Lock className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="card-glass border border-orange-500/20 bg-orange-500/5 rounded-xl p-5 flex items-start gap-3">
+                    <Bell className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-semibold text-amber-300 mb-1">Pro plan required for live alerts</p>
+                      <p className="text-sm font-bold text-white mb-1">Don&apos;t miss critical energy risk shifts</p>
                       <p className="text-xs text-gray-400 leading-relaxed mb-3">
-                        Real-time alerts are available on the Pro plan. You can configure preferences now — they activate when you upgrade.
+                        Get real-time alerts when market conditions change — before they impact cost. Configure your preferences now and they activate the moment you upgrade.
                       </p>
-                      <Link href="/pricing" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-semibold hover:bg-orange-500/20 transition-all">
-                        View Pro Plan <ChevronRight className="w-3 h-3" />
+                      <Link href="/pricing" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all">
+                        Unlock Real-Time Alerts <ChevronRight className="w-3 h-3" />
                       </Link>
                     </div>
                   </div>
@@ -513,10 +539,10 @@ export default function AlertsPage() {
                 <p className="text-xs text-gray-500 mb-3">Choose which risk drivers trigger alerts for you.</p>
                 <div className="space-y-3">
                   {[
-                    { key: "price_volatility_alert", icon: <Zap className="w-4 h-4 text-amber-400" />,         label: "ERCOT volatility",         desc: "Alerts when ERCOT Hub prices are abnormally volatile" },
-                    { key: "weather_demand_alert",   icon: <CloudLightning className="w-4 h-4 text-blue-400" />, label: "Weather demand pressure",  desc: "Alerts when temperature extremes drive grid demand risk" },
-                    { key: "gas_supply_alert",       icon: <Flame className="w-4 h-4 text-orange-400" />,       label: "Natural gas supply",       desc: "Alerts when gas storage drops below seasonal average" },
-                    { key: "data_source_alert",      icon: <Database className="w-4 h-4 text-gray-400" />,      label: "Data source degradation",  desc: "Informational notice when a data source becomes stale" },
+                    { key: "price_volatility_alert", icon: <Zap className="w-4 h-4 text-amber-400" />,         label: "ERCOT price instability",           desc: "Alert when Hub prices show abnormal volatility — early warning of cost exposure" },
+                    { key: "weather_demand_alert",   icon: <CloudLightning className="w-4 h-4 text-blue-400" />, label: "High temperature demand pressure",  desc: "Alert when heat or cold drives elevated grid load and pricing risk" },
+                    { key: "gas_supply_alert",       icon: <Flame className="w-4 h-4 text-orange-400" />,       label: "Natural gas supply tightening",     desc: "Alert when storage falls below seasonal average, increasing supply pressure" },
+                    { key: "data_source_alert",      icon: <Database className="w-4 h-4 text-gray-400" />,      label: "Data reliability issues",           desc: "Informational notice when a data feed becomes stale or unavailable" },
                   ].map(({ key, icon, label, desc }) => (
                     <div key={key} className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
@@ -544,9 +570,15 @@ export default function AlertsPage() {
                   </h2>
                   <Toggle on={prefs.quiet_hours_enabled} onToggle={() => set("quiet_hours_enabled", !prefs.quiet_hours_enabled)} />
                 </div>
-                <p className="text-xs text-gray-500 mb-4">
-                  Pause non-critical alerts during specified hours. <span className="text-amber-400">High Risk alerts always bypass quiet hours.</span>
+                <p className="text-xs text-gray-500 mb-1">
+                  Pause non-critical alerts during off hours.
                 </p>
+                <div className="mb-4 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/8 border border-amber-500/15">
+                  <span className="text-amber-400 text-xs mt-0.5">⚡</span>
+                  <p className="text-xs text-amber-300/80 leading-relaxed">
+                    <span className="font-semibold">High-risk alerts are always delivered</span> — quiet hours only suppress Medium and Low risk notifications.
+                  </p>
+                </div>
                 {prefs.quiet_hours_enabled && (
                   <div className="flex items-center gap-4 flex-wrap">
                     <div>
@@ -570,6 +602,29 @@ export default function AlertsPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* What triggers an alert */}
+              <div className="card-glass border border-white/5 rounded-xl p-5">
+                <h2 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                  <Info className="w-4 h-4 text-gray-400" />
+                  What triggers an alert?
+                </h2>
+                <div className="space-y-2">
+                  {[
+                    { dot: "bg-red-500",   text: "Risk level increases — Low→Medium, Medium→High, or Low→High" },
+                    { dot: "bg-amber-500", text: "A new primary risk driver appears (e.g. weather replaces ERCOT as the dominant signal)" },
+                    { dot: "bg-blue-500",  text: "Data reliability changes — a key data source becomes stale or unavailable" },
+                  ].map(({ dot, text }, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${dot}`} />
+                      <p className="text-xs text-gray-400 leading-relaxed">{text}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-gray-600 leading-relaxed border-t border-white/5 pt-3">
+                  Duplicate alerts are suppressed: the same risk level and driver will not re-alert within 60 minutes (30 minutes for High Risk).
+                </p>
               </div>
 
               {/* Compliance */}
