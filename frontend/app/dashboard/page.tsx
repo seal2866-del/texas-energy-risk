@@ -22,7 +22,6 @@ import {
 const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
 type Location = typeof LOCATIONS[number];
 
-// ── Placeholder signal used when real data hasn't arrived yet ─────────────────
 const EMPTY_SIGNAL = {
   type: "", signal_type: "", title: "Loading...", triggered: false,
   severity: "low" as const, value: null, threshold: null,
@@ -30,6 +29,7 @@ const EMPTY_SIGNAL = {
   confidence: null, computed_at: "",
 };
 
+// Full placeholder — every field the widgets touch, so nothing crashes before real data arrives
 const PLACEHOLDER_SIGNALS: SignalsResponse = {
   computed_at:          "",
   risk_score:           "low",
@@ -42,7 +42,10 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
   primary_driver:       "",
   primary_driver_type:  "",
   risk_direction:       "stable",
+  risk_direction_context: "",
+  market_context:       "",
   secondary_factors:    [],
+  signal_drivers:       [],
   data_valid:           false,
   data_status:          "loading",
   time_horizons:        { short_term: "", near_term: "", outlook: "" },
@@ -51,6 +54,15 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
     noaa:  { status: "unavailable", last_updated: null, age_minutes: null },
     eia:   { status: "unavailable", last_updated: null, age_minutes: null },
   },
+  demand_pressure:   { level: "low", explanation: "Loading..." },
+  supply_pressure:   { level: "low", explanation: "Loading..." },
+  market_reaction:   { level: "low", explanation: "Loading..." },
+  gas_to_power_impact: { level: "low", explanation: "Loading..." },
+  events:            [],
+  risk_narrative:    { headline: "Loading...", body: "", temporal_context: "", next_period_note: "" },
+  cost_impact:       { level: "low", label: "Loading", description: "" },
+  market_condition:  { label: "Loading...", description: "" },
+  alert_severity:    { level: "informational", label: "Loading", description: "" },
   signals: {
     price_volatility: EMPTY_SIGNAL,
     weather_demand:   EMPTY_SIGNAL,
@@ -65,7 +77,6 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   const score   = signals.risk_score;
   const driver  = signals.primary_driver;
   const drivers = (signals.signal_drivers ?? []).filter(d => d.active).map(d => d.name);
-
   if (score === "high") {
     const driverList = drivers.length > 0 ? drivers.join(", ") : driver;
     return (
@@ -86,28 +97,27 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   return (
     <div className="mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400">
       <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-      <span><span className="font-bold">Conditions Stable:</span> No significant risk signals detected. All monitored drivers are within normal range.</span>
+      <span><span className="font-bold">Conditions Stable:</span> No significant risk signals detected.</span>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  const router     = useRouter();
-  const [user,     setUser]     = useState<any>(null);
+  const router    = useRouter();
+  const [user,    setUser]    = useState<any>(null);
   const [location, setLocation] = useState<Location>("Houston");
 
-  // signals starts as PLACEHOLDER so widgets always render — never a blank screen
-  const [signals,       setSignals]       = useState<SignalsResponse>(PLACEHOLDER_SIGNALS);
-  const [signalsReady,  setSignalsReady]  = useState(false);
-  const [signalsError,  setSignalsError]  = useState(false);
-  const [prices,        setPrices]        = useState<ERCOTPrice[]>([]);
-  const [forecasts,     setForecasts]     = useState<WeatherForecast[]>([]);
-  const [gasRecs,       setGasRecs]       = useState<GasRecord[]>([]);
-  const [gasLatest,     setGasLatest]     = useState<GasRecord | null>(null);
+  const [signals,      setSignals]      = useState<SignalsResponse>(PLACEHOLDER_SIGNALS);
+  const [signalsReady, setSignalsReady] = useState(false);
+  const [signalsError, setSignalsError] = useState(false);
+  const [prices,       setPrices]       = useState<ERCOTPrice[]>([]);
+  const [forecasts,    setForecasts]    = useState<WeatherForecast[]>([]);
+  const [gasRecs,      setGasRecs]      = useState<GasRecord[]>([]);
+  const [gasLatest,    setGasLatest]    = useState<GasRecord | null>(null);
 
-  const [loading,      setLoading]      = useState(true);
-  const [refreshing,   setRefreshing]   = useState(false);
-  const [lastUpdated,  setLastUpdated]  = useState<Date | null>(null);
+  const [loading,    setLoading]    = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -119,7 +129,6 @@ export default function DashboardPage() {
   const fetchAll = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     else setRefreshing(true);
-
     try {
       const [sigData, priceData, wxData, gasData] = await Promise.allSettled([
         getSignals(location),
@@ -127,17 +136,14 @@ export default function DashboardPage() {
         getWeatherForecast(location, 7),
         getGasData(8),
       ]);
-
       if (sigData.status === "fulfilled") {
         setSignals(sigData.value);
         setSignalsReady(true);
         setSignalsError(false);
       } else {
-        // Keep placeholder — widgets still render, just show "unavailable" state
         setSignalsError(true);
         console.warn("[Dashboard] signals fetch failed:", sigData.reason);
       }
-
       if (priceData.status === "fulfilled") setPrices(priceData.value.prices);
       if (wxData.status    === "fulfilled") setForecasts(wxData.value.forecasts);
       if (gasData.status   === "fulfilled") {
@@ -152,7 +158,6 @@ export default function DashboardPage() {
   }, [location]);
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
-
   useEffect(() => {
     const id = setInterval(() => fetchAll(true), 5 * 60 * 1000);
     return () => clearInterval(id);
@@ -166,7 +171,6 @@ export default function DashboardPage() {
       <main className="pt-24 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
               <h1 className="text-2xl font-black text-white">Texas Energy Intelligence Platform</h1>
@@ -198,10 +202,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Urgency banner — only when real data is loaded */}
           {signalsReady && <UrgencyBanner signals={signals} />}
 
-          {/* Signals error notice */}
           {signalsError && !loading && (
             <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400">
               <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
@@ -209,7 +211,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Disclaimer */}
           <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/60 text-center">
             TX Energy Risk provides informational analytics and market intelligence only. This does not constitute investment, trading, financial, legal, or procurement advice. Users are responsible for their own decisions.
           </div>
@@ -223,7 +224,6 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              {/* 1. Risk Score — always shown, placeholder when loading */}
               <RiskScore
                 score={signals.risk_score}
                 activeSignals={signals.active_signals}
@@ -246,19 +246,15 @@ export default function DashboardPage() {
                 alertSeverity={signals.alert_severity}
               />
 
-              {/* 2. ERCOT Price Monitor */}
               <ERCOTPriceMonitor prices={prices} />
 
-              {/* 3. Volatility Alert */}
               <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
 
-              {/* 4. Weather Demand Risk */}
               <WeatherRisk
                 forecasts={forecasts}
                 signal={signals.signals?.weather_demand ?? EMPTY_SIGNAL}
               />
 
-              {/* 5. Gas Supply */}
               <GasSupply
                 records={gasRecs}
                 latest={gasLatest}
@@ -266,19 +262,15 @@ export default function DashboardPage() {
                 gasToPower={signals.gas_to_power_impact}
               />
 
-              {/* 6. Energy Risk Drivers */}
               <EnergyRiskDrivers signals={signals} />
 
-              {/* 7. Data Sources */}
               <DataSources
                 sources={signals.data_sources}
                 computedAt={signals.computed_at}
               />
 
-              {/* 8. Recent Alerts (full width) */}
               <RecentAlerts />
 
-              {/* 9. AI Intelligence Summary (full width) */}
               <AISummary
                 signals={signals}
                 computedAt={signals.computed_at}
