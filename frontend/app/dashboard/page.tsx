@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle } from "lucide-react";
+import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import RiskScore from "@/components/widgets/RiskScore";
@@ -21,6 +21,44 @@ import {
 
 const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
 type Location = typeof LOCATIONS[number];
+
+// ── Placeholder signal used when real data hasn't arrived yet ─────────────────
+const EMPTY_SIGNAL = {
+  type: "", signal_type: "", title: "Loading...", triggered: false,
+  severity: "low" as const, value: null, threshold: null,
+  message: "Fetching real-time data...", impact: "", time_horizon: "",
+  confidence: null, computed_at: "",
+};
+
+const PLACEHOLDER_SIGNALS: SignalsResponse = {
+  computed_at:          "",
+  risk_score:           "low",
+  risk_headline:        "Loading risk data...",
+  active_signals:       0,
+  confidence:           null,
+  confidence_note:      "",
+  explanation:          "",
+  impact:               "",
+  primary_driver:       "",
+  primary_driver_type:  "",
+  risk_direction:       "stable",
+  secondary_factors:    [],
+  data_valid:           false,
+  data_status:          "loading",
+  time_horizons:        { short_term: "", near_term: "", outlook: "" },
+  data_sources: {
+    ercot: { status: "unavailable", last_updated: null, age_minutes: null },
+    noaa:  { status: "unavailable", last_updated: null, age_minutes: null },
+    eia:   { status: "unavailable", last_updated: null, age_minutes: null },
+  },
+  signals: {
+    price_volatility: EMPTY_SIGNAL,
+    weather_demand:   EMPTY_SIGNAL,
+    gas_supply:       EMPTY_SIGNAL,
+  },
+  summary:    "",
+  disclaimer: "",
+};
 
 function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   if (!signals.data_valid) return null;
@@ -58,15 +96,18 @@ export default function DashboardPage() {
   const [user,     setUser]     = useState<any>(null);
   const [location, setLocation] = useState<Location>("Houston");
 
-  const [signals,    setSignals]    = useState<SignalsResponse | null>(null);
-  const [prices,     setPrices]     = useState<ERCOTPrice[]>([]);
-  const [forecasts,  setForecasts]  = useState<WeatherForecast[]>([]);
-  const [gasRecs,    setGasRecs]    = useState<GasRecord[]>([]);
-  const [gasLatest,  setGasLatest]  = useState<GasRecord | null>(null);
+  // signals starts as PLACEHOLDER so widgets always render — never a blank screen
+  const [signals,       setSignals]       = useState<SignalsResponse>(PLACEHOLDER_SIGNALS);
+  const [signalsReady,  setSignalsReady]  = useState(false);
+  const [signalsError,  setSignalsError]  = useState(false);
+  const [prices,        setPrices]        = useState<ERCOTPrice[]>([]);
+  const [forecasts,     setForecasts]     = useState<WeatherForecast[]>([]);
+  const [gasRecs,       setGasRecs]       = useState<GasRecord[]>([]);
+  const [gasLatest,     setGasLatest]     = useState<GasRecord | null>(null);
 
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [refreshing,   setRefreshing]   = useState(false);
+  const [lastUpdated,  setLastUpdated]  = useState<Date | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -78,6 +119,7 @@ export default function DashboardPage() {
   const fetchAll = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     else setRefreshing(true);
+
     try {
       const [sigData, priceData, wxData, gasData] = await Promise.allSettled([
         getSignals(location),
@@ -85,7 +127,17 @@ export default function DashboardPage() {
         getWeatherForecast(location, 7),
         getGasData(8),
       ]);
-      if (sigData.status   === "fulfilled") setSignals(sigData.value);
+
+      if (sigData.status === "fulfilled") {
+        setSignals(sigData.value);
+        setSignalsReady(true);
+        setSignalsError(false);
+      } else {
+        // Keep placeholder — widgets still render, just show "unavailable" state
+        setSignalsError(true);
+        console.warn("[Dashboard] signals fetch failed:", sigData.reason);
+      }
+
       if (priceData.status === "fulfilled") setPrices(priceData.value.prices);
       if (wxData.status    === "fulfilled") setForecasts(wxData.value.forecasts);
       if (gasData.status   === "fulfilled") {
@@ -107,13 +159,6 @@ export default function DashboardPage() {
   }, [fetchAll]);
 
   if (!user) return null;
-
-  const EMPTY_SIGNAL = {
-    type: "", signal_type: "", title: "", triggered: false,
-    severity: "low" as const, value: null, threshold: null,
-    message: "Loading...", impact: "", time_horizon: "",
-    confidence: null, computed_at: "",
-  };
 
   return (
     <>
@@ -153,8 +198,16 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Urgency banner */}
-          {signals && <UrgencyBanner signals={signals} />}
+          {/* Urgency banner — only when real data is loaded */}
+          {signalsReady && <UrgencyBanner signals={signals} />}
+
+          {/* Signals error notice */}
+          {signalsError && !loading && (
+            <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400">
+              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+              Risk signals are loading — retrying automatically. ERCOT prices are live.
+            </div>
+          )}
 
           {/* Disclaimer */}
           <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/60 text-center">
@@ -170,80 +223,66 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              {/* 1. Risk Score */}
-              {signals && (
-                <RiskScore
-                  score={signals.risk_score}
-                  activeSignals={signals.active_signals}
-                  computedAt={signals.computed_at}
-                  summary={signals.summary}
-                  confidence={signals.confidence}
-                  confidenceNote={signals.confidence_note}
-                  explanation={signals.explanation}
-                  impact={signals.impact}
-                  primaryDriver={signals.primary_driver}
-                  riskDirection={signals.risk_direction}
-                  riskDirectionContext={signals.risk_direction_context}
-                  signalDrivers={signals.signal_drivers}
-                  secondaryFactors={signals.secondary_factors}
-                  dataValid={signals.data_valid}
-                  dataStatus={signals.data_status}
-                  riskHeadline={signals.risk_headline}
-                  timeHorizons={signals.time_horizons}
-                  marketCondition={signals.market_condition}
-                  alertSeverity={signals.alert_severity}
-                />
-              )}
+              {/* 1. Risk Score — always shown, placeholder when loading */}
+              <RiskScore
+                score={signals.risk_score}
+                activeSignals={signals.active_signals}
+                computedAt={signals.computed_at}
+                summary={signals.summary}
+                confidence={signals.confidence}
+                confidenceNote={signals.confidence_note}
+                explanation={signals.explanation}
+                impact={signals.impact}
+                primaryDriver={signals.primary_driver}
+                riskDirection={signals.risk_direction}
+                riskDirectionContext={signals.risk_direction_context}
+                signalDrivers={signals.signal_drivers}
+                secondaryFactors={signals.secondary_factors}
+                dataValid={signals.data_valid}
+                dataStatus={signals.data_status}
+                riskHeadline={signals.risk_headline}
+                timeHorizons={signals.time_horizons}
+                marketCondition={signals.market_condition}
+                alertSeverity={signals.alert_severity}
+              />
 
               {/* 2. ERCOT Price Monitor */}
               <ERCOTPriceMonitor prices={prices} />
 
               {/* 3. Volatility Alert */}
-              {signals && (
-                <VolatilityAlert signal={signals.signals.price_volatility ?? EMPTY_SIGNAL} />
-              )}
+              <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
 
               {/* 4. Weather Demand Risk */}
-              {signals && (
-                <WeatherRisk
-                  forecasts={forecasts}
-                  signal={signals.signals.weather_demand ?? EMPTY_SIGNAL}
-                />
-              )}
+              <WeatherRisk
+                forecasts={forecasts}
+                signal={signals.signals?.weather_demand ?? EMPTY_SIGNAL}
+              />
 
               {/* 5. Gas Supply */}
-              {signals && (
-                <GasSupply
-                  records={gasRecs}
-                  latest={gasLatest}
-                  signal={signals.signals.gas_supply ?? EMPTY_SIGNAL}
-                  gasToPower={signals.gas_to_power_impact}
-                />
-              )}
+              <GasSupply
+                records={gasRecs}
+                latest={gasLatest}
+                signal={signals.signals?.gas_supply ?? EMPTY_SIGNAL}
+                gasToPower={signals.gas_to_power_impact}
+              />
 
-              {/* 6. Energy Risk Drivers panel */}
-              {signals && (
-                <EnergyRiskDrivers signals={signals} />
-              )}
+              {/* 6. Energy Risk Drivers */}
+              <EnergyRiskDrivers signals={signals} />
 
               {/* 7. Data Sources */}
-              {signals && signals.data_sources && (
-                <DataSources
-                  sources={signals.data_sources}
-                  computedAt={signals.computed_at}
-                />
-              )}
+              <DataSources
+                sources={signals.data_sources}
+                computedAt={signals.computed_at}
+              />
 
               {/* 8. Recent Alerts (full width) */}
               <RecentAlerts />
 
               {/* 9. AI Intelligence Summary (full width) */}
-              {signals && (
-                <AISummary
-                  signals={signals}
-                  computedAt={signals.computed_at}
-                />
-              )}
+              <AISummary
+                signals={signals}
+                computedAt={signals.computed_at}
+              />
 
             </div>
           )}
