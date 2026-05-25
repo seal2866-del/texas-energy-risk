@@ -47,7 +47,7 @@ export default function LandingPage() {
   return (
     <>
       <Navbar />
-      <main className="pt-20 min-h-screen">
+      <main className="pt-24 min-h-screen">
 
         {/* Hero */}
         <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-24 text-center">

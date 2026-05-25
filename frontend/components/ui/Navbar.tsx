@@ -40,7 +40,7 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0f1e]/90 backdrop-blur-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-24">
 
           {/* Logo */}
           <Link href="/" className="flex items-center">
@@ -49,7 +49,7 @@ export default function Navbar() {
               alt="TX Energy Risk"
               width={500}
               height={280}
-              className="h-14 w-auto object-contain"
+              className="h-20 w-auto object-contain"
               priority
             />
           </Link>
