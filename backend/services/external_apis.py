@@ -361,24 +361,31 @@ def _transform_noaa(data: dict, location: str, days: int) -> List[Dict[str, Any]
 
 EIA_GAS_URL    = "https://api.eia.gov/v2/natural-gas/stor/wkly/data/"
 EIA_V1_URL     = "https://api.eia.gov/series/"
-# Total US working gas in underground storage: NG.NUS_EPG0_SS6_NUS_BCF.W
-EIA_V1_SERIES  = "NG.NUS_EPG0_SS6_NUS_BCF.W"
+# Total US working gas in underground storage (EIA v1 series IDs to try)
+EIA_V1_SERIES_IDS = [
+    "NG.NUS_EPG0_SWO_NUS_BCF.W",   # Weekly Working Gas in Underground Storage, Lower 48
+    "NG.NUS_EPG0_SS6_NUS_BCF.W",   # alternate series
+    "NG.NUS_EPG0_SSN_NUS_BCF.W",   # another variant
+]
 
-# Process codes to try when unfiltered query fails
+# Process codes to try in v2 fallback (EWG = Ending Working Gas is standard)
 _EIA_PROCESS_CODES = ["EWG", "S13", "L48", "TOT", "SAT", "STO"]
-_EIA_DUOAREAS      = ["NUS", "R30", "R10"]
+_EIA_DUOAREAS      = ["NUS", "US", "L48", "R30", "R10"]
 
 
-def _eia_base_params(api_key: str, duoarea: str, weeks: int, process: str = "") -> dict:
+def _eia_base_params(api_key: str, weeks: int,
+                     duoarea: str = "", process: str = "") -> dict:
+    """Build EIA v2 params. Omit facets if empty to get unfiltered data."""
     params = {
         "api_key":             api_key,
         "frequency":           "weekly",
         "data[0]":             "value",
-        "facets[duoarea][]":   duoarea,
         "sort[0][column]":     "period",
         "sort[0][direction]":  "desc",
         "length":              str(weeks + 8),
     }
+    if duoarea:
+        params["facets[duoarea][]"] = duoarea
     if process:
         params["facets[process][]"] = process
     return params
@@ -426,35 +433,35 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
 
     async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
 
-        # ── Strategy 1: No process filter, pick largest values (total storage) ──
-        for duoarea in ["NUS", "R30"]:
-            try:
-                params = _eia_base_params(api_key, duoarea, weeks)
-                r      = await client.get(EIA_GAS_URL, params=params)
-                body   = r.json()
-                rows   = body.get("response", {}).get("data", [])
-                logger.warning("[EIA] strategy=unfiltered duoarea=%s status=%d rows=%d",
-                               duoarea, r.status_code, len(rows))
-                if rows:
-                    # Pick only rows with large values (total US storage ~1500-3000 BCF)
-                    big_rows = [row for row in rows
-                                if _safe_float(row.get("value")) >= 500]
-                    if not big_rows:
-                        big_rows = rows   # fallback: use whatever we got
-                    parsed = _parse_eia_gas_rows(big_rows, weeks)
+        # ── Strategy 1: Truly unfiltered — no facets at all ─────────────────────
+        # Get all weekly data, keep rows where value looks like total US storage
+        try:
+            params = _eia_base_params(api_key, weeks=weeks)
+            params["length"] = "200"   # grab more rows; filter client-side
+            r      = await client.get(EIA_GAS_URL, params=params)
+            body   = r.json()
+            rows   = body.get("response", {}).get("data", [])
+            logger.warning("[EIA] strategy=no-facets status=%d rows=%d",
+                           r.status_code, len(rows))
+            if rows:
+                # Total US working gas is typically 1500-3000 BCF; filter for that range
+                big_rows = [row for row in rows if 1200 <= _safe_float(row.get("value")) <= 4000]
+                if big_rows:
+                    parsed = _parse_eia_gas_rows(big_rows, weeks, min_bcf=1200)
                     if parsed:
-                        logger.warning("[EIA] Gas OK (unfiltered): %d records, latest=%s %.1f bcf",
+                        logger.warning("[EIA] Gas OK (no-facets): %d records, latest=%s %.1f bcf",
                                        len(parsed), parsed[-1]["report_date"],
                                        parsed[-1]["storage_bcf"])
                         return parsed
-            except Exception as exc:
-                logger.warning("[EIA] unfiltered duoarea=%s error: %s", duoarea, exc)
+        except Exception as exc:
+            logger.warning("[EIA] no-facets error: %s", exc)
 
-        # ── Strategy 2: Try explicit process codes ─────────────────────────────
+        # ── Strategy 2: Try explicit process + duoarea codes ──────────────────
         for process in _EIA_PROCESS_CODES:
             for duoarea in _EIA_DUOAREAS:
                 try:
-                    params = _eia_base_params(api_key, duoarea, weeks, process)
+                    params = _eia_base_params(api_key, weeks=weeks,
+                                             duoarea=duoarea, process=process)
                     r      = await client.get(EIA_GAS_URL, params=params)
                     rows   = r.json().get("response", {}).get("data", [])
                     logger.warning("[EIA] process=%s duoarea=%s status=%d rows=%d",
@@ -466,29 +473,29 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
                 except Exception as exc:
                     logger.warning("[EIA] process=%s duoarea=%s error: %s", process, duoarea, exc)
 
-        # ── Strategy 3: EIA v1 API (stable series ID) ─────────────────────────
-        try:
-            r = await client.get(EIA_V1_URL, params={
-                "api_key":   api_key,
-                "series_id": EIA_V1_SERIES,
-                "num":       str(weeks + 4),
-            })
-            body = r.json()
-            series = body.get("series", [{}])[0]
-            v1_data = series.get("data", [])
-            logger.warning("[EIA] v1 series=%s status=%d points=%d",
-                           EIA_V1_SERIES, r.status_code, len(v1_data))
-            if v1_data:
-                # v1 data: [[period, value], ...]  descending
-                rows_v1 = [{"period": d[0], "value": d[1]} for d in v1_data if d[1]]
-                parsed = _parse_eia_gas_rows(rows_v1, weeks)
-                if parsed:
-                    logger.warning("[EIA] Gas OK (v1): %d records, latest=%s %.1f bcf",
-                                   len(parsed), parsed[-1]["report_date"],
-                                   parsed[-1]["storage_bcf"])
-                    return parsed
-        except Exception as exc:
-            logger.warning("[EIA] v1 API error: %s", exc)
+        # ── Strategy 3: EIA v1 API (multiple series IDs) ─────────────────────
+        for series_id in EIA_V1_SERIES_IDS:
+            try:
+                r = await client.get(EIA_V1_URL, params={
+                    "api_key":   api_key,
+                    "series_id": series_id,
+                    "num":       str(weeks + 4),
+                })
+                body    = r.json()
+                series  = body.get("series", [{}])[0]
+                v1_data = series.get("data", [])
+                logger.warning("[EIA] v1 series=%s status=%d points=%d",
+                               series_id, r.status_code, len(v1_data))
+                if v1_data:
+                    rows_v1 = [{"period": d[0], "value": d[1]} for d in v1_data if d[1]]
+                    parsed  = _parse_eia_gas_rows(rows_v1, weeks)
+                    if parsed:
+                        logger.warning("[EIA] Gas OK (v1): %d records, latest=%s %.1f bcf",
+                                       len(parsed), parsed[-1]["report_date"],
+                                       parsed[-1]["storage_bcf"])
+                        return parsed
+            except Exception as exc:
+                logger.warning("[EIA] v1 series=%s error: %s", series_id, exc)
 
     logger.warning("[EIA] All EIA attempts failed — falling back to mock data")
     return mock_data.mock_gas_data(weeks)
