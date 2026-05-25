@@ -73,12 +73,28 @@ def get_cache_status(settlement_point: str = "HB_HOUSTON") -> Dict[str, Any]:
 
 
 # ── ERCOT CDR Scraper ─────────────────────────────────────────────────────────
-ERCOT_CDR_URL      = "https://www.ercot.com/content/cdr/html/hb_lz.html"
-ERCOT_CDR_URL_ALT  = "https://www.ercot.com/content/cdr/html/rtbm_spp_node_zone_hub.html"
+# CDR pages tried in order until a valid price is parsed.
+ERCOT_CDR_URLS = [
+    "https://www.ercot.com/content/cdr/html/hb_lz.html",
+    "https://www.ercot.com/content/cdr/html/rtbm_spp_node_zone_hub.html",
+    "https://www.ercot.com/content/cdr/html/real_time_spp.html",
+]
+ERCOT_HOME_URL = "https://www.ercot.com/"   # pre-flight to pick up session cookies
+
+# Realistic browser headers — required to avoid 403 from ERCOT's CDN
 _ERCOT_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; EnergyRiskBot/1.0; informational research)",
-    "Accept":     "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Referer":         "https://www.ercot.com/mktinfo/prices",
+    "Connection":      "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest":  "document",
+    "Sec-Fetch-Mode":  "navigate",
+    "Sec-Fetch-Site":  "same-origin",
+    "Sec-Fetch-User":  "?1",
+    "Cache-Control":   "max-age=0",
 }
 
 
@@ -164,17 +180,40 @@ async def fetch_ercot_prices(
 
     try:
         live_price: Optional[float] = None
-        async with httpx.AsyncClient(timeout=15, headers=_ERCOT_HEADERS, follow_redirects=True) as client:
-            for url in [ERCOT_CDR_URL, ERCOT_CDR_URL_ALT]:
+        last_ok_response = None
+
+        async with httpx.AsyncClient(
+            timeout=20,
+            headers=_ERCOT_HEADERS,
+            follow_redirects=True,
+            http2=False,
+        ) as client:
+            # Step 1: pre-flight to ercot.com to collect session cookies
+            # (mimics browser behaviour; without this CDN may return 403)
+            try:
+                pf = await client.get(ERCOT_HOME_URL)
+                logger.info(
+                    "[ERCOT] Pre-flight => status=%d cookies=%d",
+                    pf.status_code, len(client.cookies),
+                )
+            except Exception as pf_exc:
+                logger.warning("[ERCOT] Pre-flight failed (non-fatal): %s", pf_exc)
+
+            # Step 2: try each CDR page in order
+            for url in ERCOT_CDR_URLS:
                 try:
                     r = await client.get(url)
                     logger.info("[ERCOT] %s => status=%d ct=%s len=%d",
                                 url.split("/")[-1], r.status_code,
                                 r.headers.get("content-type", "?")[:40], len(r.text))
                     if r.status_code == 200 and len(r.text) > 200:
+                        last_ok_response = r
                         live_price = _parse_ercot_cdr(r.text, settlement_point)
                         if live_price is not None:
                             break
+                    else:
+                        logger.warning("[ERCOT] %s returned status=%d — skipping",
+                                       url.split("/")[-1], r.status_code)
                 except Exception as url_exc:
                     logger.warning("[ERCOT] URL %s failed: %s", url, url_exc)
 
@@ -189,7 +228,7 @@ async def fetch_ercot_prices(
             "price_mwh":        live_price,
             "price_type":       "real_time",
             "source":           "ercot_cdr",
-            "cdr_updated":      _parse_ercot_timestamp(r.text),
+            "cdr_updated":      _parse_ercot_timestamp(last_ok_response.text) if last_ok_response else now.isoformat(),
         }
         added = _cache_price(record)
         cached = _get_cached_prices(settlement_point)
@@ -225,23 +264,11 @@ async def fetch_current_ercot_price(
         return mock_data.mock_current_ercot_price(settlement_point)
 
     try:
-        async with httpx.AsyncClient(timeout=15, headers=_ERCOT_HEADERS) as client:
-            r = await client.get(ERCOT_CDR_URL)
-            r.raise_for_status()
-
-        live_price = _parse_ercot_cdr(r.text, settlement_point)
-        if live_price is None:
-            cache = _get_cached_prices(settlement_point)
-            return cache[-1] if cache else {"price_mwh": None, "source": "unavailable"}
-
-        return {
-            "timestamp":        datetime.now(timezone.utc).isoformat(),
-            "settlement_point": settlement_point,
-            "price_mwh":        live_price,
-            "price_type":       "real_time",
-            "source":           "ercot_cdr",
-            "last_updated":     _parse_ercot_timestamp(r.text),
-        }
+        # Reuse the full fetch (which includes cookie pre-flight + CDR fallback chain)
+        prices = await fetch_ercot_prices(hours=1, settlement_point=settlement_point)
+        if prices:
+            return prices[-1]
+        return {"price_mwh": None, "source": "unavailable", "settlement_point": settlement_point}
     except Exception:
         cache = _get_cached_prices(settlement_point)
         return cache[-1] if cache else {"price_mwh": None, "source": "unavailable"}

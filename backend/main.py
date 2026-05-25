@@ -9,6 +9,8 @@ may not reflect actual market conditions. Always consult qualified
 professionals before making decisions.
 """
 import os
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,15 +20,54 @@ from routers import ercot, weather, gas, signals, alerts, stripe_webhooks, strip
 
 load_dotenv()
 
+log = logging.getLogger(__name__)
+
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 ENVIRONMENT  = os.getenv("ENVIRONMENT", "development")
+
+# ── Background price poller ───────────────────────────────────
+# Keeps the in-memory ERCOT price cache warm regardless of user traffic.
+# Polls immediately on startup then every POLL_INTERVAL_SECONDS.
+POLL_INTERVAL_SECONDS = int(os.getenv("ERCOT_POLL_INTERVAL", "300"))   # default 5 min
+
+
+async def _ercot_price_loop():
+    """Background task: fetch ERCOT CDR price every POLL_INTERVAL_SECONDS."""
+    from services.external_apis import fetch_ercot_prices, get_cache_status
+    enabled = os.getenv("ERCOT_API_ENABLED", "false").lower() == "true"
+
+    if not enabled:
+        log.info("[POLLER] ERCOT_API_ENABLED=false — price poller idle (dev mode)")
+        return
+
+    log.info("[POLLER] ERCOT price poller starting (interval=%ds)", POLL_INTERVAL_SECONDS)
+
+    while True:
+        try:
+            prices = await fetch_ercot_prices(hours=24, settlement_point="HB_HOUSTON")
+            status = get_cache_status("HB_HOUSTON")
+            log.info(
+                "[POLLER] Poll complete — cache=%d readings, latest=%.2f",
+                status["real_readings"],
+                status["latest_price"] or 0,
+            )
+        except Exception as exc:
+            log.warning("[POLLER] Poll error: %s", exc)
+        await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🔋 Texas Energy Risk Platform API starting...")
+    # Kick off the background poller as a fire-and-forget task
+    task = asyncio.create_task(_ercot_price_loop())
+    log.info("[STARTUP] Background ERCOT price poller scheduled")
     yield
-    print("🔋 API shutting down.")
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    log.info("[SHUTDOWN] Price poller stopped")
 
 
 app = FastAPI(
@@ -67,7 +108,15 @@ app.include_router(stripe_checkout.router)
 # ── Health check ──────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "texas-energy-risk-api", "version": "1.0.0"}
+    from services.external_apis import get_cache_status
+    cache = get_cache_status("HB_HOUSTON")
+    return {
+        "status":        "ok",
+        "service":       "texas-energy-risk-api",
+        "version":       "1.0.0",
+        "ercot_cache":   cache,
+        "ercot_enabled": os.getenv("ERCOT_API_ENABLED", "false"),
+    }
 
 
 @app.get("/")

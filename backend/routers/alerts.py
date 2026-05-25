@@ -1,12 +1,17 @@
 """
 alerts.py
 Alert preferences, history, and test-send endpoints.
+All Supabase queries are wrapped in try/except so a DB permission error
+(42501) or missing column (42703) never crashes the dashboard.
 """
 from fastapi import APIRouter, Header, HTTPException, Body, Query
 from pydantic import BaseModel
 from typing import Optional
+import logging
 from datetime import datetime, timezone
 from services.supabase_client import get_supabase
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
 
@@ -47,14 +52,28 @@ def _get_user(authorization: str):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
+# ── Safe execute helper ───────────────────────────────────────
+
+def _safe_execute(query, context: str = "query"):
+    """Execute a PostgREST query and return the result, or None on error."""
+    try:
+        return query.execute()
+    except Exception as exc:
+        log.warning("[alerts] %s failed: %s", context, exc)
+        return None
+
+
 # ── Routes ────────────────────────────────────────────────────
 
 @router.get("/preferences")
 async def get_preferences(authorization: str = Header(default="")):
     user = _get_user(authorization)
-    sb = get_supabase()
-    r = sb.table("alert_preferences").select("*").eq("user_id", user.id).limit(1).execute()
-    return r.data[0] if r.data else {}
+    sb   = get_supabase()
+    r    = _safe_execute(
+        sb.table("alert_preferences").select("*").eq("user_id", user.id).limit(1),
+        "get_preferences",
+    )
+    return (r.data[0] if r and r.data else {})
 
 
 @router.put("/preferences")
@@ -63,12 +82,15 @@ async def update_preferences(
     authorization: str = Header(default=""),
 ):
     user = _get_user(authorization)
-    sb = get_supabase()
+    sb   = get_supabase()
     data = prefs.model_dump(exclude_none=True)
     data["user_id"]    = user.id
     data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    r = sb.table("alert_preferences").upsert(data, on_conflict="user_id").execute()
-    return {"status": "ok", "data": r.data}
+    r = _safe_execute(
+        sb.table("alert_preferences").upsert(data, on_conflict="user_id"),
+        "update_preferences",
+    )
+    return {"status": "ok", "data": r.data if r else []}
 
 
 @router.get("/logs")
@@ -78,7 +100,7 @@ async def get_alert_logs(
     authorization: str = Header(default=""),
 ):
     user = _get_user(authorization)
-    sb = get_supabase()
+    sb   = get_supabase()
     q = (sb.table("alert_logs")
          .select("*")
          .eq("user_id", user.id)
@@ -86,8 +108,8 @@ async def get_alert_logs(
          .limit(limit))
     if alert_type:
         q = q.eq("alert_type", alert_type)
-    r = q.execute()
-    return {"logs": r.data or []}
+    r = _safe_execute(q, "get_alert_logs")
+    return {"logs": r.data if r else []}
 
 
 @router.get("/logs/recent")
@@ -97,14 +119,34 @@ async def get_recent_logs(
 ):
     """Returns the N most recent alerts (for dashboard widget)."""
     user = _get_user(authorization)
-    sb = get_supabase()
-    r = (sb.table("alert_logs")
-         .select("id, alert_type, risk_level, previous_risk_level, primary_driver, city, delivery_status, delivered_email, created_at, sent_at")
-         .eq("user_id", user.id)
-         .order("created_at", desc=True)
-         .limit(limit)
-         .execute())
-    return {"logs": r.data or []}
+    sb   = get_supabase()
+
+    # Try the full column set first (requires migration 004 to have run).
+    cols_full = "id, alert_type, risk_level, previous_risk_level, primary_driver, city, delivery_status, delivered_email, created_at, sent_at"
+    cols_base = "id, alert_type, created_at, sent_at"
+
+    r = _safe_execute(
+        sb.table("alert_logs")
+          .select(cols_full)
+          .eq("user_id", user.id)
+          .order("created_at", desc=True)
+          .limit(limit),
+        "get_recent_logs_full",
+    )
+
+    # Fall back to base columns if migration 004 columns are missing.
+    if r is None:
+        log.info("[alerts] Falling back to base columns for recent logs")
+        r = _safe_execute(
+            sb.table("alert_logs")
+              .select(cols_base)
+              .eq("user_id", user.id)
+              .order("sent_at", desc=True)
+              .limit(limit),
+            "get_recent_logs_base",
+        )
+
+    return {"logs": r.data if r else []}
 
 
 @router.post("/logs/{log_id}/acknowledge")
@@ -114,10 +156,13 @@ async def acknowledge_alert(
 ):
     _get_user(authorization)
     sb = get_supabase()
-    sb.table("alert_logs").update({
-        "acknowledged":    True,
-        "acknowledged_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("id", log_id).execute()
+    _safe_execute(
+        sb.table("alert_logs").update({
+            "acknowledged":    True,
+            "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", log_id),
+        "acknowledge_alert",
+    )
     return {"status": "acknowledged"}
 
 
@@ -125,12 +170,18 @@ async def acknowledge_alert(
 async def send_test_alert(authorization: str = Header(default="")):
     """Sends a test email to verify alert delivery (Pro only)."""
     user = _get_user(authorization)
-    sb = get_supabase()
+    sb   = get_supabase()
 
     # Check Pro subscription
-    sub = sb.table("subscriptions").select("plan, status").eq("user_id", user.id).maybeSingle().execute()
-    sub_data = sub.data or {}
-    is_pro = sub_data.get("plan") in ("pro", "business", "enterprise") and sub_data.get("status") in ("active", "trialing")
+    sub = _safe_execute(
+        sb.table("subscriptions").select("plan, status").eq("user_id", user.id).limit(1),
+        "check_subscription",
+    )
+    sub_data = (sub.data[0] if sub and sub.data else {})
+    is_pro = (
+        sub_data.get("plan") in ("pro", "business", "enterprise")
+        and sub_data.get("status") in ("active", "trialing")
+    )
     if not is_pro:
         raise HTTPException(status_code=403, detail="Pro subscription required for email alerts")
 
