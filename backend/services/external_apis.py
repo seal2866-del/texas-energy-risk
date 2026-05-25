@@ -373,22 +373,27 @@ _EIA_PROCESS_CODES = ["EWG", "S13", "L48", "TOT", "SAT", "STO"]
 _EIA_DUOAREAS      = ["NUS", "US", "L48", "R30", "R10"]
 
 
-def _eia_base_params(api_key: str, weeks: int,
-                     duoarea: str = "", process: str = "") -> dict:
-    """Build EIA v2 params. Omit facets if empty to get unfiltered data."""
-    params = {
-        "api_key":             api_key,
-        "frequency":           "weekly",
-        "data[0]":             "value",
-        "sort[0][column]":     "period",
-        "sort[0][direction]":  "desc",
-        "length":              str(weeks + 8),
-    }
+def _eia_url(api_key: str, weeks: int,
+             duoarea: str = "", process: str = "") -> str:
+    """
+    Build EIA v2 URL with literal brackets.
+    Passing brackets as dict keys causes httpx to encode them as %5B%5D
+    which the EIA API does not recognise — hence rows=0 for every query.
+    Building the query string manually keeps them unencoded.
+    """
+    parts = [
+        f"api_key={api_key}",
+        "frequency=weekly",
+        "data[]=value",
+        "sort[0][column]=period",
+        "sort[0][direction]=desc",
+        f"length={weeks + 8}",
+    ]
     if duoarea:
-        params["facets[duoarea][]"] = duoarea
+        parts.append(f"facets[duoarea][]={duoarea}")
     if process:
-        params["facets[process][]"] = process
-    return params
+        parts.append(f"facets[process][]={process}")
+    return EIA_GAS_URL + "?" + "&".join(parts)
 
 
 def _parse_eia_gas_rows(rows: list, weeks: int, min_bcf: float = 0) -> list:
@@ -436,9 +441,8 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
         # ── Strategy 1: Truly unfiltered — no facets at all ─────────────────────
         # Get all weekly data, keep rows where value looks like total US storage
         try:
-            params = _eia_base_params(api_key, weeks=weeks)
-            params["length"] = "200"   # grab more rows; filter client-side
-            r      = await client.get(EIA_GAS_URL, params=params)
+            url = _eia_url(api_key, weeks=weeks + 192)  # grab more rows; filter client-side
+            r   = await client.get(url)
             body   = r.json()
             rows   = body.get("response", {}).get("data", [])
             logger.warning("[EIA] strategy=no-facets status=%d rows=%d",
@@ -460,10 +464,9 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
         for process in _EIA_PROCESS_CODES:
             for duoarea in _EIA_DUOAREAS:
                 try:
-                    params = _eia_base_params(api_key, weeks=weeks,
-                                             duoarea=duoarea, process=process)
-                    r      = await client.get(EIA_GAS_URL, params=params)
-                    rows   = r.json().get("response", {}).get("data", [])
+                    url  = _eia_url(api_key, weeks=weeks, duoarea=duoarea, process=process)
+                    r    = await client.get(url)
+                    rows = r.json().get("response", {}).get("data", [])
                     logger.warning("[EIA] process=%s duoarea=%s status=%d rows=%d",
                                    process, duoarea, r.status_code, len(rows))
                     if rows:
