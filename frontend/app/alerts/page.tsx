@@ -128,6 +128,15 @@ function SamplePreview() {
           </div>
         </div>
       </div>
+      {/* Urgency + social proof */}
+      <div className="px-5 pb-4 space-y-1.5">
+        <p className="text-xs text-gray-400 text-center">
+          Alerts like this are sent in real-time when market conditions change.
+        </p>
+        <p className="text-xs text-gray-600 text-center">
+          Used by energy professionals to monitor Texas market conditions.
+        </p>
+      </div>
     </div>
   );
 }
@@ -233,8 +242,7 @@ export default function AlertsPage() {
                 href="/pricing"
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-sm font-semibold hover:bg-orange-500/15 transition-all"
               >
-                <Zap className="w-4 h-4" />
-                Upgrade to Pro for alerts
+                Start Getting Alerts
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             )}
@@ -383,7 +391,7 @@ export default function AlertsPage() {
                   <div className="card-glass border border-orange-500/20 bg-orange-500/5 rounded-xl p-5 flex items-start gap-3">
                     <Bell className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-bold text-white mb-1">Don&apos;t miss critical energy risk shifts</p>
+                      <p className="text-sm font-bold text-white mb-1">Don&apos;t miss energy market shifts that impact cost</p>
                       <p className="text-xs text-gray-400 leading-relaxed mb-3">
                         Get real-time alerts when market conditions change — before they impact cost. Configure your preferences now and they activate the moment you upgrade.
                       </p>
