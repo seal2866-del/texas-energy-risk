@@ -277,29 +277,53 @@ def _transform_noaa(data: dict, location: str, days: int) -> List[Dict[str, Any]
 
 # ── EIA Natural Gas ───────────────────────────────────────────────────────────
 async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
+    """
+    Fetch weekly natural gas storage from EIA API v2.
+    URL is built as a string -- httpx params dict URL-encodes brackets
+    (data[0] -> data%5B0%5D) which EIA does not accept.
+    """
     eia_key = os.getenv("EIA_API_KEY", "")
     if not eia_key:
+        logger.warning("[EIA] EIA_API_KEY not set")
         return mock_data.mock_gas_data(weeks)
 
-    try:
-        url    = "https://api.eia.gov/v2/natural-gas/stor/wkly/data/"
-        params = {
-            "api_key":             eia_key,
-            "frequency":           "weekly",
-            "data[0]":             "value",
-            "facets[duoarea][]":   "NUS",
-            "facets[process][]":   "SAT",
-            "sort[0][column]":     "period",
-            "sort[0][direction]":  "desc",
-            "length":              weeks,
-        }
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.get(url, params=params)
-            r.raise_for_status()
-        result = _transform_eia(r.json(), weeks)
-        return result if result else mock_data.mock_gas_data(weeks)
-    except Exception:
-        return mock_data.mock_gas_data(weeks)
+    fetch_n = max(weeks * 2, 16)   # fetch extra; transform filters to weeks
+    url = (
+        "https://api.eia.gov/v2/natural-gas/stor/wkly/data/"
+        f"?api_key={eia_key}"
+        "&frequency=weekly"
+        "&data[0]=value"
+        "&facets[duoarea][]=NUS"
+        "&facets[process][]=SAT"
+        "&sort[0][column]=period"
+        "&sort[0][direction]=desc"
+        f"&length={fetch_n}"
+    )
+
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.get(url)
+            if r.status_code != 200:
+                logger.error("[EIA] HTTP %s: %s", r.status_code, r.text[:300])
+                # Try alternate process code on second attempt
+                if attempt == 0:
+                    url = url.replace("process][]=SAT", "process][]=EWG")
+                    continue
+                return mock_data.mock_gas_data(weeks)
+            result = _transform_eia(r.json(), weeks)
+            if result:
+                logger.info("[EIA] Fetched %d storage records", len(result))
+                return result
+            logger.warning("[EIA] Empty response body: %s", r.text[:300])
+            if attempt == 0:
+                url = url.replace("process][]=SAT", "process][]=EWG")
+                continue
+            return mock_data.mock_gas_data(weeks)
+        except Exception as exc:
+            logger.error("[EIA] Exception (attempt %d): %s", attempt + 1, exc)
+
+    return mock_data.mock_gas_data(weeks)
 
 
 def _transform_eia(data: dict, weeks: int) -> List[Dict[str, Any]]:
