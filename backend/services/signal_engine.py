@@ -103,7 +103,7 @@ def _assess_data_sources(
 
     ercot_status = _source_status(prices,      "timestamp",    15,    "ercot_cdr")
     noaa_status  = _source_status(forecasts,   "forecast_time", 60,   "noaa")
-    eia_status   = _source_status(gas_records, "report_date",   10080, "eia")  # EIA updates weekly
+    eia_status   = _source_status(gas_records, "report_date",   21600, "eia")  # EIA weekly — allow up to 15 days
 
     return {
         "ercot": ercot_status,
