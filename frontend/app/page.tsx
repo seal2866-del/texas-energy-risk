@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Zap, TrendingUp, CloudLightning, Flame, Bell, Brain, ArrowRight, Shield, BarChart3, AlertTriangle } from "lucide-react";
+import Image from "next/image";
+import { TrendingUp, CloudLightning, Flame, Bell, Brain, ArrowRight, Shield, BarChart3, AlertTriangle } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 
@@ -48,11 +49,18 @@ export default function LandingPage() {
       <Navbar />
       <main className="pt-20 min-h-screen">
 
-        {/* ── Hero ──────────────────────────────────────────────── */}
-        <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold mb-6">
-            <Zap className="w-3.5 h-3.5" />
-            Texas Energy Risk Intelligence Platform
+        {/* Hero */}
+        <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-24 text-center">
+          {/* Brand logo */}
+          <div className="flex justify-center mb-8">
+            <Image
+              src="/logo.png"
+              alt="TX Energy Risk"
+              width={500}
+              height={280}
+              className="h-20 w-auto object-contain"
+              priority
+            />
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6">
@@ -82,11 +90,11 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-6 text-xs text-gray-600">
-            Free tier available · No credit card required · Informational data only
+            Free tier available &middot; No credit card required &middot; Informational data only
           </p>
         </section>
 
-        {/* ── Risk score preview ────────────────────────────────── */}
+        {/* Risk score preview */}
         <section className="max-w-3xl mx-auto px-4 sm:px-6 mb-24">
           <div className="grid grid-cols-3 gap-4">
             {RISK_LEVELS.map(({ level, color, bg, desc }) => (
@@ -98,7 +106,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── Problem ───────────────────────────────────────────── */}
+        {/* Problem */}
         <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
           <div className="card-glass border border-white/5 rounded-2xl p-10">
             <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-4" />
@@ -109,13 +117,13 @@ export default function LandingPage() {
             </p>
             <p className="text-base text-gray-500 max-w-xl mx-auto mt-4 leading-relaxed">
               Texas energy markets move fast. ERCOT prices can shift significantly within hours.
-              Weather-driven demand and gas supply pressure compound quickly — and most teams
+              Weather-driven demand and gas supply pressure compound quickly -- and most teams
               are watching the wrong signals, too late.
             </p>
           </div>
         </section>
 
-        {/* ── Solution ──────────────────────────────────────────── */}
+        {/* Solution */}
         <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6">
             <Shield className="w-3.5 h-3.5" />
@@ -126,7 +134,7 @@ export default function LandingPage() {
           </h2>
           <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed mb-4">
             TX Energy Risk detects early risk signals across ERCOT power prices, Texas weather demand,
-            and natural gas supply — unified into one clear risk score with a structured time horizon outlook.
+            and natural gas supply -- unified into one clear risk score with a structured time horizon outlook.
           </p>
           <p className="text-base text-gray-500 max-w-xl mx-auto leading-relaxed">
             Not a trading tool. Not investment advice. A situational awareness platform
@@ -134,7 +142,7 @@ export default function LandingPage() {
           </p>
         </section>
 
-        {/* ── Features ──────────────────────────────────────────── */}
+        {/* Features */}
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">What you get</h2>
@@ -155,7 +163,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── CTA ───────────────────────────────────────────────── */}
+        {/* CTA */}
         <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
           <div className="card-glass border border-orange-500/20 bg-orange-500/5 rounded-2xl p-10">
             <h2 className="text-3xl font-black text-white mb-4">
@@ -183,7 +191,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── Disclaimer ────────────────────────────────────────── */}
+        {/* Disclaimer */}
         <section className="max-w-3xl mx-auto px-4 pb-16 text-center">
           <p className="text-xs text-gray-600 leading-relaxed">
             Informational analytics only. Not investment, trading, or procurement advice.

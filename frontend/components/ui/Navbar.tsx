@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Zap, Menu, X, Bell, LogOut } from "lucide-react";
+import { Menu, X, Bell, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -40,14 +41,17 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0f1e]/90 backdrop-blur-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-orange-400" />
-            </div>
-            <span className="font-bold text-white hidden sm:block">
-              TX Energy Risk
-            </span>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="TX Energy Risk"
+              width={500}
+              height={280}
+              className="h-10 w-auto object-contain"
+              priority
+            />
           </Link>
 
           {/* Desktop nav */}
