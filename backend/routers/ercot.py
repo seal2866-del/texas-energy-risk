@@ -42,3 +42,41 @@ async def get_all_hub_prices():
         "hubs":       hubs,
         "disclaimer": "Informational only. Not investment or trading advice.",
     }
+
+
+@router.get("/debug")
+async def debug_cdr():
+    """
+    Diagnostic endpoint — tests ERCOT CDR connectivity.
+    Returns raw HTTP status, content-type, and first 500 chars.
+    Purely informational; no price data stored.
+    """
+    import os, httpx
+    from services.external_apis import ERCOT_CDR_URLS, ERCOT_HOME_URL, _ERCOT_HEADERS, get_cache_status
+    results = []
+    async with httpx.AsyncClient(timeout=20, headers=_ERCOT_HEADERS, follow_redirects=True) as client:
+        try:
+            pf = await client.get(ERCOT_HOME_URL)
+            results.append({"url": ERCOT_HOME_URL, "status": pf.status_code,
+                            "cookies": len(client.cookies), "len": len(pf.text)})
+        except Exception as e:
+            results.append({"url": ERCOT_HOME_URL, "error": str(e)})
+        for url in ERCOT_CDR_URLS:
+            try:
+                r = await client.get(url)
+                results.append({
+                    "url":     url,
+                    "status":  r.status_code,
+                    "ct":      r.headers.get("content-type", "?")[:60],
+                    "len":     len(r.text),
+                    "preview": r.text[:500],
+                })
+            except Exception as e:
+                results.append({"url": url, "error": str(e)})
+    cache = get_cache_status("HB_HOUSTON")
+    return {
+        "cache":   cache,
+        "enabled": os.getenv("ERCOT_API_ENABLED", "false"),
+        "cdr_tests": results,
+        "disclaimer": "Informational only.",
+    }

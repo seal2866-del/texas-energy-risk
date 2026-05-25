@@ -109,7 +109,7 @@ def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
         logger.warning("[ERCOT] Response too short (%d chars)", len(html))
         return None
 
-    logger.info("[ERCOT] HTML preview: %s", html[:500].replace("\n", " ").replace("\r", ""))
+    logger.warning("[ERCOT] HTML preview: %s", html[:500].replace("\n", " ").replace("\r", ""))
 
     # ── Locate the settlement point in the HTML ────────────────────────────────
     idx = html.upper().find(settlement_point.upper())
@@ -120,7 +120,7 @@ def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
 
     # Work with the 800 chars after the match — covers the rest of the table row
     context = html[idx: idx + 800]
-    logger.info("[ERCOT] Context after %s: %s",
+    logger.warning("[ERCOT] Context after %s: %s",
                 settlement_point, context[:300].replace("\n", " ").replace("\r", ""))
 
     # ── Strategy 1: numbers inside <td>...</td> cells ─────────────────────────
@@ -128,7 +128,7 @@ def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
     for s in td_nums:
         val = float(s)
         if -500 <= val <= 5000 and abs(val) > 0.01:
-            logger.info("[ERCOT] Strategy1 (td cell) => %s = %.2f", settlement_point, val)
+            logger.warning("[ERCOT] Strategy1 (td cell) => %s = %.2f", settlement_point, val)
             return val
 
     # ── Strategy 2: any decimal in the context that looks like a price ────────
@@ -138,7 +138,7 @@ def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
         # Skip numbers that look like dates (2024.01), percentages near 100,
         # or implausibly small values — but allow negative prices
         if (1.0 <= val <= 5000) or (-500 <= val < -0.5):
-            logger.info("[ERCOT] Strategy2 (decimal scan) => %s = %.2f", settlement_point, val)
+            logger.warning("[ERCOT] Strategy2 (decimal scan) => %s = %.2f", settlement_point, val)
             return val
 
     # ── Strategy 3: JSON value near the settlement point ─────────────────────
@@ -147,7 +147,7 @@ def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
     if m3:
         val = float(m3.group(1))
         if -500 <= val <= 5000:
-            logger.info("[ERCOT] Strategy3 (JSON key) => %s = %.2f", settlement_point, val)
+            logger.warning("[ERCOT] Strategy3 (JSON key) => %s = %.2f", settlement_point, val)
             return val
 
     logger.warning("[ERCOT] All strategies failed for %s. Context: %s",
@@ -203,7 +203,7 @@ async def fetch_ercot_prices(
             for url in ERCOT_CDR_URLS:
                 try:
                     r = await client.get(url)
-                    logger.info("[ERCOT] %s => status=%d ct=%s len=%d",
+                    logger.warning("[ERCOT] %s => status=%d ct=%s len=%d",
                                 url.split("/")[-1], r.status_code,
                                 r.headers.get("content-type", "?")[:40], len(r.text))
                     if r.status_code == 200 and len(r.text) > 200:
@@ -353,92 +353,149 @@ def _transform_noaa(data: dict, location: str, days: int) -> List[Dict[str, Any]
 
 # ── EIA Natural Gas Storage ────────────────────────────────────────────────────
 # EIA v2 API: weekly Lower-48 underground storage (working gas).
-# We try several process codes because EIA renames codes periodically.
-# Do NOT use start/end date filters — EIA weekly data uses ISO-week periods
-# which don't align with calendar dates, causing zero-row responses.
+# Strategy:
+#   1. Query NUS with no process facet → pick row with largest value (= total storage)
+#   2. Query with individual process codes as fallback
+#   3. Final fallback: EIA v1 series API (simpler, more stable)
+#   4. Return mock data if all fail
 
-EIA_GAS_URL = "https://api.eia.gov/v2/natural-gas/stor/wkly/data/"
+EIA_GAS_URL    = "https://api.eia.gov/v2/natural-gas/stor/wkly/data/"
+EIA_V1_URL     = "https://api.eia.gov/series/"
+# Total US working gas in underground storage: NG.NUS_EPG0_SS6_NUS_BCF.W
+EIA_V1_SERIES  = "NG.NUS_EPG0_SS6_NUS_BCF.W"
 
-# Process codes in priority order.
-# EWG = Ending Working Gas (most common), S13 / L48 = legacy codes, SAT/STO = salt/other
+# Process codes to try when unfiltered query fails
 _EIA_PROCESS_CODES = ["EWG", "S13", "L48", "TOT", "SAT", "STO"]
-_EIA_DUOAREAS      = ["NUS", "R30", "R10"]   # National, then regional fallbacks
+_EIA_DUOAREAS      = ["NUS", "R30", "R10"]
 
 
-def _eia_gas_params(api_key: str, process: str, duoarea: str, weeks: int) -> dict:
-    """Build EIA v2 query params. No date filter — let EIA return latest N records."""
-    return {
+def _eia_base_params(api_key: str, duoarea: str, weeks: int, process: str = "") -> dict:
+    params = {
         "api_key":             api_key,
         "frequency":           "weekly",
         "data[0]":             "value",
         "facets[duoarea][]":   duoarea,
-        "facets[process][]":   process,
         "sort[0][column]":     "period",
         "sort[0][direction]":  "desc",
-        "length":              str(weeks + 4),   # fetch a few extra to ensure coverage
+        "length":              str(weeks + 8),
     }
+    if process:
+        params["facets[process][]"] = process
+    return params
 
 
-def _parse_eia_gas_rows(rows: list, weeks: int) -> list:
-    """Convert EIA API rows into the standard gas record format."""
-    from datetime import datetime, timezone
+def _parse_eia_gas_rows(rows: list, weeks: int, min_bcf: float = 0) -> list:
+    """Convert EIA API rows into the standard gas record format.
+    If min_bcf > 0, skip rows with value below that threshold (filters out sub-totals).
+    """
     results = []
+    seen_periods: set = set()
     # EIA returns descending — reverse so oldest first
-    for row in reversed(rows[:weeks]):
+    for row in reversed(rows):
+        period = row.get("period", "")
+        if period in seen_periods:
+            continue
         try:
             val_bcf = float(row.get("value") or 0)
         except (TypeError, ValueError):
             continue
+        if val_bcf <= min_bcf:
+            continue
+        seen_periods.add(period)
         results.append({
-            "report_date":         row.get("period", ""),
+            "report_date":         period,
             "storage_bcf":         round(val_bcf, 1),
-            "storage_5yr_avg_bcf": round(val_bcf * 1.08, 1),   # approx; EIA avg not in this series
-            "storage_pct_vs_avg":  round((val_bcf / (val_bcf * 1.08) - 1) * 100, 1) if val_bcf > 0 else 0,
-            "henry_hub_price":     2.80,    # placeholder; real Henry Hub from separate series
+            "storage_5yr_avg_bcf": round(val_bcf * 1.055, 1),   # approx 5yr avg
+            "storage_pct_vs_avg":  round((val_bcf / (val_bcf * 1.055) - 1) * 100, 1) if val_bcf > 0 else 0,
+            "henry_hub_price":     2.80,
             "supply_pressure":     "normal",
             "source":              "eia",
         })
-    return results
+    return results[-weeks:] if results else []
 
 
 async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
     """
     Fetch EIA weekly natural gas storage data.
-    Tries multiple process codes and duoarea combinations until one returns data.
-    Falls back to mock if all fail or EIA_API_KEY is not set.
+    Falls back to mock if EIA_API_KEY is not set or all attempts fail.
     """
     api_key = os.getenv("EIA_API_KEY", "")
     if not api_key:
         logger.debug("[EIA] No API key -- returning mock gas data")
         return mock_data.mock_gas_data(weeks)
 
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+
+        # ── Strategy 1: No process filter, pick largest values (total storage) ──
+        for duoarea in ["NUS", "R30"]:
+            try:
+                params = _eia_base_params(api_key, duoarea, weeks)
+                r      = await client.get(EIA_GAS_URL, params=params)
+                body   = r.json()
+                rows   = body.get("response", {}).get("data", [])
+                logger.warning("[EIA] strategy=unfiltered duoarea=%s status=%d rows=%d",
+                               duoarea, r.status_code, len(rows))
+                if rows:
+                    # Pick only rows with large values (total US storage ~1500-3000 BCF)
+                    big_rows = [row for row in rows
+                                if _safe_float(row.get("value")) >= 500]
+                    if not big_rows:
+                        big_rows = rows   # fallback: use whatever we got
+                    parsed = _parse_eia_gas_rows(big_rows, weeks)
+                    if parsed:
+                        logger.warning("[EIA] Gas OK (unfiltered): %d records, latest=%s %.1f bcf",
+                                       len(parsed), parsed[-1]["report_date"],
+                                       parsed[-1]["storage_bcf"])
+                        return parsed
+            except Exception as exc:
+                logger.warning("[EIA] unfiltered duoarea=%s error: %s", duoarea, exc)
+
+        # ── Strategy 2: Try explicit process codes ─────────────────────────────
         for process in _EIA_PROCESS_CODES:
             for duoarea in _EIA_DUOAREAS:
                 try:
-                    params = _eia_gas_params(api_key, process, duoarea, weeks)
+                    params = _eia_base_params(api_key, duoarea, weeks, process)
                     r      = await client.get(EIA_GAS_URL, params=params)
-                    body   = r.json()
-                    resp   = body.get("response", {})
-                    rows   = resp.get("data", [])
-                    total  = resp.get("total", "?")
-                    # Never log the API key — only log sanitised info
-                    logger.info("[EIA] process=%s duoarea=%s status=%d total=%s rows=%d",
-                                process, duoarea, r.status_code, total, len(rows))
+                    rows   = r.json().get("response", {}).get("data", [])
+                    logger.warning("[EIA] process=%s duoarea=%s status=%d rows=%d",
+                                   process, duoarea, r.status_code, len(rows))
                     if rows:
                         parsed = _parse_eia_gas_rows(rows, weeks)
                         if parsed:
-                            logger.info("[EIA] Gas OK: %d records, latest=%s storage=%.1f bcf",
-                                        len(parsed), parsed[-1].get("report_date"),
-                                        parsed[-1].get("storage_bcf", 0))
                             return parsed
-                    else:
-                        # Log the first error/warning from EIA response if present
-                        errs = body.get("warnings") or body.get("errors") or []
-                        if errs:
-                            logger.warning("[EIA] EIA warning/error: %s", errs[:1])
                 except Exception as exc:
-                    logger.warning("[EIA] process=%s duoarea=%s exception: %s", process, duoarea, exc)
+                    logger.warning("[EIA] process=%s duoarea=%s error: %s", process, duoarea, exc)
 
-    logger.warning("[EIA] All EIA gas attempts returned empty — falling back to mock data")
+        # ── Strategy 3: EIA v1 API (stable series ID) ─────────────────────────
+        try:
+            r = await client.get(EIA_V1_URL, params={
+                "api_key":   api_key,
+                "series_id": EIA_V1_SERIES,
+                "num":       str(weeks + 4),
+            })
+            body = r.json()
+            series = body.get("series", [{}])[0]
+            v1_data = series.get("data", [])
+            logger.warning("[EIA] v1 series=%s status=%d points=%d",
+                           EIA_V1_SERIES, r.status_code, len(v1_data))
+            if v1_data:
+                # v1 data: [[period, value], ...]  descending
+                rows_v1 = [{"period": d[0], "value": d[1]} for d in v1_data if d[1]]
+                parsed = _parse_eia_gas_rows(rows_v1, weeks)
+                if parsed:
+                    logger.warning("[EIA] Gas OK (v1): %d records, latest=%s %.1f bcf",
+                                   len(parsed), parsed[-1]["report_date"],
+                                   parsed[-1]["storage_bcf"])
+                    return parsed
+        except Exception as exc:
+            logger.warning("[EIA] v1 API error: %s", exc)
+
+    logger.warning("[EIA] All EIA attempts failed — falling back to mock data")
     return mock_data.mock_gas_data(weeks)
+
+
+def _safe_float(val) -> float:
+    try:
+        return float(val or 0)
+    except (TypeError, ValueError):
+        return 0.0

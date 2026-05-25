@@ -80,6 +80,7 @@ app = FastAPI(
     docs_url="/docs" if ENVIRONMENT == "development" else None,
     redoc_url=None,
     lifespan=lifespan,
+    redirect_slashes=False,   # prevent 307 redirects on trailing-slash URLs
 )
 
 # ── CORS ──────────────────────────────────────────────────────
