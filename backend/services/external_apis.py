@@ -281,12 +281,11 @@ async def fetch_all_hub_prices() -> Dict[str, float]:
         return {h: mock_data.mock_current_ercot_price(h)["price_mwh"] for h in hubs}
 
     try:
-        async with httpx.AsyncClient(timeout=15, headers=_ERCOT_HEADERS) as client:
-            r = await client.get(ERCOT_CDR_URL)
+        async with httpx.AsyncClient(timeout=20, headers=_ERCOT_HEADERS, follow_redirects=True) as client:
+            await client.get(ERCOT_HOME_URL)   # cookie pre-flight
+            r = await client.get(ERCOT_CDR_URLS[0])
             r.raise_for_status()
-        return {
-            h: (_parse_ercot_cdr(r.text, h) or 0.0) for h in hubs
-        }
+        return {h: (_parse_ercot_cdr(r.text, h) or 0.0) for h in hubs}
     except Exception:
         return {h: 0.0 for h in hubs}
 
@@ -354,30 +353,29 @@ def _transform_noaa(data: dict, location: str, days: int) -> List[Dict[str, Any]
 
 # ── EIA Natural Gas Storage ────────────────────────────────────────────────────
 # EIA v2 API: weekly Lower-48 underground storage (working gas).
-# Primary series: NUS / EWG  (national / working-gas-endings)
-# Fallback series: try several process codes in case EIA changes codes.
+# We try several process codes because EIA renames codes periodically.
+# Do NOT use start/end date filters — EIA weekly data uses ISO-week periods
+# which don't align with calendar dates, causing zero-row responses.
 
 EIA_GAS_URL = "https://api.eia.gov/v2/natural-gas/stor/wkly/data/"
 
-_EIA_PROCESS_CODES = ["EWG", "SAT", "STO"]   # try in order
-_EIA_DUOAREAS      = ["NUS", "R10"]            # Lower-48 then New England as last resort
+# Process codes in priority order.
+# EWG = Ending Working Gas (most common), S13 / L48 = legacy codes, SAT/STO = salt/other
+_EIA_PROCESS_CODES = ["EWG", "S13", "L48", "TOT", "SAT", "STO"]
+_EIA_DUOAREAS      = ["NUS", "R30", "R10"]   # National, then regional fallbacks
 
 
 def _eia_gas_params(api_key: str, process: str, duoarea: str, weeks: int) -> dict:
-    from datetime import datetime, timedelta
-    end   = datetime.utcnow().date()
-    start = end - timedelta(weeks=weeks + 4)  # extra buffer
+    """Build EIA v2 query params. No date filter — let EIA return latest N records."""
     return {
-        "api_key":          api_key,
-        "frequency":        "weekly",
-        "data[0]":          "value",
-        "facets[duoarea][]": duoarea,
-        "facets[process][]": process,
-        "sort[0][column]":  "period",
-        "sort[0][direction]": "desc",
-        "length":           str(weeks + 4),
-        "start":            start.isoformat(),
-        "end":              end.isoformat(),
+        "api_key":             api_key,
+        "frequency":           "weekly",
+        "data[0]":             "value",
+        "facets[duoarea][]":   duoarea,
+        "facets[process][]":   process,
+        "sort[0][column]":     "period",
+        "sort[0][direction]":  "desc",
+        "length":              str(weeks + 4),   # fetch a few extra to ensure coverage
     }
 
 
@@ -419,20 +417,28 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
             for duoarea in _EIA_DUOAREAS:
                 try:
                     params = _eia_gas_params(api_key, process, duoarea, weeks)
-                    r = await client.get(EIA_GAS_URL, params=params)
-                    body = r.json()
-                    rows = body.get("response", {}).get("data", [])
-                    logger.info("[EIA] process=%s duoarea=%s => %d rows (status %d)",
-                                process, duoarea, len(rows), r.status_code)
+                    r      = await client.get(EIA_GAS_URL, params=params)
+                    body   = r.json()
+                    resp   = body.get("response", {})
+                    rows   = resp.get("data", [])
+                    total  = resp.get("total", "?")
+                    # Never log the API key — only log sanitised info
+                    logger.info("[EIA] process=%s duoarea=%s status=%d total=%s rows=%d",
+                                process, duoarea, r.status_code, total, len(rows))
                     if rows:
                         parsed = _parse_eia_gas_rows(rows, weeks)
                         if parsed:
-                            logger.info("[EIA] Gas data OK: %d records, latest=%s bcf=%s",
+                            logger.info("[EIA] Gas OK: %d records, latest=%s storage=%.1f bcf",
                                         len(parsed), parsed[-1].get("report_date"),
-                                        parsed[-1].get("storage_bcf"))
+                                        parsed[-1].get("storage_bcf", 0))
                             return parsed
+                    else:
+                        # Log the first error/warning from EIA response if present
+                        errs = body.get("warnings") or body.get("errors") or []
+                        if errs:
+                            logger.warning("[EIA] EIA warning/error: %s", errs[:1])
                 except Exception as exc:
-                    logger.warning("[EIA] process=%s duoarea=%s failed: %s", process, duoarea, exc)
+                    logger.warning("[EIA] process=%s duoarea=%s exception: %s", process, duoarea, exc)
 
-    logger.warning("[EIA] All EIA gas attempts failed -- returning mock data")
+    logger.warning("[EIA] All EIA gas attempts returned empty — falling back to mock data")
     return mock_data.mock_gas_data(weeks)
