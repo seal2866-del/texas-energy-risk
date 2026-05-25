@@ -1,159 +1,198 @@
 import Link from "next/link";
-import { Zap, TrendingUp, Bell, Shield, ChevronRight, BarChart2, Thermometer, Flame } from "lucide-react";
+import { Zap, TrendingUp, CloudLightning, Flame, Bell, Brain, ArrowRight, Shield, BarChart3, AlertTriangle } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 
 const FEATURES = [
   {
-    icon: <BarChart2 className="w-5 h-5 text-orange-400" />,
-    title: "ERCOT Price Monitor",
-    desc:  "Real-time and day-ahead ERCOT power prices across all major Texas hubs — updated continuously.",
+    icon: <BarChart3   className="w-5 h-5 text-orange-400" />,
+    title:  "Texas Energy Risk Score",
+    desc:   "A single Low / Medium / High risk score updated every 5 minutes, backed by three independent signal sources and a structured time horizon outlook.",
   },
   {
-    icon: <Thermometer className="w-5 h-5 text-blue-400" />,
-    title: "Weather Demand Risk",
-    desc:  "7-day Texas forecast with demand risk classification. Know when extreme heat or cold may be driving grid stress.",
+    icon: <TrendingUp  className="w-5 h-5 text-blue-400" />,
+    title:  "ERCOT Price Monitoring",
+    desc:   "Real-time Houston Hub settlement prices from the ERCOT CDR data feed, with volatility detection, trend analysis, and confidence-weighted alerts.",
   },
   {
-    icon: <Flame className="w-5 h-5 text-yellow-400" />,
-    title: "Gas Supply Pressure",
-    desc:  "EIA natural gas storage vs. 5-year averages. Monitor supply tightness before it affects prices.",
+    icon: <CloudLightning className="w-5 h-5 text-amber-400" />,
+    title:  "Weather Demand Alerts",
+    desc:   "7-day NOAA forecast integrated with grid demand modeling. Triggers when forecast temperatures indicate elevated cooling or heating load on the Texas grid.",
   },
   {
-    icon: <Bell className="w-5 h-5 text-violet-400" />,
-    title: "Smart Alerts",
-    desc:  "Get notified when multiple risk signals converge. Customizable thresholds for price, temperature, and storage.",
+    icon: <Flame       className="w-5 h-5 text-red-400" />,
+    title:  "Natural Gas Supply Pressure",
+    desc:   "EIA weekly storage data compared to 5-year seasonal averages. Signals when supply buffers are reduced, increasing sensitivity to demand spikes.",
   },
   {
-    icon: <TrendingUp className="w-5 h-5 text-green-400" />,
-    title: "Texas Risk Score",
-    desc:  "Composite Low / Medium / High risk score updated in real time based on all active market signals.",
+    icon: <Bell        className="w-5 h-5 text-green-400" />,
+    title:  "Email Alerts",
+    desc:   "Immediate notifications when risk changes from Low to Medium or Medium to High. Configurable thresholds, frequency, and market selection.",
   },
   {
-    icon: <Shield className="w-5 h-5 text-gray-400" />,
-    title: "Informational Only",
-    desc:  "Built with compliance in mind. No buy/sell advice — clear, contextual language for situational awareness.",
+    icon: <Brain       className="w-5 h-5 text-purple-400" />,
+    title:  "AI Intelligence Summary",
+    desc:   "Analyst-style summaries that synthesize all three risk drivers into a single coherent narrative with short-term, near-term, and 48-hour outlook.",
   },
+];
+
+const RISK_LEVELS = [
+  { level: "Low",    color: "text-green-400",  bg: "bg-green-500/10 border-green-500/20",  desc: "All drivers within normal range. No signals active." },
+  { level: "Medium", color: "text-amber-400",  bg: "bg-amber-500/10 border-amber-500/20",  desc: "One active driver. Monitoring is recommended." },
+  { level: "High",   color: "text-red-400",    bg: "bg-red-500/10 border-red-500/20",      desc: "Multiple drivers converging. Close monitoring warranted." },
 ];
 
 export default function LandingPage() {
   return (
     <>
       <Navbar />
-      <main className="pt-16">
+      <main className="pt-20 min-h-screen">
 
-        {/* Hero */}
-        <section className="relative overflow-hidden">
-          {/* Background glow */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-orange-500/8 rounded-full blur-3xl" />
+        {/* ── Hero ──────────────────────────────────────────────── */}
+        <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold mb-6">
+            <Zap className="w-3.5 h-3.5" />
+            Texas Energy Risk Intelligence Platform
           </div>
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20 text-center relative">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold mb-8">
-              <Zap className="w-3 h-3" />
-              Texas Energy Risk Alert Platform
-            </div>
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6">
+            Real-Time Texas<br />
+            <span className="text-orange-400">Energy Risk</span> Intelligence
+          </h1>
 
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-tight max-w-4xl mx-auto">
-              Monitor Texas Energy
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 block">
-                Risk in Real Time
-              </span>
-            </h1>
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            Monitor ERCOT pricing, weather-driven demand, and natural gas supply pressure
+            before risk turns into cost.
+          </p>
 
-            <p className="mt-6 text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              ERCOT price signals, Texas weather demand risk, and natural gas
-              supply pressure — unified into one clear risk score.
-              Informational only.
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/login?signup=true"
+              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-base transition-all shadow-lg shadow-orange-500/25"
+            >
+              Start Monitoring Free
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/pricing"
+              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold text-base transition-all"
+            >
+              View Pricing
+            </Link>
+          </div>
+
+          <p className="mt-6 text-xs text-gray-600">
+            Free tier available · No credit card required · Informational data only
+          </p>
+        </section>
+
+        {/* ── Risk score preview ────────────────────────────────── */}
+        <section className="max-w-3xl mx-auto px-4 sm:px-6 mb-24">
+          <div className="grid grid-cols-3 gap-4">
+            {RISK_LEVELS.map(({ level, color, bg, desc }) => (
+              <div key={level} className={`card-glass border rounded-xl p-4 text-center ${bg}`}>
+                <p className={`text-2xl font-black ${color}`}>{level}</p>
+                <p className="text-xs text-gray-400 mt-1 leading-snug hidden sm:block">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Problem ───────────────────────────────────────────── */}
+        <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
+          <div className="card-glass border border-white/5 rounded-2xl p-10">
+            <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-4" />
+            <h2 className="text-3xl font-black text-white mb-4">The Problem</h2>
+            <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
+              Energy buyers often react after market conditions change. By the time a price spike appears
+              on an invoice, the window to monitor, prepare, or escalate has already passed.
             </p>
-
-            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/login?signup=true"
-                className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-lg transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
-              >
-                Start Monitoring Free
-                <ChevronRight className="w-5 h-5" />
-              </Link>
-              <Link
-                href="/pricing"
-                className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-xl text-lg transition-all"
-              >
-                View Pricing
-              </Link>
-            </div>
-
-            <p className="mt-5 text-xs text-gray-600">
-              Free tier available · No credit card required
+            <p className="text-base text-gray-500 max-w-xl mx-auto mt-4 leading-relaxed">
+              Texas energy markets move fast. ERCOT prices can shift significantly within hours.
+              Weather-driven demand and gas supply pressure compound quickly — and most teams
+              are watching the wrong signals, too late.
             </p>
           </div>
         </section>
 
-        {/* Risk score preview */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
-            {(["low", "medium", "high"] as const).map((score) => {
-              const cfg = {
-                low:    { label: "LOW",    color: "text-green-400", bg: "bg-green-500/10 border-green-500/20", icon: "🟢" },
-                medium: { label: "MEDIUM", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", icon: "🟡" },
-                high:   { label: "HIGH",   color: "text-red-400",   bg: "bg-red-500/10 border-red-500/20",     icon: "🔴" },
-              }[score];
-              return (
-                <div key={score} className={`card-glass p-4 border ${cfg.bg} text-center`}>
-                  <div className="text-2xl mb-1">{cfg.icon}</div>
-                  <p className={`text-xs font-black ${cfg.color}`}>{cfg.label}</p>
-                  <p className="text-xs text-gray-500">RISK</p>
-                </div>
-              );
-            })}
+        {/* ── Solution ──────────────────────────────────────────── */}
+        <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6">
+            <Shield className="w-3.5 h-3.5" />
+            The Solution
           </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-white mb-6">
+            Early risk signals across<br className="hidden sm:block" /> power, weather, and gas markets
+          </h2>
+          <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed mb-4">
+            TX Energy Risk detects early risk signals across ERCOT power prices, Texas weather demand,
+            and natural gas supply — unified into one clear risk score with a structured time horizon outlook.
+          </p>
+          <p className="text-base text-gray-500 max-w-xl mx-auto leading-relaxed">
+            Not a trading tool. Not investment advice. A situational awareness platform
+            that tells you when to pay closer attention.
+          </p>
         </section>
 
-        {/* Features */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black text-white">
-              Everything Texas energy professionals need
-            </h2>
-            <p className="mt-4 text-gray-400 max-w-xl mx-auto">
-              Built for buyers, operators, and investors who need to stay ahead
-              of ERCOT conditions — not wade through raw data.
+        {/* ── Features ──────────────────────────────────────────── */}
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">What you get</h2>
+            <p className="text-gray-400 max-w-xl mx-auto">
+              Three independent signal sources. One unified risk score. Built for Texas energy markets.
             </p>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((f) => (
-              <div key={f.title} className="card-glass p-6 border border-white/5 hover:border-white/10 transition-all">
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center mb-4">
+              <div key={f.title} className="card-glass border border-white/5 rounded-xl p-6">
+                <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center mb-4">
                   {f.icon}
                 </div>
-                <h3 className="font-bold text-white mb-2">{f.title}</h3>
+                <h3 className="text-sm font-bold text-white mb-2">{f.title}</h3>
                 <p className="text-sm text-gray-400 leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-          <div className="card-glass border border-orange-500/20 bg-orange-500/5 rounded-2xl p-12 text-center">
+        {/* ── CTA ───────────────────────────────────────────────── */}
+        <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
+          <div className="card-glass border border-orange-500/20 bg-orange-500/5 rounded-2xl p-10">
             <h2 className="text-3xl font-black text-white mb-4">
-              Risk may be rising. Are you watching?
+              Start monitoring Texas energy risk
             </h2>
             <p className="text-gray-400 mb-8 max-w-lg mx-auto">
-              Join Texas energy professionals monitoring ERCOT conditions daily.
-              Free tier available.
+              Free tier available. No credit card required.
+              Upgrade to Pro for email alerts and full intelligence access.
             </p>
-            <Link
-              href="/login?signup=true"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-lg transition-all shadow-lg shadow-orange-500/25"
-            >
-              Create Free Account
-              <ChevronRight className="w-5 h-5" />
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/login?signup=true"
+                className="flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-all shadow-lg shadow-orange-500/25"
+              >
+                Start Monitoring Free
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/pricing"
+                className="px-8 py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold transition-all"
+              >
+                View Pricing
+              </Link>
+            </div>
           </div>
         </section>
+
+        {/* ── Disclaimer ────────────────────────────────────────── */}
+        <section className="max-w-3xl mx-auto px-4 pb-16 text-center">
+          <p className="text-xs text-gray-600 leading-relaxed">
+            Informational analytics only. Not investment, trading, or procurement advice.
+            All data is sourced from publicly available ERCOT, NOAA, and EIA data feeds.
+            Risk indicators are probabilistic and do not guarantee any particular market outcome.
+            Consult qualified advisors before making energy procurement or financial decisions.
+          </p>
+        </section>
+
       </main>
       <Footer />
     </>

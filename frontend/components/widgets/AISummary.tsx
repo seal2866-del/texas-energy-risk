@@ -1,56 +1,101 @@
 "use client";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { Brain, Clock } from "lucide-react";
+import type { RiskScore, TimeHorizons } from "@/lib/api";
+import { cn, riskColor } from "@/lib/utils";
 
 interface Props {
-  summary:    string;
-  riskScore:  string;
-  disclaimer: string;
-  computedAt: string;
+  summary:       string;
+  riskScore:     RiskScore;
+  disclaimer:    string;
+  computedAt:    string;
+  timeHorizons?: TimeHorizons;
 }
 
-function parseSummary(text: string): string[] {
-  return text.split(/\.\s+(?=[A-Z])/).map((s) => s.trim().replace(/\.$/, "") + ".").filter(Boolean);
+function parseSummary(text: string): { text: string; type: "headline" | "horizon" | "disclaimer" | "body" }[] {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text];
+  return sentences.map((s) => {
+    const t = s.trim();
+    if (!t) return null;
+    if (/(short-term energy risk|risk is (low|medium|high))/i.test(t))
+      return { text: t, type: "headline" as const };
+    if (/(situational awareness|not a trading|not.*advice|informational)/i.test(t))
+      return { text: t, type: "disclaimer" as const };
+    return { text: t, type: "body" as const };
+  }).filter(Boolean) as any[];
 }
 
-export default function AISummary({ summary, riskScore, disclaimer, computedAt }: Props) {
-  const time = new Date(computedAt).toLocaleTimeString("en-US", {
-    hour: "numeric", minute: "2-digit", timeZone: "America/Chicago", timeZoneName: "short",
+const HORIZON_COLORS = {
+  short_term: "text-gray-200",
+  near_term:  "text-amber-400/80",
+  outlook:    "text-gray-400",
+};
+
+export default function AISummary({ summary, riskScore, disclaimer, computedAt, timeHorizons }: Props) {
+  const parts = parseSummary(summary);
+  const time  = new Date(computedAt).toLocaleTimeString("en-US", {
+    timeZone: "America/Chicago", timeZoneName: "short",
   });
-  const sentences = parseSummary(summary);
 
   return (
-    <div className="card-glass p-6 border border-white/5 col-span-full">
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-4 h-4 text-violet-400" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-white">Energy Risk Intelligence Summary</p>
-            <span className="text-xs text-gray-500">{time}</span>
+    <div className="card-glass border border-white/5 p-6 lg:col-span-2">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
+            <Brain className="w-4 h-4 text-blue-400" />
           </div>
-
-          {sentences.length > 1 ? (
-            <div className="space-y-2">
-              {sentences.map((sentence, i) => {
-                if (i === 0) return <p key={i} className="text-sm font-semibold text-white leading-relaxed">{sentence}</p>;
-                if (sentence.includes("24") && sentence.toLowerCase().includes("outlook"))
-                  return <p key={i} className="text-xs text-amber-300/80 leading-relaxed font-medium">{sentence}</p>;
-                if (sentence.includes("situational awareness") || sentence.includes("not a trading"))
-                  return <p key={i} className="text-xs text-gray-600 leading-relaxed">{sentence}</p>;
-                return <p key={i} className="text-sm text-gray-300 leading-relaxed">{sentence}</p>;
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-200 leading-relaxed">{summary}</p>
-          )}
-
-          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-200/70 leading-relaxed">{disclaimer}</p>
-          </div>
+          <p className="text-sm font-semibold text-white">Energy Risk Intelligence Summary</p>
         </div>
+        <span className="text-xs text-gray-600 font-mono">{time}</span>
       </div>
+
+      {/* Prose summary */}
+      <div className="space-y-1.5 mb-5">
+        {parts.map((p, i) => (
+          <p
+            key={i}
+            className={cn(
+              "text-sm leading-relaxed",
+              p.type === "headline"   ? cn("font-bold", riskColor(riskScore)) :
+              p.type === "disclaimer" ? "text-gray-600 text-xs" :
+                                        "text-gray-300"
+            )}
+          >
+            {p.text}
+          </p>
+        ))}
+      </div>
+
+      {/* Phase 1 — Structured time horizons block */}
+      {timeHorizons && (
+        <div className="border-t border-white/5 pt-4 mb-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Clock className="w-3.5 h-3.5 text-gray-500" />
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Time Horizon Outlook</p>
+          </div>
+          <div className="space-y-2">
+            {([
+              ["short_term", timeHorizons.short_term],
+              ["near_term",  timeHorizons.near_term],
+              ["outlook",    timeHorizons.outlook],
+            ] as [keyof typeof HORIZON_COLORS, string][]).map(([key, line]) => (
+              <div key={key} className="flex gap-2">
+                <span className={cn("text-xs font-mono leading-relaxed", HORIZON_COLORS[key])}>
+                  {line}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Disclaimer */}
+      {disclaimer && (
+        <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/6">
+          <p className="text-xs text-gray-600 leading-relaxed">
+            <span className="text-gray-500 font-medium">ⓘ </span>{disclaimer}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

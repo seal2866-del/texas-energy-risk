@@ -1,6 +1,6 @@
 "use client";
-import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap } from "lucide-react";
-import type { RiskScore as RiskScoreType } from "@/lib/api";
+import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap, Info } from "lucide-react";
+import type { RiskScore as RiskScoreType, TimeHorizons } from "@/lib/api";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   computedAt:         string;
   summary:            string;
   confidence?:        number | null;
+  confidenceNote?:    string;
   explanation?:       string;
   impact?:            string;
   primaryDriver?:     string;
@@ -16,6 +17,8 @@ interface Props {
   secondaryFactors?:  string[];
   dataValid?:         boolean;
   dataStatus?:        string;
+  riskHeadline?:      string;
+  timeHorizons?:      TimeHorizons;
 }
 
 const SCORE_CONFIG = {
@@ -40,8 +43,8 @@ function dataStatusLabel(status: string): string {
 
 function DirectionBadge({ direction }: { direction: "increasing" | "stable" | "decreasing" }) {
   const configs = {
-    increasing: { icon: <TrendingUp  className="w-3.5 h-3.5" />, label: "Increasing", cls: "text-red-400 bg-red-500/10 border-red-500/20" },
-    stable:     { icon: <Minus       className="w-3.5 h-3.5" />, label: "Stable",     cls: "text-gray-400 bg-white/5 border-white/10" },
+    increasing: { icon: <TrendingUp   className="w-3.5 h-3.5" />, label: "Increasing", cls: "text-red-400 bg-red-500/10 border-red-500/20" },
+    stable:     { icon: <Minus        className="w-3.5 h-3.5" />, label: "Stable",     cls: "text-gray-400 bg-white/5 border-white/10" },
     decreasing: { icon: <TrendingDown className="w-3.5 h-3.5" />, label: "Decreasing", cls: "text-green-400 bg-green-500/10 border-green-500/20" },
   };
   const cfg = configs[direction];
@@ -54,9 +57,9 @@ function DirectionBadge({ direction }: { direction: "increasing" | "stable" | "d
 
 export default function RiskScore({
   score, activeSignals, computedAt, summary,
-  confidence, explanation, impact,
+  confidence, confidenceNote, explanation, impact,
   primaryDriver, riskDirection, secondaryFactors,
-  dataValid, dataStatus,
+  dataValid, dataStatus, riskHeadline, timeHorizons,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
 
@@ -112,7 +115,13 @@ export default function RiskScore({
         <Activity className="w-5 h-5 text-gray-600" />
       </div>
 
-      <div className="mt-5">
+      {/* Risk headline — Phase 1 */}
+      {riskHeadline && (
+        <p className={cn("mt-3 text-sm font-bold", riskColor(score))}>{riskHeadline}</p>
+      )}
+
+      {/* Signal intensity bar */}
+      <div className="mt-4">
         <div className="flex justify-between text-xs text-gray-500 mb-1.5">
           <span>Signal intensity</span><span>{activeSignals}/3</span>
         </div>
@@ -171,7 +180,27 @@ export default function RiskScore({
         </div>
       )}
 
-      {!explanation && (
+      {/* Phase 3 — Confidence note */}
+      {confidenceNote && confidence != null && (
+        <div className="mt-3 flex items-start gap-1.5">
+          <Info className="w-3 h-3 text-gray-600 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-gray-600 leading-relaxed">{confidenceNote}</p>
+        </div>
+      )}
+
+      {/* Phase 1 — Time horizons */}
+      {timeHorizons && (
+        <div className="mt-4 space-y-1 border-t border-white/5 pt-3">
+          {[timeHorizons.short_term, timeHorizons.near_term, timeHorizons.outlook].map((line, i) => (
+            <p key={i} className={cn(
+              "text-xs font-mono leading-relaxed",
+              i === 0 ? "text-gray-400" : i === 1 ? "text-gray-500" : "text-gray-600"
+            )}>{line}</p>
+          ))}
+        </div>
+      )}
+
+      {!explanation && !riskHeadline && (
         <p className="mt-4 text-sm text-gray-300 leading-relaxed line-clamp-3">{summary}</p>
       )}
 

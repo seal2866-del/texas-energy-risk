@@ -10,6 +10,7 @@ import VolatilityAlert from "@/components/widgets/VolatilityAlert";
 import WeatherRisk from "@/components/widgets/WeatherRisk";
 import GasSupply from "@/components/widgets/GasSupply";
 import AISummary from "@/components/widgets/AISummary";
+import DataSources from "@/components/widgets/DataSources";
 import { supabase } from "@/lib/supabase";
 import {
   getSignals, getERCOTPrices, getWeatherForecast, getGasData,
@@ -20,15 +21,15 @@ const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
 type Location = typeof LOCATIONS[number];
 
 export default function DashboardPage() {
-  const router    = useRouter();
-  const [user,    setUser]    = useState<any>(null);
+  const router     = useRouter();
+  const [user,     setUser]     = useState<any>(null);
   const [location, setLocation] = useState<Location>("Houston");
 
-  const [signals,   setSignals]   = useState<SignalsResponse | null>(null);
-  const [prices,    setPrices]    = useState<ERCOTPrice[]>([]);
-  const [forecasts, setForecasts] = useState<WeatherForecast[]>([]);
-  const [gasRecs,   setGasRecs]   = useState<GasRecord[]>([]);
-  const [gasLatest, setGasLatest] = useState<GasRecord | null>(null);
+  const [signals,    setSignals]    = useState<SignalsResponse | null>(null);
+  const [prices,     setPrices]     = useState<ERCOTPrice[]>([]);
+  const [forecasts,  setForecasts]  = useState<WeatherForecast[]>([]);
+  const [gasRecs,    setGasRecs]    = useState<GasRecord[]>([]);
+  const [gasLatest,  setGasLatest]  = useState<GasRecord | null>(null);
 
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -87,6 +88,7 @@ export default function DashboardPage() {
       <main className="pt-20 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
+          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
               <h1 className="text-2xl font-black text-white">Energy Risk Dashboard</h1>
@@ -118,19 +120,21 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Disclaimer */}
           <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/60 text-center">
             All data is for informational purposes only. Risk indicators are not investment, trading, or procurement advice.
           </div>
 
           {loading ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className={`card-glass border border-white/5 p-6 h-48 animate-pulse ${i === 5 ? "lg:col-span-2" : ""}`} />
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className={`card-glass border border-white/5 p-6 h-48 animate-pulse ${i >= 5 ? "lg:col-span-2" : ""}`} />
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
+              {/* 1. Risk Score */}
               {signals && (
                 <RiskScore
                   score={signals.risk_score}
@@ -138,6 +142,7 @@ export default function DashboardPage() {
                   computedAt={signals.computed_at}
                   summary={signals.summary}
                   confidence={signals.confidence}
+                  confidenceNote={signals.confidence_note}
                   explanation={signals.explanation}
                   impact={signals.impact}
                   primaryDriver={signals.primary_driver}
@@ -145,15 +150,20 @@ export default function DashboardPage() {
                   secondaryFactors={signals.secondary_factors}
                   dataValid={signals.data_valid}
                   dataStatus={signals.data_status}
+                  riskHeadline={signals.risk_headline}
+                  timeHorizons={signals.time_horizons}
                 />
               )}
 
+              {/* 2. ERCOT Price Monitor */}
               <ERCOTPriceMonitor prices={prices} />
 
+              {/* 3. Volatility Alert */}
               {signals && (
                 <VolatilityAlert signal={signals.signals.price_volatility ?? EMPTY_SIGNAL} />
               )}
 
+              {/* 4. Weather Demand Risk */}
               {signals && (
                 <WeatherRisk
                   forecasts={forecasts}
@@ -161,6 +171,7 @@ export default function DashboardPage() {
                 />
               )}
 
+              {/* 5. Gas Supply */}
               {signals && (
                 <GasSupply
                   records={gasRecs}
@@ -169,19 +180,22 @@ export default function DashboardPage() {
                 />
               )}
 
-              <div className="card-glass border border-white/5 p-6 flex items-center justify-center text-center">
-                <div>
-                  <p className="text-sm font-semibold text-gray-400 mb-1">More signals coming soon</p>
-                  <p className="text-xs text-gray-600">Grid frequency, renewable penetration, ancillary market data</p>
-                </div>
-              </div>
+              {/* 6. Data Sources — Phase 6 */}
+              {signals && signals.data_sources && (
+                <DataSources
+                  sources={signals.data_sources}
+                  computedAt={signals.computed_at}
+                />
+              )}
 
+              {/* 7. AI Summary (full width) */}
               {signals && (
                 <AISummary
                   summary={signals.summary}
                   riskScore={signals.risk_score}
                   disclaimer={signals.disclaimer}
                   computedAt={signals.computed_at}
+                  timeHorizons={signals.time_horizons}
                 />
               )}
 

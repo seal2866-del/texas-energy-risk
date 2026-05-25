@@ -111,14 +111,14 @@ async def fetch_ercot_prices(
     CRITICAL: Returns ONLY real ERCOT prices from the in-memory cache.
     NO mock data is mixed in, ever.
 
-    - If ERCOT_API_ENABLED=false → returns full mock (dev/test only, clearly labeled)
-    - If ERCOT_API_ENABLED=true  → fetches CDR, caches new reading, returns real cache only
-    - If CDR fetch fails          → returns existing real cache (may be empty)
+    - If ERCOT_API_ENABLED=false -> returns full mock (dev/test only, clearly labeled)
+    - If ERCOT_API_ENABLED=true  -> fetches CDR, caches new reading, returns real cache only
+    - If CDR fetch fails          -> returns existing real cache (may be empty)
     """
     enabled = os.getenv("ERCOT_API_ENABLED", "false").lower() == "true"
 
     if not enabled:
-        logger.debug("[ERCOT] API disabled — returning mock data (dev mode)")
+        logger.debug("[ERCOT] API disabled -- returning mock data (dev mode)")
         return mock_data.mock_ercot_prices(hours, settlement_point)
 
     try:
@@ -129,7 +129,7 @@ async def fetch_ercot_prices(
         live_price = _parse_ercot_cdr(r.text, settlement_point)
 
         if live_price is None:
-            logger.warning("[ERCOT] CDR parse failed — returning existing cache only")
+            logger.warning("[ERCOT] CDR parse failed -- returning existing cache only")
             return _get_cached_prices(settlement_point)
 
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
@@ -144,7 +144,6 @@ async def fetch_ercot_prices(
         added = _cache_price(record)
         cached = _get_cached_prices(settlement_point)
 
-        # Task 7 — Debug logging
         if len(cached) >= 2:
             prev = cached[-2]["price_mwh"]
             logger.info(

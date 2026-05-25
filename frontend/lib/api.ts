@@ -29,19 +29,42 @@ export interface Signal {
   computed_at:  string;
 }
 
+export interface DataSourceStatus {
+  status:       "active" | "stale" | "unavailable";
+  last_updated: string | null;
+  age_minutes:  number | null;
+  source?:      string;
+}
+
+export interface DataSources {
+  ercot: DataSourceStatus;
+  noaa:  DataSourceStatus;
+  eia:   DataSourceStatus;
+}
+
+export interface TimeHorizons {
+  short_term: string;
+  near_term:  string;
+  outlook:    string;
+}
+
 export interface SignalsResponse {
-  computed_at:          string;
-  risk_score:           RiskScore;
-  active_signals:       number;
-  confidence:           number | null;
-  explanation:          string;
-  impact:               string;
-  primary_driver:       string;
-  primary_driver_type:  string;
-  risk_direction:       "increasing" | "stable" | "decreasing";
-  secondary_factors:    string[];
-  data_valid:           boolean;
-  data_status:          string;
+  computed_at:           string;
+  risk_score:            RiskScore;
+  risk_headline:         string;
+  active_signals:        number;
+  confidence:            number | null;
+  confidence_note:       string;
+  explanation:           string;
+  impact:                string;
+  primary_driver:        string;
+  primary_driver_type:   string;
+  risk_direction:        "increasing" | "stable" | "decreasing";
+  secondary_factors:     string[];
+  data_valid:            boolean;
+  data_status:           string;
+  time_horizons:         TimeHorizons;
+  data_sources:          DataSources;
   signals: {
     price_volatility: Signal;
     weather_demand:   Signal;
@@ -80,12 +103,17 @@ export interface GasRecord {
 }
 
 export interface AlertLog {
-  id:           string;
-  channel:      string;
-  severity:     RiskScore;
-  message:      string;
-  sent_at:      string;
-  acknowledged: boolean;
+  id:              string;
+  channel:         string;
+  severity:        RiskScore;
+  message:         string;
+  sent_at:         string;
+  acknowledged:    boolean;
+  risk_level?:     string;
+  primary_driver?: string;
+  city?:           string;
+  delivered_email?: boolean;
+  delivered_sms?:  boolean;
 }
 
 export const getSignals = (location = "Houston") =>
