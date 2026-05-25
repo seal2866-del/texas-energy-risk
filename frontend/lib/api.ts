@@ -113,17 +113,28 @@ export interface GasRecord {
 }
 
 export interface AlertLog {
-  id:              string;
-  channel:         string;
-  severity:        RiskScore;
-  message:         string;
-  sent_at:         string;
-  acknowledged:    boolean;
-  risk_level?:     string;
-  primary_driver?: string;
-  city?:           string;
-  delivered_email?: boolean;
-  delivered_sms?:  boolean;
+  id:                    string;
+  channel:               string;
+  severity:              RiskScore;
+  message:               string;
+  sent_at:               string;
+  created_at?:           string;
+  acknowledged:          boolean;
+  risk_level?:           string;
+  previous_risk_level?:  string;
+  alert_type?:           string;
+  primary_driver?:       string;
+  risk_direction?:       string;
+  city?:                 string;
+  confidence?:           number | null;
+  ercot_price?:          number | null;
+  weather_temp?:         number | null;
+  gas_storage?:          number | null;
+  source_health_status?: string;
+  delivery_status?:      string;
+  delivered_email?:      boolean;
+  delivered_sms?:        boolean;
+  voice_sent?:           boolean;
 }
 
 export const getSignals = (location = "Houston") =>

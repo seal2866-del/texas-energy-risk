@@ -11,6 +11,7 @@ import WeatherRisk from "@/components/widgets/WeatherRisk";
 import GasSupply from "@/components/widgets/GasSupply";
 import AISummary from "@/components/widgets/AISummary";
 import DataSources from "@/components/widgets/DataSources";
+import RecentAlerts from "@/components/widgets/RecentAlerts";
 import { supabase } from "@/lib/supabase";
 import {
   getSignals, getERCOTPrices, getWeatherForecast, getGasData,
@@ -20,7 +21,6 @@ import {
 const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
 type Location = typeof LOCATIONS[number];
 
-// Task 4 -- Urgency alert banner
 function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   if (!signals.data_valid) return null;
   const score   = signals.risk_score;
@@ -152,7 +152,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Task 4 -- Urgency alert banner */}
+          {/* Urgency banner */}
           {signals && <UrgencyBanner signals={signals} />}
 
           {/* Disclaimer */}
@@ -162,8 +162,8 @@ export default function DashboardPage() {
 
           {loading ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className={`card-glass border border-white/5 p-6 h-48 animate-pulse ${i >= 5 ? "lg:col-span-2" : ""}`} />
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className={`card-glass border border-white/5 p-6 h-48 animate-pulse ${i >= 6 ? "lg:col-span-2" : ""}`} />
               ))}
             </div>
           ) : (
@@ -225,7 +225,10 @@ export default function DashboardPage() {
                 />
               )}
 
-              {/* 7. AI Summary (full width) */}
+              {/* 7. Recent Alerts (full width) */}
+              <RecentAlerts />
+
+              {/* 8. AI Summary (full width) */}
               {signals && (
                 <AISummary
                   summary={signals.summary}
