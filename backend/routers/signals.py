@@ -65,7 +65,7 @@ async def _maybe_trigger_alert(result: dict, location: str, authorization: str) 
         logger.warning("[SIGNALS] Alert dispatch error (non-fatal): %s", exc)
 
 
-@router.get("/")
+@router.get("")
 async def get_signals(
     location:      str = Query(default="Houston"),
     authorization: str = Header(default=""),
