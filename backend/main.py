@@ -126,4 +126,6 @@ async def root():
         "version":    "1.0.0",
         "disclaimer": (
             "All signals and data are for informational purposes only. "
-  
+            "Not investment, trading, or procurement advice."
+        ),
+    }
