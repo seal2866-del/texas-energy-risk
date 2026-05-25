@@ -84,7 +84,11 @@ def _assess_data_sources(
         latest = records[-1]
         ts_raw = latest.get(ts_field, "")
         try:
-            ts          = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+            ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+            # EIA returns date-only strings ("2024-01-26") which parse as
+            # naive datetimes. Make them UTC-aware so subtraction works.
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
             age_minutes = (now - ts).total_seconds() / 60
             status      = "active" if age_minutes <= fresh_minutes else "stale"
             return {
@@ -93,7 +97,8 @@ def _assess_data_sources(
                 "age_minutes":  round(age_minutes, 1),
                 "source":       latest.get("source", source_label),
             }
-        except Exception:
+        except Exception as exc:
+            logger.warning("[SOURCE_STATUS] parse error for %s ts=%r: %s", source_label, ts_raw, exc)
             return {"status": "unavailable", "last_updated": None, "age_minutes": None}
 
     ercot_status = _source_status(prices,      "timestamp",    15,    "ercot_cdr")
