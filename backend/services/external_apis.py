@@ -73,53 +73,69 @@ def get_cache_status(settlement_point: str = "HB_HOUSTON") -> Dict[str, Any]:
 
 
 # ── ERCOT CDR Scraper ─────────────────────────────────────────────────────────
-ERCOT_CDR_URL = "https://www.ercot.com/content/cdr/html/hb_lz.html"
+ERCOT_CDR_URL      = "https://www.ercot.com/content/cdr/html/hb_lz.html"
+ERCOT_CDR_URL_ALT  = "https://www.ercot.com/content/cdr/html/rtbm_spp_node_zone_hub.html"
 _ERCOT_HEADERS = {
-    "User-Agent": "TexasEnergyRiskPlatform/1.0 (informational research tool)",
-    "Accept":     "text/html,application/xhtml+xml",
+    "User-Agent": "Mozilla/5.0 (compatible; EnergyRiskBot/1.0; informational research)",
+    "Accept":     "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
 }
 
 
 def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
+    """
+    Robust multi-strategy parser for ERCOT CDR HTML pages.
+    Finds the row/section containing the settlement point and extracts
+    any number that looks like a plausible ERCOT LMP price.
+    ERCOT LMPs range from ~-$500 to $5,000.
+    """
     if not html or len(html) < 100:
-        logger.warning("[ERCOT] Response too short (%d chars) -- likely an error page", len(html))
+        logger.warning("[ERCOT] Response too short (%d chars)", len(html))
         return None
 
-    # Log a preview for Railway diagnostics
-    preview = html[:400].replace("\n", " ").replace("\r", "")
-    logger.info("[ERCOT] HTML preview (first 400): %s", preview)
+    logger.info("[ERCOT] HTML preview: %s", html[:500].replace("\n", " ").replace("\r", ""))
 
-    # Pattern 1: standard CDR table  <td>HB_HOUSTON</td><td>45.23</td>
-    p1 = rf'{re.escape(settlement_point)}[^<]*</td>\s*<td[^>]*>\s*([\d]+\.[\d]+)'
-    m1 = re.search(p1, html, re.IGNORECASE)
-    if m1:
-        val = float(m1.group(1))
-        if val > 0:
-            logger.info("[ERCOT] Pattern1 matched %s = %.2f", settlement_point, val)
+    # ── Locate the settlement point in the HTML ────────────────────────────────
+    idx = html.upper().find(settlement_point.upper())
+    if idx == -1:
+        logger.warning("[ERCOT] '%s' not found anywhere in HTML (%d chars total)",
+                       settlement_point, len(html))
+        return None
+
+    # Work with the 800 chars after the match — covers the rest of the table row
+    context = html[idx: idx + 800]
+    logger.info("[ERCOT] Context after %s: %s",
+                settlement_point, context[:300].replace("\n", " ").replace("\r", ""))
+
+    # ── Strategy 1: numbers inside <td>...</td> cells ─────────────────────────
+    td_nums = re.findall(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', context, re.IGNORECASE)
+    for s in td_nums:
+        val = float(s)
+        if -500 <= val <= 5000 and abs(val) > 0.01:
+            logger.info("[ERCOT] Strategy1 (td cell) => %s = %.2f", settlement_point, val)
             return val
 
-    # Pattern 2: value appears anywhere near the settlement point name
-    p2 = rf'{re.escape(settlement_point)}[^0-9\n]{{0,80}}?([\d]{{1,6}}\.[\d]{{2}})'
-    m2 = re.search(p2, html, re.IGNORECASE | re.DOTALL)
-    if m2:
-        val = float(m2.group(1))
-        if val > 0.5:          # ignore 0.00 false positives
-            logger.info("[ERCOT] Pattern2 matched %s = %.2f", settlement_point, val)
+    # ── Strategy 2: any decimal in the context that looks like a price ────────
+    all_decimals = re.findall(r'-?[\d]{1,6}\.[\d]{1,2}', context)
+    for s in all_decimals:
+        val = float(s)
+        # Skip numbers that look like dates (2024.01), percentages near 100,
+        # or implausibly small values — but allow negative prices
+        if (1.0 <= val <= 5000) or (-500 <= val < -0.5):
+            logger.info("[ERCOT] Strategy2 (decimal scan) => %s = %.2f", settlement_point, val)
             return val
 
-    # Pattern 3: JSON-style  "HB_HOUSTON": 45.23  or  "price": 45.23 near the name
-    p3 = rf'{re.escape(settlement_point)}[^}}]{{0,120}}"(?:price|value|lmp)"[^0-9]{{0,20}}([\d]+\.[\d]+)'
-    m3 = re.search(p3, html, re.IGNORECASE | re.DOTALL)
+    # ── Strategy 3: JSON value near the settlement point ─────────────────────
+    p3 = r'"(?:price|value|lmp|spp|settlementPointPrice)"[^0-9-]{0,20}(-?[\d]{1,6}\.[\d]{1,4})'
+    m3 = re.search(p3, context, re.IGNORECASE)
     if m3:
         val = float(m3.group(1))
-        if val > 0.5:
-            logger.info("[ERCOT] Pattern3 (JSON) matched %s = %.2f", settlement_point, val)
+        if -500 <= val <= 5000:
+            logger.info("[ERCOT] Strategy3 (JSON key) => %s = %.2f", settlement_point, val)
             return val
 
-    logger.warning(
-        "[ERCOT] No pattern matched for %s -- HTML snippet: %s",
-        settlement_point, html[:300].replace("\n", " ")
-    )
+    logger.warning("[ERCOT] All strategies failed for %s. Context: %s",
+                   settlement_point, context[:200].replace("\n", " "))
     return None
 
 
@@ -147,20 +163,23 @@ async def fetch_ercot_prices(
         return mock_data.mock_ercot_prices(hours, settlement_point)
 
     try:
+        live_price: Optional[float] = None
         async with httpx.AsyncClient(timeout=15, headers=_ERCOT_HEADERS, follow_redirects=True) as client:
-            r = await client.get(ERCOT_CDR_URL)
-
-        logger.info("[ERCOT] CDR response: status=%d content-type=%s length=%d",
-                    r.status_code, r.headers.get("content-type", "?"), len(r.text))
-
-        if r.status_code != 200:
-            logger.warning("[ERCOT] Non-200 status %d -- returning cache", r.status_code)
-            return _get_cached_prices(settlement_point)
-
-        live_price = _parse_ercot_cdr(r.text, settlement_point)
+            for url in [ERCOT_CDR_URL, ERCOT_CDR_URL_ALT]:
+                try:
+                    r = await client.get(url)
+                    logger.info("[ERCOT] %s => status=%d ct=%s len=%d",
+                                url.split("/")[-1], r.status_code,
+                                r.headers.get("content-type", "?")[:40], len(r.text))
+                    if r.status_code == 200 and len(r.text) > 200:
+                        live_price = _parse_ercot_cdr(r.text, settlement_point)
+                        if live_price is not None:
+                            break
+                except Exception as url_exc:
+                    logger.warning("[ERCOT] URL %s failed: %s", url, url_exc)
 
         if live_price is None:
-            logger.warning("[ERCOT] CDR parse failed -- returning existing cache only")
+            logger.warning("[ERCOT] All CDR URLs failed to yield a price -- returning cache")
             return _get_cached_prices(settlement_point)
 
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
