@@ -192,7 +192,7 @@ export interface AlertLog {
 }
 
 export const getSignals = (location = "Houston") =>
-  apiFetch<SignalsResponse>(`/api/signals?location=${location}`);
+  apiFetch<SignalsResponse>(`/api/signals/?location=${location}`);
 
 export const getERCOTPrices = (hours = 24, point = "HB_HOUSTON") =>
   apiFetch<{ prices: ERCOTPrice[] }>(`/api/ercot/prices?hours=${hours}&settlement_point=${point}`);
