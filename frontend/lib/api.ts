@@ -192,16 +192,16 @@ export interface AlertLog {
 }
 
 export const getSignals = (location = "Houston") =>
-  apiFetch<SignalsResponse>(`/api/signals/?location=${location}`);
+  apiFetch<SignalsResponse>(`/api/signals?location=${location}`);
 
 export const getERCOTPrices = (hours = 24, point = "HB_HOUSTON") =>
-  apiFetch<{ prices: ERCOTPrice[] }>(`/api/ercot/prices/?hours=${hours}&settlement_point=${point}`);
+  apiFetch<{ prices: ERCOTPrice[] }>(`/api/ercot/prices?hours=${hours}&settlement_point=${point}`);
 
 export const getWeatherForecast = (location = "Houston", days = 7) =>
-  apiFetch<{ forecasts: WeatherForecast[] }>(`/api/weather/forecast/?location=${location}&days=${days}`);
+  apiFetch<{ forecasts: WeatherForecast[] }>(`/api/weather/forecast?location=${location}&days=${days}`);
 
 export const getGasData = (weeks = 8) =>
-  apiFetch<{ records: GasRecord[]; latest: GasRecord }>(`/api/gas/storage/?weeks=${weeks}`);
+  apiFetch<{ records: GasRecord[]; latest: GasRecord }>(`/api/gas/storage?weeks=${weeks}`);
 
 export const getAlertLogs = (limit = 20) =>
   apiFetch<{ alerts: AlertLog[] }>(`/api/alerts/log/?limit=${limit}`);

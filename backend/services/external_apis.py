@@ -75,9 +75,9 @@ def get_cache_status(settlement_point: str = "HB_HOUSTON") -> Dict[str, Any]:
 # ── ERCOT CDR Scraper ─────────────────────────────────────────────────────────
 # CDR pages tried in order until a valid price is parsed.
 ERCOT_CDR_URLS = [
-    "https://www.ercot.com/content/cdr/html/hb_lz.html",
-    "https://www.ercot.com/content/cdr/html/rtbm_spp_node_zone_hub.html",
+    # real_time_spp.html has full data (~55KB); hb_lz.html is JS-only shell (~8KB, no prices)
     "https://www.ercot.com/content/cdr/html/real_time_spp.html",
+    "https://www.ercot.com/content/cdr/html/hb_lz.html",
 ]
 ERCOT_HOME_URL = "https://www.ercot.com/"   # pre-flight to pick up session cookies
 
