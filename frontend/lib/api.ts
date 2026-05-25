@@ -1,5 +1,5 @@
 /**
- * api.ts — typed fetch wrappers for the FastAPI backend.
+ * api.ts -- typed fetch wrappers for the FastAPI backend.
  */
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -48,23 +48,33 @@ export interface TimeHorizons {
   outlook:    string;
 }
 
+export interface SignalDriver {
+  name:     string;
+  type:     string;
+  active:   boolean;
+  severity: RiskScore;
+}
+
 export interface SignalsResponse {
-  computed_at:           string;
-  risk_score:            RiskScore;
-  risk_headline:         string;
-  active_signals:        number;
-  confidence:            number | null;
-  confidence_note:       string;
-  explanation:           string;
-  impact:                string;
-  primary_driver:        string;
-  primary_driver_type:   string;
-  risk_direction:        "increasing" | "stable" | "decreasing";
-  secondary_factors:     string[];
-  data_valid:            boolean;
-  data_status:           string;
-  time_horizons:         TimeHorizons;
-  data_sources:          DataSources;
+  computed_at:             string;
+  risk_score:              RiskScore;
+  risk_headline:           string;
+  active_signals:          number;
+  confidence:              number | null;
+  confidence_note:         string;
+  explanation:             string;
+  impact:                  string;
+  primary_driver:          string;
+  primary_driver_type:     string;
+  risk_direction:          "increasing" | "stable" | "decreasing";
+  risk_direction_context?: string;
+  market_context?:         string;
+  signal_drivers?:         SignalDriver[];
+  secondary_factors:       string[];
+  data_valid:              boolean;
+  data_status:             string;
+  time_horizons:           TimeHorizons;
+  data_sources:            DataSources;
   signals: {
     price_volatility: Signal;
     weather_demand:   Signal;

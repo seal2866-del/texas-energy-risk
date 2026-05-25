@@ -45,4 +45,4 @@ ALTER TABLE alert_preferences
   ADD COLUMN IF NOT EXISTS updated_at      TIMESTAMPTZ DEFAULT now();
 
 -- Index for fast per-user lookups
-CREATE INDEX IF NOT EXISTS idx_alert_logs_user_created ON alert_logs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alert_logs_user_sent ON alert_logs(user_id, sent_at DESC);

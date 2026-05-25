@@ -14,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 logger = logging.getLogger(__name__)
 
 
-# ── Thresholds ────────────────────────────────────────────────────────────────
+# -- Thresholds ----------------------------------------------------------------
 PRICE_SPIKE_THRESHOLD_PCT = 50.0
 PRICE_ABS_HIGH_MWH        = 150.0
 PRICE_LOW_FLOOR           = 10.0
@@ -22,12 +22,12 @@ TEMP_HIGH_THRESHOLD_F     = 100.0
 TEMP_LOW_THRESHOLD_F      = 28.0
 GAS_STORAGE_PCT_THRESHOLD = -10.0
 
-# ── Data validation constants ─────────────────────────────────────────────────
+# -- Data validation constants -------------------------------------------------
 DATA_FRESHNESS_MINUTES = 15
 DATA_MIN_REAL_POINTS   = 2
 MOCK_SOURCES           = {"mock", "mock_data", "generated", "demo", None, ""}
 
-# ── Severity rank for driver comparison ──────────────────────────────────────
+# -- Severity rank for driver comparison ---------------------------------------
 _SEVERITY_RANK = {"high": 2, "medium": 1, "low": 0}
 
 
@@ -35,20 +35,20 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Data validation layer
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def _validate_data(prices: List[Dict]) -> Tuple[bool, str]:
     if not prices:
-        logger.warning("[VALIDATE] No price data — failsafe active")
+        logger.warning("[VALIDATE] No price data -- failsafe active")
         return False, "no_data"
 
     real_prices = [p for p in prices if p.get("source") not in MOCK_SOURCES]
 
     if len(real_prices) < DATA_MIN_REAL_POINTS:
         got = len(real_prices)
-        logger.warning("[VALIDATE] Insufficient real data: %d/%d real readings — failsafe active", got, DATA_MIN_REAL_POINTS)
+        logger.warning("[VALIDATE] Insufficient real data: %d/%d real readings -- failsafe active", got, DATA_MIN_REAL_POINTS)
         return False, ("mock_only" if got == 0 else f"building_cache_{got}_of_{DATA_MIN_REAL_POINTS}")
 
     latest      = prices[-1]
@@ -58,7 +58,7 @@ def _validate_data(prices: List[Dict]) -> Tuple[bool, str]:
         ts          = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
         age_minutes = (_utcnow() - ts).total_seconds() / 60
         if age_minutes > DATA_FRESHNESS_MINUTES:
-            logger.warning("[VALIDATE] Stale data: %.1f min old — failsafe active", age_minutes)
+            logger.warning("[VALIDATE] Stale data: %.1f min old -- failsafe active", age_minutes)
             return False, f"stale_{age_minutes:.0f}m"
     except Exception as exc:
         logger.warning("[VALIDATE] Cannot parse timestamp '%s': %s", ts_raw, exc)
@@ -73,7 +73,7 @@ def _assess_data_sources(
     gas_records: List[Dict],
 ) -> Dict[str, Any]:
     """
-    Phase 6 — assess freshness and availability of each data source.
+    Phase 6 -- assess freshness and availability of each data source.
     Returns a dict with status (active/stale/unavailable) and last_updated per source.
     """
     now = _utcnow()
@@ -96,8 +96,8 @@ def _assess_data_sources(
         except Exception:
             return {"status": "unavailable", "last_updated": None, "age_minutes": None}
 
-    ercot_status = _source_status(prices,      "timestamp",    15,  "ercot_cdr")
-    noaa_status  = _source_status(forecasts,   "forecast_time", 60, "noaa")
+    ercot_status = _source_status(prices,      "timestamp",    15,    "ercot_cdr")
+    noaa_status  = _source_status(forecasts,   "forecast_time", 60,   "noaa")
     eia_status   = _source_status(gas_records, "report_date",   10080, "eia")  # EIA updates weekly
 
     return {
@@ -113,29 +113,36 @@ def _failsafe_response() -> Dict[str, Any]:
         signal_type="unavailable", sig_type="UNAVAILABLE",
         triggered=False, severity="low", confidence=None,
         title="Monitoring Paused", value=None, threshold=None,
-        time_horizon="Short-term (0–6h): unavailable · Near-term (6–24h): unavailable · Outlook (24–48h): unavailable",
+        time_horizon="Short-term (0-6h): unavailable · Near-term (6-24h): unavailable · Outlook (24-48h): unavailable",
         message="Live data unavailable. Monitoring paused.",
         impact="Risk signals will resume automatically once real-time data is confirmed.",
     )
     return {
-        "computed_at":          now,
-        "risk_score":           "low",
-        "risk_headline":        "Live data unavailable. Monitoring paused.",
-        "active_signals":       0,
-        "confidence":           None,
-        "confidence_note":      "Confidence unavailable — data source offline.",
-        "explanation":          "Live data unavailable. Monitoring paused.",
-        "impact":               "Risk signals are suppressed until real-time data is confirmed.",
-        "primary_driver":       "None",
-        "primary_driver_type":  "none",
-        "risk_direction":       "stable",
-        "secondary_factors":    [],
-        "data_valid":           False,
-        "data_status":          "unavailable",
+        "computed_at":            now,
+        "risk_score":             "low",
+        "risk_headline":          "Live data unavailable. Monitoring paused.",
+        "active_signals":         0,
+        "confidence":             None,
+        "confidence_note":        "Confidence unavailable -- data source offline.",
+        "explanation":            "Live data unavailable. Monitoring paused.",
+        "impact":                 "Risk signals are suppressed until real-time data is confirmed.",
+        "primary_driver":         "None",
+        "primary_driver_type":    "none",
+        "risk_direction":         "stable",
+        "risk_direction_context": "data unavailable",
+        "market_context":         "Live data unavailable. Monitoring paused.",
+        "signal_drivers": [
+            {"name": "ERCOT Volatility",        "type": "price_volatility", "active": False, "severity": "low"},
+            {"name": "Weather Demand Pressure", "type": "weather_demand",   "active": False, "severity": "low"},
+            {"name": "Natural Gas Supply",      "type": "gas_supply",       "active": False, "severity": "low"},
+        ],
+        "secondary_factors":  [],
+        "data_valid":         False,
+        "data_status":        "unavailable",
         "time_horizons": {
-            "short_term": "Short-term (0–6h): unavailable",
-            "near_term":  "Near-term (6–24h): unavailable",
-            "outlook":    "Outlook (24–48h): unavailable",
+            "short_term": "Short-term (0-6h): unavailable",
+            "near_term":  "Near-term (6-24h): unavailable",
+            "outlook":    "Outlook (24-48h): unavailable",
         },
         "data_sources": {
             "ercot": {"status": "unavailable", "last_updated": None, "age_minutes": None},
@@ -183,15 +190,15 @@ def _awaiting_signal(signal_type: str, sig_type: str, status: str) -> Dict[str, 
         signal_type=signal_type, sig_type=sig_type,
         triggered=False, severity="low", confidence=None,
         title=title, value=None, threshold=None,
-        time_horizon="Short-term (0–6h): pending · Near-term (6–24h): pending · Outlook (24–48h): pending",
+        time_horizon="Short-term (0-6h): pending · Near-term (6-24h): pending · Outlook (24-48h): pending",
         message=message,
         impact="Signals will activate automatically once verified data is available.",
     )
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Price change helpers
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def _safe_pct_change(current: float, previous: float) -> Tuple[Optional[float], str]:
     if previous < PRICE_LOW_FLOOR:
@@ -208,9 +215,9 @@ def _validate_spike(prices: List[Dict], window: int = 2) -> bool:
     return sum(1 for p in recent if float(p["price_mwh"]) >= PRICE_ABS_HIGH_MWH) >= window
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 3 — Explainable confidence scoring
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 3 -- Explainable confidence scoring
+# ------------------------------------------------------------------------------
 
 def _compute_confidence(
     prices:       List[Dict],
@@ -218,20 +225,22 @@ def _compute_confidence(
     data_sources: Dict[str, Any],
 ) -> Tuple[int, str]:
     """
-    Phase 3 — Explainable confidence based on active drivers, data freshness, and persistence.
+    Phase 3 -- Explainable confidence based on active drivers, data freshness, and persistence.
     Returns (confidence_int, note_string).
 
     Base:
-      0 active drivers  → 50
-      1 active driver   → 70
-      2 active drivers  → 80
-      3 active drivers  → 87
+      0 active drivers  -> 50
+      1 active driver   -> 70
+      2 active drivers  -> 80
+      3 active drivers  -> 87
 
     Adjustments:
       +5 all data fresh (ercot + noaa active)
       +5 signal persists 2+ consecutive intervals
       -10 any source stale
       -15 any source unavailable
+
+    Task 1: clamp min raised to 50. Note flags partial data availability.
     """
     triggered_count = len([s for s in all_signals if s.get("triggered")])
 
@@ -246,9 +255,11 @@ def _compute_confidence(
     noaa_status  = data_sources.get("noaa",  {}).get("status", "unavailable")
     eia_status   = data_sources.get("eia",   {}).get("status", "unavailable")
 
-    all_active   = all(s == "active" for s in [ercot_status, noaa_status, eia_status])
-    any_stale    = any(s == "stale"  for s in [ercot_status, noaa_status, eia_status])
+    all_active   = all(s == "active"      for s in [ercot_status, noaa_status, eia_status])
+    any_stale    = any(s == "stale"       for s in [ercot_status, noaa_status, eia_status])
     any_unavail  = any(s == "unavailable" for s in [ercot_status, noaa_status, eia_status])
+
+    unavail_count = sum(1 for s in [ercot_status, noaa_status, eia_status] if s == "unavailable")
 
     if all_active:
         adj += 5
@@ -256,9 +267,12 @@ def _compute_confidence(
     if any_stale:
         adj -= 10
         adjustments.append("-10% data source delayed")
-    if any_unavail:
+    if unavail_count == 1:
         adj -= 15
-        adjustments.append("-15% data source unavailable")
+        adjustments.append("-15% one data source unavailable")
+    elif unavail_count >= 2:
+        adj -= 25
+        adjustments.append("-25% multiple data sources unavailable")
 
     # Signal persistence bonus
     if len(prices) >= 2:
@@ -267,19 +281,22 @@ def _compute_confidence(
             adj += 5
             adjustments.append("+5% signal persists across 2+ intervals")
 
-    confidence = max(30, min(90, base + adj))
+    # Task 1: floor raised from 30 to 50
+    confidence = max(50, min(90, base + adj))
 
     driver_phrase = {0: "No active drivers", 1: "1 active driver", 2: "2 active drivers", 3: "3 active drivers"}.get(triggered_count, "Multiple drivers")
-    note = f"Confidence based on signal alignment, data freshness, and persistence. {driver_phrase} detected."
-    if adjustments:
+    note = f"Confidence based on signal alignment, data freshness, and source availability. {driver_phrase} detected."
+    if any_unavail or any_stale:
+        note += " Adjusted due to partial data availability."
+    elif adjustments:
         note += " Adjustments: " + "; ".join(adjustments) + "."
 
     return confidence, note
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Task 1 — Primary Driver
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Task 1 -- Primary Driver
+# ------------------------------------------------------------------------------
 
 _DRIVER_LABELS = {
     "price_volatility": "Market volatility",
@@ -308,11 +325,12 @@ def _determine_primary_driver(signals: List[Dict]) -> Tuple[str, str]:
     return "none", "No active risk drivers"
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Task 2 — Risk Direction
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Task 5 -- Risk Direction with driver context
+# ------------------------------------------------------------------------------
 
-def _determine_risk_direction(prices: List[Dict], signals: List[Dict]) -> str:
+def _determine_risk_direction(prices: List[Dict], signals: List[Dict]) -> Tuple[str, str]:
+    """Returns (direction, context) -- direction tied to dominant driver for clarity."""
     triggered    = [s for s in signals if s.get("triggered")]
     high_active  = any(s.get("severity") == "high" for s in triggered)
     multi_active = len(triggered) >= 2
@@ -326,24 +344,53 @@ def _determine_risk_direction(prices: List[Dict], signals: List[Dict]) -> str:
         elif pct_delta < -8:
             price_trend = "falling"
 
+    triggered_types = {s.get("signal_type", "") for s in triggered}
+
     if high_active or multi_active:
-        return "increasing" if price_trend in ("rising", "flat") else "stable"
-
-    if triggered:
+        direction = "increasing" if price_trend in ("rising", "flat") else "stable"
+    elif triggered:
         if price_trend == "rising":
-            return "increasing"
-        if price_trend == "falling":
-            return "decreasing"
-        return "stable"
+            direction = "increasing"
+        elif price_trend == "falling":
+            direction = "decreasing"
+        else:
+            direction = "stable"
+    elif price_trend == "falling":
+        direction = "decreasing"
+    else:
+        direction = "stable"
 
-    if price_trend == "falling":
-        return "decreasing"
-    return "stable"
+    # Context phrase tied directly to dominant driver
+    if direction == "increasing":
+        if "weather_demand" in triggered_types:
+            context = "weather-driven demand pressure rising"
+        elif "gas_supply" in triggered_types:
+            context = "supply constraints building"
+        elif "price_volatility" in triggered_types:
+            context = "price volatility escalating"
+        else:
+            context = "multiple pressure factors building"
+    elif direction == "decreasing":
+        if "weather_demand" in triggered_types:
+            context = "cooling demand easing"
+        elif price_trend == "falling":
+            context = "price pressure easing"
+        else:
+            context = "risk conditions improving"
+    else:  # stable
+        if not triggered:
+            context = "balanced supply and demand conditions"
+        elif "price_volatility" in triggered_types:
+            context = "price conditions stabilizing"
+        else:
+            context = "current conditions holding steady"
+
+    return direction, context
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Secondary Factors
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def _secondary_factors(signals: List[Dict], primary_type: str) -> List[str]:
     label_map = {
@@ -361,16 +408,16 @@ def _secondary_factors(signals: List[Dict], primary_type: str) -> List[str]:
     return factors
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Individual signal detectors
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
     if not prices or len(prices) < 2:
         return _signal(
             "price_volatility", "VOLATILITY", False, "low", 40,
             "Awaiting Price Data", None, PRICE_ABS_HIGH_MWH,
-            "Short-term (0–6h): monitoring · Near-term (6–24h): monitoring · Outlook (24–48h): monitoring",
+            "Short-term (0-6h): monitoring · Near-term (6-24h): monitoring · Outlook (24-48h): monitoring",
             "Insufficient price data to assess volatility.",
             "Monitoring will begin once two consecutive readings are available.",
         )
@@ -390,7 +437,7 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
             return _signal(
                 "price_volatility", "VOLATILITY", True, "high", None,
                 "Extreme Price Event", current, PRICE_ABS_HIGH_MWH,
-                "Short-term (0–6h): extreme volatility active · Near-term (6–24h): monitor for stabilisation · Outlook (24–48h): elevated risk persists",
+                "Short-term (0-6h): extreme volatility active · Near-term (6-24h): monitor for stabilisation · Outlook (24-48h): elevated risk persists",
                 (
                     f"ERCOT Houston Hub reached ${current:.0f}/MWh"
                     + (f", reflecting a {pct_display} move from ${prev:.0f}/MWh." if pct_change is not None else ".")
@@ -402,7 +449,7 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
         return _signal(
             "price_volatility", "VOLATILITY", True, "medium", None,
             "ERCOT Price Volatility Active", current, PRICE_ABS_HIGH_MWH,
-            "Short-term (0–6h): elevated volatility · Near-term (6–24h): monitor for stabilisation · Outlook (24–48h): conditions suggest continued uncertainty",
+            "Short-term (0-6h): elevated volatility · Near-term (6-24h): monitor for stabilisation · Outlook (24-48h): conditions suggest continued uncertainty",
             (
                 f"ERCOT prices moved from ${prev:.0f} to ${current:.0f}/MWh"
                 + (f" ({pct_display})" if pct_change is not None else "")
@@ -410,14 +457,14 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
                 + (" Movement sustained across consecutive readings, reflecting persistent pressure." if sustained_spike else "")
             ),
             "Elevated ERCOT prices may reflect a tightening supply-demand balance, increasing the likelihood"
-            " of further price movement over the next 24–48 hours.",
+            " of further price movement over the next 24-48 hours.",
         )
 
     if single_outlier:
         return _signal(
             "price_volatility", "VOLATILITY", False, "low", None,
             "Transient Price Movement", current, PRICE_ABS_HIGH_MWH,
-            "Short-term (0–6h): elevated but unconfirmed · Near-term (6–24h): monitoring · Outlook (24–48h): monitoring",
+            "Short-term (0-6h): elevated but unconfirmed · Near-term (6-24h): monitoring · Outlook (24-48h): monitoring",
             f"ERCOT price reached ${current:.0f}/MWh, suggesting a transient spike."
             " Movement not yet confirmed across consecutive readings, indicating a potential outlier.",
             "Monitoring for confirmation. Single-interval spikes are filtered to reduce noise.",
@@ -428,17 +475,17 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
         return _signal(
             "price_volatility", "VOLATILITY", False, "low", None,
             "Price Approaching Threshold", current, PRICE_ABS_HIGH_MWH,
-            "Short-term (0–6h): within range, approaching threshold · Near-term (6–24h): monitor closely · Outlook (24–48h): watch for escalation",
+            "Short-term (0-6h): within range, approaching threshold · Near-term (6-24h): monitor closely · Outlook (24-48h): watch for escalation",
             f"ERCOT Houston Hub at ${current:.0f}/MWh, approaching the elevated-risk threshold.{pct_note}"
             " Conditions suggest rising but not yet confirmed volatility.",
-            "Continued price movement may push conditions into an elevated risk zone within the next 6–24 hours.",
+            "Continued price movement may push conditions into an elevated risk zone within the next 6-24 hours.",
         )
 
     pct_note = f" {pct_display} vs previous interval." if pct_change is not None else ""
     return _signal(
         "price_volatility", "VOLATILITY", False, "low", None,
         "ERCOT Pricing Stable", current, PRICE_ABS_HIGH_MWH,
-        "Short-term (0–6h): stable · Near-term (6–24h): no immediate risk · Outlook (24–48h): stable conditions expected",
+        "Short-term (0-6h): stable · Near-term (6-24h): no immediate risk · Outlook (24-48h): stable conditions expected",
         f"ERCOT Houston Hub at ${current:.0f}/MWh, reflecting normal operating conditions.{pct_note}"
         " Current pricing indicates low immediate volatility risk.",
         "No price-based risk signals active. Stable conditions are expected to persist short-term.",
@@ -450,7 +497,7 @@ def check_weather_demand(forecasts: List[Dict]) -> Dict[str, Any]:
         return _signal(
             "weather_demand", "WEATHER", False, "low", None,
             "Awaiting Weather Data", None, TEMP_HIGH_THRESHOLD_F,
-            "Short-term (0–6h): monitoring · Near-term (6–24h): monitoring · Outlook (24–48h): monitoring",
+            "Short-term (0-6h): monitoring · Near-term (6-24h): monitoring · Outlook (24-48h): monitoring",
             "No weather forecast data available.",
             "Weather-based demand signals will activate once forecast data loads.",
         )
@@ -469,20 +516,20 @@ def check_weather_demand(forecasts: List[Dict]) -> Dict[str, Any]:
         if high_f >= 105:
             return _signal(
                 "weather_demand", "WEATHER", True, "high", None,
-                "Extreme Heat — Grid Load Alert", high_f, TEMP_HIGH_THRESHOLD_F,
-                "Short-term (0–6h): extreme demand expected · Near-term (6–24h): peak load during afternoon hours · Outlook (24–48h): sustained heat stress likely",
-                f"Forecast high of {high_f:.0f}°F in {location} indicates extreme cooling demand across the Texas grid."
-                " Historical patterns reflect sharp ERCOT load increases above 105°F, suggesting tight reserve margins."
+                "Extreme Heat -- Grid Load Alert", high_f, TEMP_HIGH_THRESHOLD_F,
+                "Short-term (0-6h): extreme demand expected · Near-term (6-24h): peak load during afternoon hours · Outlook (24-48h): sustained heat stress likely",
+                f"Forecast high of {high_f:.0f}\u00b0F in {location} indicates extreme cooling demand across the Texas grid."
+                " Historical patterns reflect sharp ERCOT load increases above 105F, suggesting tight reserve margins."
                 + (" Pattern persists across multiple forecast days." if multi_day_heat else ""),
                 "Extreme temperatures may significantly increase grid load and tighten reserve margins,"
-                " increasing the likelihood of short-term price volatility over the next 24–48 hours.",
+                " increasing the likelihood of short-term price volatility over the next 24-48 hours.",
             )
         return _signal(
             "weather_demand", "WEATHER", True, "medium", None,
             "Heat Demand Risk Elevated", high_f, TEMP_HIGH_THRESHOLD_F,
-            "Short-term (0–6h): elevated demand building · Near-term (6–24h): peak load during afternoon hours · Outlook (24–48h): continued heat risk",
-            f"Forecast high of {high_f:.0f}°F in {location} indicates elevated cooling demand."
-            " Temperatures above 100°F reflect a pattern of increased ERCOT load during peak afternoon hours."
+            "Short-term (0-6h): elevated demand building · Near-term (6-24h): peak load during afternoon hours · Outlook (24-48h): continued heat risk",
+            f"Forecast high of {high_f:.0f}\u00b0F in {location} indicates elevated cooling demand."
+            " Temperatures above 100F reflect a pattern of increased ERCOT load during peak afternoon hours."
             + (" Sustained heat pattern detected across multiple forecast days." if multi_day_heat else ""),
             "Elevated temperatures may increase grid load, increasing the likelihood of price pressure"
             " during peak afternoon hours over the next 24 hours.",
@@ -493,17 +540,17 @@ def check_weather_demand(forecasts: List[Dict]) -> Dict[str, Any]:
             return _signal(
                 "weather_demand", "WEATHER", True, "high", None,
                 "Freeze Event Risk", low_f, TEMP_LOW_THRESHOLD_F,
-                "Short-term (0–6h): severe heating demand · Near-term (6–24h): freeze conditions possible · Outlook (24–48h): compounding grid stress risk",
-                f"Forecast low of {low_f:.0f}°F in {location} indicates severe freeze risk."
+                "Short-term (0-6h): severe heating demand · Near-term (6-24h): freeze conditions possible · Outlook (24-48h): compounding grid stress risk",
+                f"Forecast low of {low_f:.0f}\u00b0F in {location} indicates severe freeze risk."
                 " Extreme cold reflects compounding grid stress from elevated heating demand and potential gas supply constraints.",
                 "Severe freeze conditions may simultaneously stress gas-fired generation and heating demand,"
-                " increasing the likelihood of supply-side constraints over the next 48–72 hours.",
+                " increasing the likelihood of supply-side constraints over the next 48-72 hours.",
             )
         return _signal(
             "weather_demand", "WEATHER", True, "medium", None,
             "Cold Weather Demand Elevated", low_f, TEMP_LOW_THRESHOLD_F,
-            "Short-term (0–6h): elevated heating demand · Near-term (6–24h): continued cold risk · Outlook (24–48h): monitor for sustained cold pattern",
-            f"Forecast low of {low_f:.0f}°F in {location} indicates elevated heating demand."
+            "Short-term (0-6h): elevated heating demand · Near-term (6-24h): continued cold risk · Outlook (24-48h): monitor for sustained cold pattern",
+            f"Forecast low of {low_f:.0f}\u00b0F in {location} indicates elevated heating demand."
             " Cold weather reflects increased overnight grid stress and natural gas consumption.",
             "Elevated heating demand may tighten reserve margins overnight, increasing the likelihood"
             " of price pressure during peak morning hours over the next 24 hours.",
@@ -512,8 +559,8 @@ def check_weather_demand(forecasts: List[Dict]) -> Dict[str, Any]:
     return _signal(
         "weather_demand", "WEATHER", False, "low", None,
         "Normal Weather Conditions", high_f, TEMP_HIGH_THRESHOLD_F,
-        "Short-term (0–6h): normal demand · Near-term (6–24h): no weather risk · Outlook (24–48h): stable demand expected",
-        f"Forecast high of {high_f:.0f}°F in {location}, reflecting normal seasonal conditions."
+        "Short-term (0-6h): normal demand · Near-term (6-24h): no weather risk · Outlook (24-48h): stable demand expected",
+        f"Forecast high of {high_f:.0f}\u00b0F in {location}, reflecting normal seasonal conditions."
         " Current temperatures indicate no weather-driven demand pressure on the grid.",
         "No weather-driven demand signals active. Demand conditions are expected to remain stable.",
     )
@@ -524,7 +571,7 @@ def check_gas_supply(gas_records: List[Dict]) -> Dict[str, Any]:
         return _signal(
             "gas_supply", "GAS", False, "low", None,
             "Awaiting Storage Data", None, GAS_STORAGE_PCT_THRESHOLD,
-            "Short-term (0–6h): monitoring · Near-term (6–24h): monitoring · Outlook (24–48h): monitoring",
+            "Short-term (0-6h): monitoring · Near-term (6-24h): monitoring · Outlook (24-48h): monitoring",
             "No natural gas storage data available.",
             "Gas supply signals will activate once EIA storage data loads.",
         )
@@ -540,38 +587,38 @@ def check_gas_supply(gas_records: List[Dict]) -> Dict[str, Any]:
             return _signal(
                 "gas_supply", "GAS", True, "high", None,
                 "Critical Gas Supply Deficit", pct, GAS_STORAGE_PCT_THRESHOLD,
-                "Short-term (0–6h): supply buffer severely reduced · Near-term (6–24h): sensitive to demand spikes · Outlook (24–48h): risk elevated if demand increases",
-                f"Working gas storage at {bcf} Bcf — {abs(pct):.1f}% below the 5-year seasonal average.{price_note}"
+                "Short-term (0-6h): supply buffer severely reduced · Near-term (6-24h): sensitive to demand spikes · Outlook (24-48h): risk elevated if demand increases",
+                f"Working gas storage at {bcf} Bcf -- {abs(pct):.1f}% below the 5-year seasonal average.{price_note}"
                 " A deficit of this magnitude reflects critical supply tightness, suggesting"
                 " elevated sensitivity to any demand surge or supply disruption.",
                 "Critical gas storage deficit may constrain fuel supply for gas-fired generation,"
-                " increasing the likelihood of supply-side stress during demand peaks over the next 48–72 hours.",
+                " increasing the likelihood of supply-side stress during demand peaks over the next 48-72 hours.",
             )
         return _signal(
             "gas_supply", "GAS", True, "medium", None,
             "Gas Storage Below Seasonal Average", pct, GAS_STORAGE_PCT_THRESHOLD,
-            "Short-term (0–6h): supply buffer reduced · Near-term (6–24h): sensitivity elevated · Outlook (24–48h): monitor for further draws",
-            f"Working gas storage at {bcf} Bcf — {abs(pct):.1f}% below the 5-year average.{price_note}"
+            "Short-term (0-6h): supply buffer reduced · Near-term (6-24h): sensitivity elevated · Outlook (24-48h): monitor for further draws",
+            f"Working gas storage at {bcf} Bcf -- {abs(pct):.1f}% below the 5-year average.{price_note}"
             " Below-average storage indicates a reduced supply buffer,"
             " suggesting increased sensitivity to demand spikes or supply disruptions.",
             "Below-average gas storage may reduce the supply buffer, increasing the likelihood"
-            " of price sensitivity during any demand surge over the next 48–72 hours.",
+            " of price sensitivity during any demand surge over the next 48-72 hours.",
         )
 
     surplus = "above" if pct >= 0 else "below"
     return _signal(
         "gas_supply", "GAS", False, "low", None,
         "Gas Supply Adequate", pct, GAS_STORAGE_PCT_THRESHOLD,
-        "Short-term (0–6h): adequate supply · Near-term (6–24h): stable outlook · Outlook (24–48h): no supply risk expected",
-        f"Working gas storage at {bcf} Bcf — {abs(pct):.1f}% {surplus} the 5-year average.{price_note}"
+        "Short-term (0-6h): adequate supply · Near-term (6-24h): stable outlook · Outlook (24-48h): no supply risk expected",
+        f"Working gas storage at {bcf} Bcf -- {abs(pct):.1f}% {surplus} the 5-year average.{price_note}"
         " Storage levels reflect adequate supply buffer, indicating no near-term fuel supply risk.",
         "Natural gas supply conditions appear stable. No supply-side risk signals are active.",
     )
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 1 — Structured time horizons
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 1 -- Structured time horizons
+# ------------------------------------------------------------------------------
 
 def _build_time_horizons(
     risk_score:     str,
@@ -579,71 +626,63 @@ def _build_time_horizons(
     risk_direction: str,
     primary_driver: str,
 ) -> Dict[str, str]:
-    """
-    Phase 1 — Returns three structured time horizon statements:
-      short_term  (0–6h):   current conditions
-      near_term   (6–24h):  trending / expected
-      outlook     (24–48h): multi-day forecast
-    """
     risk_label = risk_score.capitalize()
 
-    # Short-term: current risk level + primary driver
     if risk_score == "high":
-        short = f"Short-term (0–6h): High risk — {primary_driver} is the primary driver. Close monitoring is recommended."
+        short = f"Short-term (0-6h): High risk -- {primary_driver} is the primary driver. Close monitoring is recommended."
     elif risk_score == "medium":
-        short = f"Short-term (0–6h): Medium risk — {primary_driver} is elevating conditions. Continued monitoring is recommended."
+        short = f"Short-term (0-6h): Medium risk -- {primary_driver} is elevating conditions. Continued monitoring is recommended."
     else:
-        short = "Short-term (0–6h): Low risk — all monitored drivers within normal operating range."
+        short = "Short-term (0-6h): Low risk -- all monitored drivers within normal operating range."
 
-    # Near-term: based on risk direction
     weather_sig = next((s for s in signals if s.get("signal_type") == "weather_demand"), None)
     near_high   = weather_sig and weather_sig.get("triggered") and float(weather_sig.get("value") or 0) >= TEMP_HIGH_THRESHOLD_F
 
     if risk_direction == "increasing":
-        near = "Near-term (6–24h): Risk may be elevated. Conditions suggest upward pressure during afternoon peak hours."
+        near = "Near-term (6-24h): Risk may be elevated. Conditions suggest upward pressure during afternoon peak hours."
     elif risk_direction == "decreasing":
-        near = "Near-term (6–24h): Conditions improving. Risk pressure appears to be easing."
+        near = "Near-term (6-24h): Conditions improving. Risk pressure appears to be easing."
     elif near_high:
-        near = "Near-term (6–24h): Monitor. Elevated temperatures may sustain demand pressure through evening hours."
+        near = "Near-term (6-24h): Monitor. Elevated temperatures may sustain demand pressure through evening hours."
     else:
-        near = "Near-term (6–24h): Stable. No escalation signals detected at this time."
+        near = "Near-term (6-24h): Stable. No escalation signals detected at this time."
 
-    # Outlook: multi-day weather + gas
     gas_sig     = next((s for s in signals if s.get("signal_type") == "gas_supply"), None)
     gas_tight   = gas_sig and gas_sig.get("triggered")
     weather_val = float((weather_sig or {}).get("value") or 0)
 
     if gas_tight and near_high:
-        outlook = "Outlook (24–48h): Weather-driven demand remains elevated while gas supply buffer is reduced. Combined pressure warrants monitoring."
+        outlook = "Outlook (24-48h): Weather-driven demand remains elevated while gas supply buffer is reduced. Combined pressure warrants monitoring."
     elif near_high:
         if weather_val >= 105:
-            outlook = "Outlook (24–48h): Extreme heat pattern may persist. Grid demand conditions likely to remain elevated."
+            outlook = "Outlook (24-48h): Extreme heat pattern may persist. Grid demand conditions likely to remain elevated."
         else:
-            outlook = "Outlook (24–48h): Weather-driven demand remains elevated. Monitor for sustained heat pattern."
+            outlook = "Outlook (24-48h): Weather-driven demand remains elevated. Monitor for sustained heat pattern."
     elif gas_tight:
-        outlook = "Outlook (24–48h): Gas supply conditions remain below seasonal average. Sensitivity to demand spikes persists."
+        outlook = "Outlook (24-48h): Gas supply conditions remain below seasonal average. Sensitivity to demand spikes persists."
     elif risk_direction == "decreasing":
-        outlook = "Outlook (24–48h): Conditions are improving. Risk expected to ease if current trends continue."
+        outlook = "Outlook (24-48h): Conditions are improving. Risk expected to ease if current trends continue."
     else:
-        outlook = "Outlook (24–48h): No significant risk escalation signals detected. Stable conditions are expected."
+        outlook = "Outlook (24-48h): No significant risk escalation signals detected. Stable conditions are expected."
 
     return {"short_term": short, "near_term": near, "outlook": outlook}
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 2 — Single narrative function (consistent cross-panel language)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 2 -- Single narrative function (consistent cross-panel language)
+# ------------------------------------------------------------------------------
 
 def _build_narrative(
     risk_score:     str,
     signals:        List[Dict],
     primary_driver: str,
     risk_direction: str,
-) -> Tuple[str, str, str]:
+) -> Tuple[str, str, str, str]:
     """
-    Phase 2 — Single source of truth for risk narrative.
-    Returns (summary, explanation, impact).
-    Ensures panels don't contradict each other.
+    Phase 2 -- Single source of truth for risk narrative.
+    Returns (summary, explanation, impact, market_context).
+    market_context is the short contrast sentence shown consistently across all panels.
+    Ensures panels do not contradict each other.
     """
     risk_label = risk_score.capitalize()
 
@@ -665,21 +704,20 @@ def _build_narrative(
         "decreasing": "is improving",
     }.get(risk_direction, "remains stable")
 
-    # ── Phase 2 consistency: build context that doesn't contradict ────────────
+    # Phase 2 consistency: build context that does not contradict
     # Rule: if price is stable but another driver is active, acknowledge both
     price_context = ""
     if price_triggered:
         price_context = f"ERCOT pricing is elevated at ${price_val:.0f}/MWh, reflecting active volatility"
     elif price_val > 0:
         if weather_triggered or gas_triggered:
-            # Stable price BUT other risk is high — use contrasting language
             price_context = f"ERCOT prices are currently stable at ${price_val:.0f}/MWh"
         else:
             price_context = f"ERCOT pricing remains stable at ${price_val:.0f}/MWh"
 
     weather_context = ""
     if weather_triggered:
-        weather_context = f"temperatures of {weather_val:.0f}°F are driving elevated grid load"
+        weather_context = f"temperatures of {weather_val:.0f}\u00b0F are driving elevated grid load"
     elif weather_val > 0:
         weather_context = "weather conditions are within normal operating range"
 
@@ -696,7 +734,7 @@ def _build_narrative(
     elif len(parts) == 1:
         context = parts[0].capitalize() + "."
     elif price_triggered is False and (weather_triggered or gas_triggered):
-        # Stable ERCOT but other risk active — use "but" contrast
+        # Stable ERCOT but other risk active -- use "but" contrast
         context = f"{parts[0].capitalize()}, but {parts[1]}"
         if len(parts) >= 3:
             context += f", and {parts[2]}"
@@ -709,16 +747,16 @@ def _build_narrative(
             context += f", and {parts[2]}"
         context += "."
 
-    # ── Summary ───────────────────────────────────────────────────────────────
+    # Summary
     summary = (
         f"Short-term Texas energy risk is {risk_label}. "
         f"The primary driver is {primary_driver}. "
         f"{context} "
-        f"Short-term (24–48 hours) outlook: risk {direction_phrase}. "
+        f"Short-term (24-48 hours) outlook: risk {direction_phrase}. "
         f"Monitoring is recommended."
     ).strip()
 
-    # ── Explanation (for risk score card) ────────────────────────────────────
+    # Explanation (for risk score card)
     triggered_labels = {
         "price_volatility": "ERCOT price volatility",
         "weather_demand":   "weather-driven demand pressure",
@@ -733,8 +771,8 @@ def _build_narrative(
     stable_types    = {"price_volatility", "weather_demand", "gas_supply"} - triggered_types
 
     if risk_score == "high":
-        driver_str = " and ".join(triggered_labels[t] for t in triggered_types if t in triggered_labels)
-        stable_str = ", ".join(stable_labels[t] for t in stable_types if t in stable_labels)
+        driver_str  = " and ".join(triggered_labels[t] for t in triggered_types if t in triggered_labels)
+        stable_str  = ", ".join(stable_labels[t] for t in stable_types if t in stable_labels)
         explanation = f"High risk driven by simultaneous {driver_str}."
         if stable_str:
             explanation += f" {stable_str.capitalize()}."
@@ -745,48 +783,54 @@ def _build_narrative(
         if stable_str:
             explanation += f" {stable_str.capitalize()}."
     else:
-        explanation = "All monitored risk drivers — price, weather, and gas supply — are within normal ranges."
+        explanation = "All monitored risk drivers -- price, weather, and gas supply -- are within normal ranges."
 
-    # ── Impact ────────────────────────────────────────────────────────────────
+    # Impact
     triggered_signals = [s for s in signals if s.get("triggered")]
     if not triggered_signals:
         impact = (
             "All monitored risk drivers are within normal operating ranges. "
             "No near-term risk elevation detected. Conditions are expected to remain stable "
-            "over the short-term (0–6h) and near-term (6–24h) outlook."
+            "over the short-term (0-6h) and near-term (6-24h) outlook."
         )
     elif risk_score == "high" and len(triggered_signals) >= 2:
         impact = (
             "Multiple converging risk signals are active, increasing the likelihood of "
-            "short-term grid stress and price volatility over the next 24–48 hours. "
+            "short-term grid stress and price volatility over the next 24-48 hours. "
             "Conditions warrant close monitoring."
         )
     else:
         impact_map = {
             "weather_demand": {
-                "high":   "Extreme temperatures may significantly increase grid load and tighten reserve margins, increasing the likelihood of short-term price volatility over the next 24–48 hours.",
+                "high":   "Extreme temperatures may significantly increase grid load and tighten reserve margins, increasing the likelihood of short-term price volatility over the next 24-48 hours.",
                 "medium": "Elevated temperatures may increase grid load and pressure peak-hour pricing, increasing the likelihood of reserve margin tightening over the next 24 hours.",
             },
             "price_volatility": {
                 "high":   "Sustained ERCOT price spikes may signal constrained grid conditions, increasing the likelihood of continued volatility and potential supply stress over the next 24 hours.",
-                "medium": "Elevated ERCOT prices may reflect a tightening supply-demand balance, increasing the likelihood of further price movement over the next 24–48 hours.",
+                "medium": "Elevated ERCOT prices may reflect a tightening supply-demand balance, increasing the likelihood of further price movement over the next 24-48 hours.",
             },
             "gas_supply": {
-                "high":   "A critical gas storage deficit may constrain fuel supply for gas-fired generation, increasing the likelihood of supply-side stress during demand peaks over the next 48–72 hours.",
-                "medium": "Below-average gas storage may reduce the supply buffer, increasing the likelihood of price sensitivity during any demand surge over the next 48–72 hours.",
+                "high":   "A critical gas storage deficit may constrain fuel supply for gas-fired generation, increasing the likelihood of supply-side stress during demand peaks over the next 48-72 hours.",
+                "medium": "Below-average gas storage may reduce the supply buffer, increasing the likelihood of price sensitivity during any demand surge over the next 48-72 hours.",
             },
         }
         target   = triggered_signals[0]
         sig_type = target.get("signal_type", "")
         severity = target.get("severity", "medium")
-        impact   = impact_map.get(sig_type, {}).get(severity, "Active risk signals detected. Monitor conditions closely over the next 24–48 hours.")
+        impact   = impact_map.get(sig_type, {}).get(severity, "Active risk signals detected. Monitor conditions closely over the next 24-48 hours.")
 
-    return summary, explanation, impact
+    # market_context is the short authoritative contrast sentence for all panels
+    market_context = context if context else (
+        f"Short-term Texas energy risk is {risk_score.capitalize()}. "
+        f"The primary driver is {primary_driver}."
+    )
+
+    return summary, explanation, impact, market_context
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Composite risk score
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def compute_risk_score(signals: List[Dict]) -> Tuple[str, int]:
     active = [s for s in signals if s.get("triggered")]
@@ -798,9 +842,9 @@ def compute_risk_score(signals: List[Dict]) -> Tuple[str, int]:
     return "low", count
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Master runner
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def run_all_signals(
     prices:      List[Dict],
@@ -808,7 +852,7 @@ def run_all_signals(
     gas_records: List[Dict],
 ) -> Dict[str, Any]:
     """
-    Master function — runs all detectors, validates data, and returns
+    Master function -- runs all detectors, validates data, and returns
     a professional analyst-grade risk snapshot.
     """
     data_valid, data_status = _validate_data(prices)
@@ -820,11 +864,11 @@ def run_all_signals(
 
     if not data_valid:
         result = _failsafe_response()
-        result["data_status"]   = data_status
-        result["data_sources"]  = _assess_data_sources(prices, forecasts, gas_records)
+        result["data_status"]  = data_status
+        result["data_sources"] = _assess_data_sources(prices, forecasts, gas_records)
         return result
 
-    # ── Run detectors ─────────────────────────────────────────────────────────
+    # Run detectors
     price_signal   = check_price_volatility(prices)
     weather_signal = check_weather_demand(forecasts)
     gas_signal     = check_gas_supply(gas_records)
@@ -832,10 +876,10 @@ def run_all_signals(
     all_signals              = [price_signal, weather_signal, gas_signal]
     risk_score, active_count = compute_risk_score(all_signals)
 
-    # ── Phase 6: Data source assessment ───────────────────────────────────────
+    # Phase 6: Data source assessment
     data_sources = _assess_data_sources(prices, forecasts, gas_records)
 
-    # ── Phase 3: Explainable confidence ───────────────────────────────────────
+    # Phase 3: Explainable confidence
     confidence, confidence_note = _compute_confidence(prices, all_signals, data_sources)
 
     for sig in all_signals:
@@ -844,21 +888,43 @@ def run_all_signals(
         elif not sig.get("triggered"):
             sig["confidence"] = max(confidence - 20, 40)
 
-    # ── Intelligence fields ───────────────────────────────────────────────────
+    # Intelligence fields
     primary_driver_type, primary_driver_label = _determine_primary_driver(all_signals)
-    risk_direction  = _determine_risk_direction(prices, all_signals)
-    secondary       = _secondary_factors(all_signals, primary_driver_type)
+    risk_direction, risk_direction_context    = _determine_risk_direction(prices, all_signals)
+    secondary                                 = _secondary_factors(all_signals, primary_driver_type)
 
-    # ── Phase 1: Structured time horizons ────────────────────────────────────
+    # Task 3 -- Named signal drivers for human-readable display
+    signal_drivers = [
+        {
+            "name":     "ERCOT Volatility",
+            "type":     "price_volatility",
+            "active":   price_signal.get("triggered",   False),
+            "severity": price_signal.get("severity",   "low"),
+        },
+        {
+            "name":     "Weather Demand Pressure",
+            "type":     "weather_demand",
+            "active":   weather_signal.get("triggered", False),
+            "severity": weather_signal.get("severity", "low"),
+        },
+        {
+            "name":     "Natural Gas Supply",
+            "type":     "gas_supply",
+            "active":   gas_signal.get("triggered",     False),
+            "severity": gas_signal.get("severity",     "low"),
+        },
+    ]
+
+    # Phase 1: Structured time horizons
     time_horizons = _build_time_horizons(risk_score, all_signals, risk_direction, primary_driver_label)
 
-    # ── Phase 2: Single narrative source ──────────────────────────────────────
-    summary, explanation, impact = _build_narrative(
+    # Phase 2: Single narrative source
+    summary, explanation, impact, market_context = _build_narrative(
         risk_score, all_signals, primary_driver_label, risk_direction
     )
 
-    # ── Risk headline (Phase 1) ────────────────────────────────────────────────
-    risk_headline = f"Short-term (0–6h) Texas energy risk is {risk_score.capitalize()}."
+    # Risk headline
+    risk_headline = f"Short-term (0-6h) Texas energy risk is {risk_score.capitalize()}."
 
     logger.info(
         "[SIGNALS] score=%s direction=%s driver=%s active=%d confidence=%d",
@@ -866,22 +932,25 @@ def run_all_signals(
     )
 
     return {
-        "computed_at":          _utcnow().isoformat(),
-        "risk_score":           risk_score,
-        "risk_headline":        risk_headline,
-        "active_signals":       active_count,
-        "confidence":           confidence,
-        "confidence_note":      confidence_note,
-        "explanation":          explanation,
-        "impact":               impact,
-        "primary_driver":       primary_driver_label,
-        "primary_driver_type":  primary_driver_type,
-        "risk_direction":       risk_direction,
-        "secondary_factors":    secondary,
-        "data_valid":           True,
-        "data_status":          data_status,
-        "time_horizons":        time_horizons,
-        "data_sources":         data_sources,
+        "computed_at":            _utcnow().isoformat(),
+        "risk_score":             risk_score,
+        "risk_headline":          risk_headline,
+        "active_signals":         active_count,
+        "confidence":             confidence,
+        "confidence_note":        confidence_note,
+        "explanation":            explanation,
+        "impact":                 impact,
+        "primary_driver":         primary_driver_label,
+        "primary_driver_type":    primary_driver_type,
+        "risk_direction":         risk_direction,
+        "risk_direction_context": risk_direction_context,
+        "market_context":         market_context,
+        "signal_drivers":         signal_drivers,
+        "secondary_factors":      secondary,
+        "data_valid":             True,
+        "data_status":            data_status,
+        "time_horizons":          time_horizons,
+        "data_sources":           data_sources,
         "signals": {
             "price_volatility": price_signal,
             "weather_demand":   weather_signal,
@@ -891,14 +960,14 @@ def run_all_signals(
         "disclaimer": (
             "This information is provided for situational awareness only. "
             "It does not constitute investment, trading, or procurement advice. "
-            "Risk may be rising — consult qualified advisors before making decisions."
+            "Risk may be rising -- consult qualified advisors before making decisions."
         ),
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Signal builder
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def _signal(
     signal_type: str, sig_type: str,

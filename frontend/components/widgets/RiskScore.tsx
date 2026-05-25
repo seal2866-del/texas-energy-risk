@@ -1,47 +1,49 @@
 "use client";
 import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap, Info } from "lucide-react";
-import type { RiskScore as RiskScoreType, TimeHorizons } from "@/lib/api";
+import type { RiskScore as RiskScoreType, TimeHorizons, SignalDriver } from "@/lib/api";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
 interface Props {
-  score:              RiskScoreType;
-  activeSignals:      number;
-  computedAt:         string;
-  summary:            string;
-  confidence?:        number | null;
-  confidenceNote?:    string;
-  explanation?:       string;
-  impact?:            string;
-  primaryDriver?:     string;
-  riskDirection?:     "increasing" | "stable" | "decreasing";
-  secondaryFactors?:  string[];
-  dataValid?:         boolean;
-  dataStatus?:        string;
-  riskHeadline?:      string;
-  timeHorizons?:      TimeHorizons;
+  score:                   RiskScoreType;
+  activeSignals:           number;
+  computedAt:              string;
+  summary:                 string;
+  confidence?:             number | null;
+  confidenceNote?:         string;
+  explanation?:            string;
+  impact?:                 string;
+  primaryDriver?:          string;
+  riskDirection?:          "increasing" | "stable" | "decreasing";
+  riskDirectionContext?:   string;
+  signalDrivers?:          SignalDriver[];
+  secondaryFactors?:       string[];
+  dataValid?:              boolean;
+  dataStatus?:             string;
+  riskHeadline?:           string;
+  timeHorizons?:           TimeHorizons;
 }
 
 const SCORE_CONFIG = {
-  low:    { label: "LOW RISK",    icon: "🟢", ring: "ring-green-500/40",  bar: "bg-green-500" },
-  medium: { label: "MEDIUM RISK", icon: "🟡", ring: "ring-amber-500/40",  bar: "bg-amber-500" },
-  high:   { label: "HIGH RISK",   icon: "🔴", ring: "ring-red-500/40",    bar: "bg-red-500"   },
+  low:    { label: "LOW RISK",    icon: "\u{1F7E2}", ring: "ring-green-500/40",  bar: "bg-green-500" },
+  medium: { label: "MEDIUM RISK", icon: "\u{1F7E1}", ring: "ring-amber-500/40",  bar: "bg-amber-500" },
+  high:   { label: "HIGH RISK",   icon: "\u{1F534}", ring: "ring-red-500/40",    bar: "bg-red-500"   },
 };
 
 const CONFIDENCE_COLOR = (c: number) =>
   c >= 75 ? "text-green-400" : c >= 55 ? "text-amber-400" : "text-gray-500";
 
 function dataStatusLabel(status: string): string {
-  if (status === "mock_only") return "Real-time feed initializing — mock data excluded";
+  if (status === "mock_only") return "Real-time feed initializing -- mock data excluded";
   if (status.startsWith("building_cache_")) {
     const parts = status.split("_");
     return `Building cache: ${parts[2] ?? "0"}/${parts[4] ?? "2"} verified readings received`;
   }
-  if (status.startsWith("stale_")) return "Data feed interrupted — waiting for fresh reading";
+  if (status.startsWith("stale_")) return "Data feed interrupted -- waiting for fresh reading";
   if (status === "no_data")        return "No price data received yet";
   return "Live data unavailable";
 }
 
-function DirectionBadge({ direction }: { direction: "increasing" | "stable" | "decreasing" }) {
+function DirectionBadge({ direction, context }: { direction: "increasing" | "stable" | "decreasing"; context?: string }) {
   const configs = {
     increasing: { icon: <TrendingUp   className="w-3.5 h-3.5" />, label: "Increasing", cls: "text-red-400 bg-red-500/10 border-red-500/20" },
     stable:     { icon: <Minus        className="w-3.5 h-3.5" />, label: "Stable",     cls: "text-gray-400 bg-white/5 border-white/10" },
@@ -49,8 +51,10 @@ function DirectionBadge({ direction }: { direction: "increasing" | "stable" | "d
   };
   const cfg = configs[direction];
   return (
-    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border", cfg.cls)}>
-      {cfg.icon}{cfg.label}
+    <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border", cfg.cls)}>
+      {cfg.icon}
+      {cfg.label}
+      {context && <span className="font-normal opacity-75">({context})</span>}
     </span>
   );
 }
@@ -58,8 +62,8 @@ function DirectionBadge({ direction }: { direction: "increasing" | "stable" | "d
 export default function RiskScore({
   score, activeSignals, computedAt, summary,
   confidence, confidenceNote, explanation, impact,
-  primaryDriver, riskDirection, secondaryFactors,
-  dataValid, dataStatus, riskHeadline, timeHorizons,
+  primaryDriver, riskDirection, riskDirectionContext, signalDrivers,
+  secondaryFactors, dataValid, dataStatus, riskHeadline, timeHorizons,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
 
@@ -115,19 +119,52 @@ export default function RiskScore({
         <Activity className="w-5 h-5 text-gray-600" />
       </div>
 
-      {/* Risk headline — Phase 1 */}
+      {/* Risk headline */}
       {riskHeadline && (
         <p className={cn("mt-3 text-sm font-bold", riskColor(score))}>{riskHeadline}</p>
       )}
 
-      {/* Signal intensity bar */}
+      {/* Task 3 -- Signal intensity (human-readable) */}
       <div className="mt-4">
         <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-          <span>Signal intensity</span><span>{activeSignals}/3</span>
+          <span>
+            {activeSignals === 0
+              ? "No risk drivers active"
+              : activeSignals === 1
+                ? "1 of 3 risk drivers active"
+                : `${activeSignals} of 3 risk drivers active`}
+          </span>
+          <span className={cn(
+            "font-semibold",
+            activeSignals === 3 ? "text-red-400"
+            : activeSignals === 2 ? "text-amber-400"
+            : activeSignals === 1 ? "text-amber-300"
+            : "text-gray-500"
+          )}>
+            {activeSignals === 0 ? "Low" : activeSignals === 1 ? "Moderate" : activeSignals === 2 ? "Elevated" : "High"} signal strength
+          </span>
         </div>
         <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
           <div className={cn("h-full rounded-full transition-all duration-700", cfg.bar)} style={{ width: `${(activeSignals / 3) * 100}%` }} />
         </div>
+        {/* Named drivers */}
+        {signalDrivers && (
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {signalDrivers.map((d) => {
+              const activeCls =
+                d.severity === "high"   ? "bg-red-500/10 border-red-500/25 text-red-300" :
+                d.severity === "medium" ? "bg-amber-500/10 border-amber-500/25 text-amber-300" :
+                                          "bg-green-500/10 border-green-500/25 text-green-300";
+              const cls = d.active ? activeCls : "bg-white/5 border-white/8 text-gray-600";
+              return (
+                <span key={d.type} className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border", cls)}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", d.active ? "bg-current" : "bg-gray-700")} />
+                  {d.name}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {primaryDriver && (
@@ -144,10 +181,11 @@ export default function RiskScore({
         </div>
       )}
 
+      {/* Task 5 -- Risk direction with context */}
       {riskDirection && (
-        <div className="mt-2.5 flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-2 flex-wrap">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Risk Direction</span>
-          <DirectionBadge direction={riskDirection} />
+          <DirectionBadge direction={riskDirection} context={riskDirectionContext} />
         </div>
       )}
 
@@ -163,7 +201,7 @@ export default function RiskScore({
                                "bg-white/5 border-white/8 text-gray-400"
         )}>
           <span className="font-semibold uppercase tracking-wide mr-1.5">
-            {score === "high" ? "⚠ Why this matters:" : score === "medium" ? "ℹ Why this matters:" : "✓ Status:"}
+            {score === "high" ? "Why this matters:" : score === "medium" ? "Why this matters:" : "Status:"}
           </span>
           {impact}
         </div>
@@ -180,7 +218,7 @@ export default function RiskScore({
         </div>
       )}
 
-      {/* Phase 3 — Confidence note */}
+      {/* Phase 3 -- Confidence note */}
       {confidenceNote && confidence != null && (
         <div className="mt-3 flex items-start gap-1.5">
           <Info className="w-3 h-3 text-gray-600 mt-0.5 flex-shrink-0" />
@@ -188,7 +226,7 @@ export default function RiskScore({
         </div>
       )}
 
-      {/* Phase 1 — Time horizons */}
+      {/* Phase 1 -- Time horizons */}
       {timeHorizons && (
         <div className="mt-4 space-y-1 border-t border-white/5 pt-3">
           {[timeHorizons.short_term, timeHorizons.near_term, timeHorizons.outlook].map((line, i) => (

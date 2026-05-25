@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, MapPin } from "lucide-react";
+import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import RiskScore from "@/components/widgets/RiskScore";
@@ -19,6 +19,38 @@ import {
 
 const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
 type Location = typeof LOCATIONS[number];
+
+// Task 4 -- Urgency alert banner
+function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
+  if (!signals.data_valid) return null;
+  const score   = signals.risk_score;
+  const driver  = signals.primary_driver;
+  const drivers = (signals.signal_drivers ?? []).filter(d => d.active).map(d => d.name);
+
+  if (score === "high") {
+    const driverList = drivers.length > 0 ? drivers.join(", ") : driver;
+    return (
+      <div className="mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm text-red-300">
+        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
+        <span><span className="font-bold">Elevated Risk:</span> Multiple signals detected including {driverList}. Short-term volatility risk is elevated.</span>
+      </div>
+    );
+  }
+  if (score === "medium") {
+    return (
+      <div className="mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
+        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
+        <span><span className="font-bold">Monitoring Recommended:</span> {driver} is elevating near-term conditions in Texas.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400">
+      <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+      <span><span className="font-bold">Conditions Stable:</span> No significant risk signals detected. All monitored drivers are within normal range.</span>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const router     = useRouter();
@@ -120,6 +152,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Task 4 -- Urgency alert banner */}
+          {signals && <UrgencyBanner signals={signals} />}
+
           {/* Disclaimer */}
           <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/60 text-center">
             All data is for informational purposes only. Risk indicators are not investment, trading, or procurement advice.
@@ -147,6 +182,8 @@ export default function DashboardPage() {
                   impact={signals.impact}
                   primaryDriver={signals.primary_driver}
                   riskDirection={signals.risk_direction}
+                  riskDirectionContext={signals.risk_direction_context}
+                  signalDrivers={signals.signal_drivers}
                   secondaryFactors={signals.secondary_factors}
                   dataValid={signals.data_valid}
                   dataStatus={signals.data_status}
@@ -180,7 +217,7 @@ export default function DashboardPage() {
                 />
               )}
 
-              {/* 6. Data Sources — Phase 6 */}
+              {/* 6. Data Sources */}
               {signals && signals.data_sources && (
                 <DataSources
                   sources={signals.data_sources}
