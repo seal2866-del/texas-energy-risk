@@ -149,6 +149,15 @@ def _failsafe_response() -> Dict[str, Any]:
         "market_reaction":    {"level": "low", "explanation": "Market reaction unavailable — data source offline.", "score": 0},
         "gas_to_power_impact": {"level": "low", "explanation": "Gas-to-power impact unavailable — data source offline."},
         "events":             [],
+        "risk_narrative":     {
+            "headline":        "Texas energy risk monitoring is paused",
+            "body":            "Live data is currently unavailable. Risk signals will resume automatically once real-time ERCOT data is confirmed.",
+            "temporal_context": "0–6 hours",
+            "next_period_note": "Monitoring will resume once data feeds are restored.",
+        },
+        "cost_impact":        {"level": "low", "label": "Unavailable", "description": "Cost impact assessment unavailable — data source offline."},
+        "market_condition":   {"label": "Unavailable", "description": "Market condition assessment unavailable — data source offline."},
+        "alert_severity":     {"level": "informational", "label": "Informational", "description": "Monitoring paused — awaiting live data."},
         "time_horizons": {
             "short_term": "Short-term (0-6h): unavailable",
             "near_term":  "Near-term (6-24h): unavailable",
@@ -295,12 +304,45 @@ def _compute_confidence(
     # Task 1: floor raised from 30 to 50
     confidence = max(50, min(90, base + adj))
 
-    driver_phrase = {0: "No active drivers", 1: "1 active driver", 2: "2 active drivers", 3: "3 active drivers"}.get(triggered_count, "Multiple drivers")
-    note = f"Confidence based on signal alignment, data freshness, and source availability. {driver_phrase} detected."
-    if any_unavail or any_stale:
-        note += " Adjusted due to partial data availability."
-    elif adjustments:
-        note += " Adjustments: " + "; ".join(adjustments) + "."
+    # Phase 11: plain-English WHY explanation
+    conf_word = "high" if confidence >= 75 else "moderate" if confidence >= 60 else "limited"
+    driver_phrase = {
+        0: "No active risk drivers detected",
+        1: "1 active risk driver detected",
+        2: "2 active risk drivers detected",
+        3: "3 active risk drivers detected",
+    }.get(triggered_count, "Multiple drivers detected")
+
+    if any_unavail:
+        unavail_names = [
+            src.upper()
+            for src, info in {"ercot": ercot_status, "noaa": noaa_status, "eia": eia_status}.items()
+            if info == "unavailable"
+        ]
+        note = (
+            f"Confidence is {conf_word} ({confidence}%). {driver_phrase}. "
+            f"Reduced because {', '.join(unavail_names)} data is currently unavailable — "
+            "signal precision is limited to available sources."
+        )
+    elif any_stale:
+        note = (
+            f"Confidence is {conf_word} ({confidence}%). {driver_phrase}. "
+            "Slightly reduced because one or more data sources have not refreshed within the expected interval."
+        )
+    elif all_active and triggered_count >= 2:
+        note = (
+            f"Confidence is {conf_word} ({confidence}%). {driver_phrase} with strong alignment "
+            "across weather, gas, and ERCOT signals. All data sources are active and current."
+        )
+    elif all_active:
+        note = (
+            f"Confidence is {conf_word} ({confidence}%). {driver_phrase}. "
+            "All data sources are active and current."
+        )
+    else:
+        note = (
+            f"Confidence is {conf_word} ({confidence}%). {driver_phrase}."
+        )
 
     return confidence, note
 
@@ -1185,6 +1227,330 @@ def _detect_events(
 
 
 # ------------------------------------------------------------------------------
+# Phase 11 — Premium Intelligence Layer
+# ------------------------------------------------------------------------------
+
+def _compute_risk_narrative(
+    risk_score:          str,
+    demand_pressure:     Dict[str, Any],
+    supply_pressure:     Dict[str, Any],
+    market_reaction:     Dict[str, Any],
+    gas_to_power_impact: Dict[str, Any],
+    risk_direction:      str,
+    primary_driver_type: str,
+    price_val:           float,
+    weather_val:         float,
+    gas_pct:             float,
+) -> Dict[str, str]:
+    """
+    System-thinking narrative engine.
+    Connects weather → demand pressure → grid load
+               gas   → generation cost sensitivity
+               ERCOT → real-time market reflection of the balance.
+    Returns {headline, body, temporal_context, next_period_note}.
+    """
+    risk_label = risk_score.capitalize()
+
+    # Temporal framing (Phase 11 item 4)
+    headline       = f"Texas energy risk is {risk_label} for the next 0–6 hours"
+    temporal_ctx   = "0–6 hours"
+    next_period    = "Conditions may change within the next 6–24 hours based on forecast demand trends."
+
+    demand_level = demand_pressure.get("level", "low")
+    supply_level = supply_pressure.get("level", "low")
+    market_level = market_reaction.get("level", "low")
+
+    # ── Sentence 1: weather → demand chain ────────────────────────────────────
+    if demand_level == "high":
+        if weather_val >= TEMP_HIGH_THRESHOLD_F:
+            s1 = (
+                f"Extreme temperatures of {weather_val:.0f}°F are driving significant "
+                "cooling demand across the Texas grid, placing substantial load on power "
+                "generation resources."
+            )
+        else:
+            s1 = (
+                f"Severe cold of {weather_val:.0f}°F is driving significant heating "
+                "demand across Texas, placing substantial load on the grid."
+            )
+    elif demand_level == "medium":
+        if weather_val >= TEMP_HIGH_THRESHOLD_F:
+            s1 = (
+                f"Elevated temperatures of {weather_val:.0f}°F are increasing cooling "
+                "demand pressure on the Texas grid, with peak load expected during "
+                "afternoon hours."
+            )
+        elif weather_val > 0:
+            s1 = (
+                f"Cold temperatures of {weather_val:.0f}°F are increasing heating "
+                "demand, with elevated overnight grid load expected."
+            )
+        else:
+            s1 = "Weather-driven demand pressure is moderate, with conditions above normal levels."
+    else:
+        s1 = (
+            "Weather conditions are within normal seasonal ranges, with no elevated "
+            "demand pressure on the Texas grid at this time."
+        )
+
+    # ── Sentence 2: gas → generation cost chain ───────────────────────────────
+    gas_abs = abs(gas_pct)
+    if supply_level == "high":
+        s2 = (
+            f"Natural gas — which fuels a significant portion of Texas power generation — "
+            f"is critically below seasonal averages ({gas_abs:.0f}% below the 5-year average), "
+            "substantially reducing the fuel buffer available to meet any demand surge."
+        )
+    elif supply_level == "medium":
+        s2 = (
+            f"Natural gas supply remains {gas_abs:.0f}% below seasonal averages, "
+            "which may increase cost sensitivity and reduce the available fuel buffer "
+            "during periods of elevated generation demand."
+        )
+    else:
+        s2 = (
+            "Natural gas supply conditions appear adequate, with storage near seasonal "
+            "norms and no fuel availability concerns that would compound demand pressure."
+        )
+
+    # ── Sentence 3: ERCOT → real-time balance reflection ─────────────────────
+    price_str = f"${price_val:.0f}/MWh" if price_val > 0 else "current levels"
+    if market_level == "high":
+        s3 = (
+            f"ERCOT Houston Hub pricing at {price_str} already reflects these converging "
+            "pressures — the real-time market is pricing in elevated risk conditions."
+        )
+    elif market_level == "medium":
+        s3 = (
+            f"ERCOT pricing at {price_str} is showing early volatility, suggesting the "
+            "market is beginning to respond to the current pressure environment."
+        )
+    else:
+        if demand_level != "low" or supply_level != "low":
+            s3 = (
+                f"ERCOT pricing remains stable at {price_str}, but conditions suggest "
+                "potential for short-term pricing variability during peak demand windows "
+                "if pressure continues to build."
+            )
+        else:
+            s3 = (
+                f"ERCOT pricing is stable at {price_str}, consistent with the current "
+                "balanced supply-demand environment."
+            )
+
+    # ── Assemble body: lead with dominant driver ───────────────────────────────
+    if risk_score == "high":
+        body = f"{s1} {s2} {s3}"
+        next_period = (
+            "Conditions may remain elevated over the next 6–24 hours. "
+            "Close monitoring is recommended as multiple risk drivers are active."
+        )
+    elif primary_driver_type == "weather_demand":
+        body = f"{s1} {s2} {s3}"
+    elif primary_driver_type == "gas_supply":
+        body = f"{s2} {s1} {s3}"
+    elif primary_driver_type == "price_volatility":
+        body = f"{s3} {s1} {s2}"
+    else:
+        body = f"{s1} {s2} {s3}"
+
+    return {
+        "headline":        headline,
+        "body":            body.strip(),
+        "temporal_context": temporal_ctx,
+        "next_period_note": next_period,
+    }
+
+
+def _compute_cost_impact(
+    risk_score:      str,
+    demand_pressure: Dict[str, Any],
+    supply_pressure: Dict[str, Any],
+    market_reaction: Dict[str, Any],
+) -> Dict[str, str]:
+    """
+    Translate technical risk signals into plain-language cost awareness.
+    Uses ranges, not specific figures. No financial advice.
+    """
+    demand_level = demand_pressure.get("level", "low")
+    supply_level = supply_pressure.get("level", "low")
+    market_level = market_reaction.get("level", "low")
+
+    if risk_score == "high":
+        return {
+            "level": "high",
+            "label": "Elevated pricing variability risk",
+            "description": (
+                "Significant pricing volatility risk may occur, particularly during "
+                "peak demand windows. Multiple converging risk drivers suggest elevated "
+                "cost sensitivity over the next 24–48 hours."
+            ),
+        }
+    elif risk_score == "medium":
+        if demand_level in ("medium", "high"):
+            return {
+                "level": "medium",
+                "label": "Moderate cost variability possible",
+                "description": (
+                    "Moderate pricing variability may occur during peak demand periods, "
+                    "particularly during afternoon hours when grid load is highest."
+                ),
+            }
+        elif supply_level in ("medium", "high"):
+            return {
+                "level": "medium",
+                "label": "Cost sensitivity elevated",
+                "description": (
+                    "Moderate pricing variability may occur if demand spikes, given the "
+                    "current reduction in natural gas supply buffers."
+                ),
+            }
+        elif market_level in ("medium", "high"):
+            return {
+                "level": "medium",
+                "label": "Market pricing uncertainty active",
+                "description": (
+                    "Moderate pricing variability may occur. ERCOT price movement "
+                    "suggests active market uncertainty in real-time settlement pricing."
+                ),
+            }
+        return {
+            "level": "medium",
+            "label": "Moderate cost variability possible",
+            "description": "Moderate pricing variability may occur during elevated risk conditions.",
+        }
+    else:
+        return {
+            "level": "low",
+            "label": "Minimal cost impact expected",
+            "description": (
+                "Minimal expected cost impact under current conditions. "
+                "All monitored risk drivers are within normal operating ranges."
+            ),
+        }
+
+
+def _compute_market_condition(
+    risk_score:      str,
+    risk_direction:  str,
+    demand_pressure: Dict[str, Any],
+    supply_pressure: Dict[str, Any],
+    market_reaction: Dict[str, Any],
+) -> Dict[str, str]:
+    """
+    Simple market condition classification for rapid user orientation.
+    Labels: Stable / Tightening / Volatile / Elevated Risk
+    """
+    demand_level = demand_pressure.get("level", "low")
+    supply_level = supply_pressure.get("level", "low")
+    market_level = market_reaction.get("level", "low")
+
+    if risk_score == "high":
+        return {
+            "label": "Elevated Risk",
+            "description": (
+                "Market conditions are under significant pressure from multiple converging "
+                "risk drivers. Close monitoring is recommended."
+            ),
+        }
+    elif market_level in ("medium", "high"):
+        return {
+            "label": "Volatile",
+            "description": (
+                "ERCOT pricing reflects active market volatility. "
+                "Short-term pricing uncertainty is elevated."
+            ),
+        }
+    elif demand_level in ("medium", "high") and supply_level in ("medium", "high"):
+        return {
+            "label": "Tightening",
+            "description": (
+                "Market conditions are tightening as demand pressure and supply constraints "
+                "converge. ERCOT pricing may begin to reflect these pressures."
+            ),
+        }
+    elif demand_level in ("medium", "high"):
+        return {
+            "label": "Tightening",
+            "description": (
+                "Market conditions are tightening as demand pressure builds. "
+                "ERCOT pricing remains stable but conditions warrant monitoring."
+            ),
+        }
+    elif supply_level in ("medium", "high"):
+        return {
+            "label": "Tightening",
+            "description": (
+                "Supply buffer conditions are tightening. Gas-to-power cost sensitivity "
+                "is elevated, increasing potential market sensitivity."
+            ),
+        }
+    else:
+        return {
+            "label": "Stable",
+            "description": (
+                "Market conditions are balanced. No significant pressure signals are "
+                "active across demand, supply, or real-time pricing."
+            ),
+        }
+
+
+def _compute_alert_severity(
+    risk_score:      str,
+    active_count:    int,
+    demand_pressure: Dict[str, Any],
+    supply_pressure: Dict[str, Any],
+    market_reaction: Dict[str, Any],
+) -> Dict[str, str]:
+    """
+    Alert severity classification for clear user action guidance.
+    Levels: Informational / Monitoring / Elevated / Critical
+    """
+    demand_level = demand_pressure.get("level", "low")
+    supply_level = supply_pressure.get("level", "low")
+    market_level = market_reaction.get("level", "low")
+    high_count   = sum(1 for l in [demand_level, supply_level, market_level] if l == "high")
+
+    if risk_score == "high" and (high_count >= 2 or active_count >= 2):
+        return {
+            "level":       "critical",
+            "label":       "Critical",
+            "description": (
+                "Multiple high-severity risk drivers are converging. "
+                "Immediate monitoring is recommended."
+            ),
+        }
+    elif risk_score == "high":
+        return {
+            "level":       "elevated",
+            "label":       "Elevated",
+            "description": (
+                "Risk conditions are elevated. Active monitoring is recommended."
+            ),
+        }
+    elif risk_score == "medium":
+        active_labels = []
+        if demand_level in ("medium", "high"):
+            active_labels.append("demand pressure increasing")
+        if supply_level in ("medium", "high"):
+            active_labels.append("supply pressure elevated")
+        if market_level in ("medium", "high"):
+            active_labels.append("market reaction detected")
+        desc = ("; ".join(active_labels)).capitalize() if active_labels else "Active monitoring recommended"
+        return {
+            "level":       "monitoring",
+            "label":       "Monitoring",
+            "description": desc,
+        }
+    else:
+        return {
+            "level":       "informational",
+            "label":       "Informational",
+            "description": "No active risk drivers. Routine monitoring.",
+        }
+
+
+# ------------------------------------------------------------------------------
 # Master runner
 # ------------------------------------------------------------------------------
 
@@ -1234,6 +1600,20 @@ def run_all_signals(
 
     # Phase 5: Event detection
     events = _detect_events(prices, forecasts, gas_records, data_sources)
+
+    # Phase 11: Premium intelligence layer
+    price_val   = float(price_signal.get("value")   or 0)
+    weather_val = float(weather_signal.get("value") or 0)
+    gas_pct_val = float(gas_signal.get("value")     or 0)
+
+    risk_narrative    = _compute_risk_narrative(
+        risk_score, demand_pressure, supply_pressure, market_reaction,
+        gas_to_power_impact, risk_direction, primary_driver_type,
+        price_val, weather_val, gas_pct_val,
+    )
+    cost_impact       = _compute_cost_impact(risk_score, demand_pressure, supply_pressure, market_reaction)
+    market_condition  = _compute_market_condition(risk_score, risk_direction, demand_pressure, supply_pressure, market_reaction)
+    alert_severity    = _compute_alert_severity(risk_score, active_count, demand_pressure, supply_pressure, market_reaction)
 
     for sig in all_signals:
         if sig.get("triggered") and sig.get("confidence") is None:
@@ -1311,6 +1691,11 @@ def run_all_signals(
         "gas_to_power_impact":    gas_to_power_impact,
         # Phase 5: Events
         "events":                 events,
+        # Phase 11: Premium intelligence
+        "risk_narrative":         risk_narrative,
+        "cost_impact":            cost_impact,
+        "market_condition":       market_condition,
+        "alert_severity":         alert_severity,
         "signals": {
             "price_volatility": price_signal,
             "weather_demand":   weather_signal,

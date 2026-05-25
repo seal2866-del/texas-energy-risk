@@ -62,7 +62,7 @@ export default function EnergyRiskDrivers({ signals }: Props) {
 
   if (!demand_pressure && !supply_pressure && !market_reaction) return null;
 
-  // Filter events to show — exclude data_source_degraded (DataSources widget covers it)
+  // Filter events - exclude data_source_degraded (DataSources widget covers it)
   const visibleEvents = (events ?? []).filter(
     (e) => e.type !== "data_source_degraded",
   );
@@ -180,7 +180,7 @@ export default function EnergyRiskDrivers({ signals }: Props) {
       {/* Informational footer */}
       <p className="mt-4 text-xs text-gray-700 leading-relaxed">
         Each driver contributes independently to the unified Energy Risk Score.
-        Risk may be rising — monitoring is recommended when any driver is elevated.
+        Risk may be rising &mdash; monitoring is recommended when any driver is elevated.
       </p>
     </div>
   );

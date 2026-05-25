@@ -190,6 +190,8 @@ export default function DashboardPage() {
                   dataStatus={signals.data_status}
                   riskHeadline={signals.risk_headline}
                   timeHorizons={signals.time_horizons}
+                  marketCondition={signals.market_condition}
+                  alertSeverity={signals.alert_severity}
                 />
               )}
 

@@ -72,6 +72,31 @@ export interface EnergyEvent {
   message:  string;
 }
 
+// Phase 11 -- Premium Intelligence Layer
+export interface RiskNarrative {
+  headline:         string;
+  body:             string;
+  temporal_context: string;
+  next_period_note: string;
+}
+
+export interface CostImpact {
+  level:       RiskScore;
+  label:       string;
+  description: string;
+}
+
+export interface MarketCondition {
+  label:       string;  // Stable | Tightening | Volatile | Elevated Risk
+  description: string;
+}
+
+export interface AlertSeverityInfo {
+  level:       string;  // informational | monitoring | elevated | critical
+  label:       string;
+  description: string;
+}
+
 export interface SignalsResponse {
   computed_at:             string;
   risk_score:              RiskScore;
@@ -99,6 +124,11 @@ export interface SignalsResponse {
   gas_to_power_impact?: GasToPowerImpact;
   // Phase 5: Events
   events?:              EnergyEvent[];
+  // Phase 11: Premium Intelligence
+  risk_narrative?:      RiskNarrative;
+  cost_impact?:         CostImpact;
+  market_condition?:    MarketCondition;
+  alert_severity?:      AlertSeverityInfo;
   signals: {
     price_volatility: Signal;
     weather_demand:   Signal;
@@ -165,22 +195,33 @@ export const getSignals = (location = "Houston") =>
   apiFetch<SignalsResponse>(`/api/signals/?location=${location}`);
 
 export const getERCOTPrices = (hours = 24, point = "HB_HOUSTON") =>
-  apiFetch<{ prices: ERCOTPrice[] }>(`/api/ercot/prices?hours=${hours}&settlement_point=${point}`);
+  apiFetch<{ prices: ERCOTPrice[] }>(`/api/ercot/prices/?hours=${hours}&settlement_point=${point}`);
 
 export const getWeatherForecast = (location = "Houston", days = 7) =>
-  apiFetch<{ forecasts: WeatherForecast[] }>(`/api/weather/forecast?location=${location}&days=${days}`);
+  apiFetch<{ forecasts: WeatherForecast[] }>(`/api/weather/forecast/?location=${location}&days=${days}`);
 
 export const getGasData = (weeks = 8) =>
-  apiFetch<{ records: GasRecord[]; latest: GasRecord }>(`/api/gas/storage?weeks=${weeks}`);
+  apiFetch<{ records: GasRecord[]; latest: GasRecord }>(`/api/gas/storage/?weeks=${weeks}`);
 
-export const getAlertLogs = (token: string) =>
-  apiFetch<{ logs: AlertLog[] }>("/api/alerts/logs", token);
+export const getAlertLogs = (limit = 20) =>
+  apiFetch<{ alerts: AlertLog[] }>(`/api/alerts/log/?limit=${limit}`);
 
-export const updateAlertPrefs = async (prefs: object, token: string) => {
-  const res = await fetch(`${BASE}/api/alerts/preferences`, {
-    method:  "PUT",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(prefs),
-  });
-  return res.json();
-};
+export interface AlertPrefs {
+  email_alerts?:           boolean;
+  sms_alerts?:             boolean;
+  voice_enabled?:          boolean;
+  alert_frequency?:        string;
+  risk_threshold?:         string;
+  city?:                   string;
+  price_volatility_alert?: boolean;
+  weather_demand_alert?:   boolean;
+  gas_supply_alert?:       boolean;
+  data_source_alert?:      boolean;
+  quiet_hours_enabled?:    boolean;
+  quiet_hours_start?:      string;
+  quiet_hours_end?:        string;
+  phone_number?:           string;
+}
+
+export const updateAlertPrefs = (prefs: AlertPrefs, token: string) =>
+  apiFetch<{ success: boolean }>(`/api/alerts/prefs/`, token);

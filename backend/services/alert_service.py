@@ -263,11 +263,33 @@ def _build_risk_email(
     supply_pressure:     Optional[dict] = None,
     market_reaction:     Optional[dict] = None,
     gas_to_power_impact: Optional[dict] = None,
+    risk_narrative:      Optional[dict] = None,
+    cost_impact:         Optional[dict] = None,
+    market_condition:    Optional[dict] = None,
+    alert_severity:      Optional[dict] = None,
 ) -> str:
     color = RISK_COLOR.get(risk_level, "#6b7280")
     label = RISK_LABEL.get(risk_level, risk_level.upper())
     prev_label = previous_risk_level.capitalize() if previous_risk_level else "Unknown"
     direction  = (risk_direction or "stable").capitalize()
+
+    # Phase 11: Alert severity badge
+    sev_colors = {"critical": "#ef4444", "elevated": "#f97316", "monitoring": "#f59e0b", "informational": "#6b7280"}
+    sev_label  = alert_severity.get("label", "Informational") if alert_severity else "Informational"
+    sev_desc   = alert_severity.get("description", "") if alert_severity else ""
+    sev_level  = alert_severity.get("level", "informational") if alert_severity else "informational"
+    sev_color  = sev_colors.get(sev_level, "#6b7280")
+
+    # Phase 11: Market condition
+    mkt_label  = market_condition.get("label", "") if market_condition else ""
+    mkt_desc   = market_condition.get("description", "") if market_condition else ""
+
+    # Phase 11: Narrative body
+    narrative_body = risk_narrative.get("body", "") if risk_narrative else ""
+
+    # Phase 11: Cost impact
+    cost_label = cost_impact.get("label", "") if cost_impact else ""
+    cost_desc  = cost_impact.get("description", "") if cost_impact else ""
 
     rows = ""
     rows += _row("Location", city)
@@ -332,10 +354,16 @@ def _build_risk_email(
   </div>
 
   <div style="background:rgba(255,255,255,0.04);border:2px solid {color}40;border-radius:14px;padding:24px;margin-bottom:18px;text-align:center;">
-    <p style="color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 8px;">CURRENT RISK LEVEL</p>
+    <p style="color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;">CURRENT RISK LEVEL</p>
     <p style="color:{color};font-size:34px;font-weight:900;margin:0 0 6px;">{label}</p>
-    {"<p style='color:#d1d5db;font-size:13px;margin:0;'>Increased from <strong>" + prev_label + "</strong></p>" if previous_risk_level and previous_risk_level != risk_level else ""}
+    {"<p style='color:#d1d5db;font-size:13px;margin:0 0 10px;'>Increased from <strong>" + prev_label + "</strong></p>" if previous_risk_level and previous_risk_level != risk_level else ""}
+    <div style="display:inline-flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center;">
+      {"<span style='background:" + sev_color + "20;border:1px solid " + sev_color + "40;border-radius:20px;padding:3px 12px;color:" + sev_color + ";font-size:11px;font-weight:700;'>⚠ " + sev_label + "</span>" if sev_level != "informational" else ""}
+      {"<span style='background:#ffffff10;border:1px solid #ffffff20;border-radius:20px;padding:3px 12px;color:#9ca3af;font-size:11px;font-weight:600;'>" + mkt_label + "</span>" if mkt_label else ""}
+    </div>
   </div>
+
+  {"<div style='background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px 18px;margin-bottom:18px;'><p style='color:#f3f4f6;font-size:14px;line-height:1.7;margin:0;'>" + narrative_body + "</p></div>" if narrative_body else ""}
 
   <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:18px 20px;margin-bottom:18px;">
     <table style="width:100%;border-collapse:collapse;">
@@ -346,6 +374,8 @@ def _build_risk_email(
   {drivers_html}
 
   {"<div style='background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.18);border-radius:12px;padding:16px 18px;margin-bottom:18px;'><p style='color:#fb923c;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;'>WHY THIS MATTERS</p><p style='color:#d1d5db;font-size:13px;line-height:1.65;margin:0;'>" + why_it_matters + "</p></div>" if why_it_matters else ""}
+
+  {"<div style='background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 18px;margin-bottom:18px;'><p style='color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;'>COST IMPACT INTERPRETATION</p><p style='color:#f59e0b;font-size:12px;font-weight:700;margin:0 0 4px;'>" + cost_label + "</p><p style='color:#9ca3af;font-size:12px;line-height:1.6;margin:0;'>" + cost_desc + "</p></div>" if cost_label else ""}
 
   {"<div style='background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px 18px;margin-bottom:18px;'><p style='color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 10px;'>TIME HORIZON</p>" + ("<p style='color:#e5e7eb;font-size:13px;font-family:monospace;margin:0 0 6px;'>" + short + "</p>" if short else "") + ("<p style='color:#9ca3af;font-size:12px;font-family:monospace;margin:0 0 6px;'>" + near + "</p>" if near else "") + ("<p style='color:#6b7280;font-size:12px;font-family:monospace;margin:0;'>" + outlook + "</p>" if outlook else "") + "</div>" if (short or near or outlook) else ""}
 
@@ -591,6 +621,10 @@ async def maybe_send_alert(
     supply_pressure     = signals_data.get("supply_pressure")
     market_reaction     = signals_data.get("market_reaction")
     gas_to_power_impact = signals_data.get("gas_to_power_impact")
+    risk_narrative      = signals_data.get("risk_narrative")
+    cost_impact         = signals_data.get("cost_impact")
+    market_condition    = signals_data.get("market_condition")
+    alert_severity_data = signals_data.get("alert_severity")
 
     html     = _build_risk_email(
         risk_level, prev_level, confidence, primary_driver,
@@ -598,6 +632,7 @@ async def maybe_send_alert(
         ercot_price, weather_temp, gas_storage,
         impact, computed_str,
         demand_pressure, supply_pressure, market_reaction, gas_to_power_impact,
+        risk_narrative, cost_impact, market_condition, alert_severity_data,
     )
     subject  = _subject("risk_change", risk_level)
     delivered = False

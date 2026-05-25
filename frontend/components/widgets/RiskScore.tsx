@@ -1,6 +1,6 @@
 "use client";
-import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap, Info } from "lucide-react";
-import type { RiskScore as RiskScoreType, TimeHorizons, SignalDriver } from "@/lib/api";
+import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap, Info, AlertTriangle } from "lucide-react";
+import type { RiskScore as RiskScoreType, TimeHorizons, SignalDriver, MarketCondition, AlertSeverityInfo } from "@/lib/api";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
 interface Props {
@@ -21,7 +21,23 @@ interface Props {
   dataStatus?:             string;
   riskHeadline?:           string;
   timeHorizons?:           TimeHorizons;
+  marketCondition?:        MarketCondition;
+  alertSeverity?:          AlertSeverityInfo;
 }
+
+const MARKET_CLS: Record<string, string> = {
+  "Stable":        "text-green-400  bg-green-500/10  border-green-500/25",
+  "Tightening":    "text-amber-400  bg-amber-500/10  border-amber-500/25",
+  "Volatile":      "text-orange-400 bg-orange-500/10 border-orange-500/25",
+  "Elevated Risk": "text-red-400    bg-red-500/10    border-red-500/25",
+};
+
+const SEVERITY_ICON_CLS: Record<string, string> = {
+  informational: "text-gray-500",
+  monitoring:    "text-amber-400",
+  elevated:      "text-orange-400",
+  critical:      "text-red-400",
+};
 
 const SCORE_CONFIG = {
   low:    { label: "LOW RISK",    icon: "\u{1F7E2}", ring: "ring-green-500/40",  bar: "bg-green-500" },
@@ -64,6 +80,7 @@ export default function RiskScore({
   confidence, confidenceNote, explanation, impact,
   primaryDriver, riskDirection, riskDirectionContext, signalDrivers,
   secondaryFactors, dataValid, dataStatus, riskHeadline, timeHorizons,
+  marketCondition, alertSeverity,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
 
@@ -108,7 +125,7 @@ export default function RiskScore({
                 <p className="text-xs text-gray-500">{activeSignals} active risk driver{activeSignals !== 1 ? "s" : ""}</p>
                 {confidence != null && (
                   <>
-                    <span className="text-gray-700">·</span>
+                    <span className="text-gray-700">&middot;</span>
                     <p className={cn("text-xs font-semibold", CONFIDENCE_COLOR(confidence))}>Confidence: {confidence}%</p>
                   </>
                 )}
@@ -124,7 +141,7 @@ export default function RiskScore({
         <p className={cn("mt-3 text-sm font-bold", riskColor(score))}>{riskHeadline}</p>
       )}
 
-      {/* Task 3 -- Signal intensity (human-readable) */}
+      {/* Signal intensity bar */}
       <div className="mt-4">
         <div className="flex justify-between text-xs text-gray-500 mb-1.5">
           <span>
@@ -181,11 +198,39 @@ export default function RiskScore({
         </div>
       )}
 
-      {/* Task 5 -- Risk direction with context */}
+      {/* Risk direction */}
       {riskDirection && (
         <div className="mt-2.5 flex items-center gap-2 flex-wrap">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Risk Direction</span>
           <DirectionBadge direction={riskDirection} context={riskDirectionContext} />
+        </div>
+      )}
+
+      {/* Phase 11 -- Market condition + alert severity */}
+      {marketCondition && (
+        <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Market</span>
+          <span className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border",
+            MARKET_CLS[marketCondition.label] ?? "text-gray-400 bg-white/5 border-white/10",
+          )}>
+            {marketCondition.label}
+          </span>
+        </div>
+      )}
+      {alertSeverity && alertSeverity.level !== "informational" && (
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Alert</span>
+          <span className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border",
+            alertSeverity.level === "critical"  ? "text-red-400 bg-red-500/10 border-red-500/25" :
+            alertSeverity.level === "elevated"  ? "text-orange-400 bg-orange-500/10 border-orange-500/25" :
+                                                  "text-amber-400 bg-amber-500/10 border-amber-500/20",
+          )}>
+            <AlertTriangle className="w-3 h-3" />
+            {alertSeverity.label}
+          </span>
+          <span className="text-xs text-gray-600">{alertSeverity.description}</span>
         </div>
       )}
 
@@ -218,7 +263,7 @@ export default function RiskScore({
         </div>
       )}
 
-      {/* Phase 3 -- Confidence note */}
+      {/* Confidence note */}
       {confidenceNote && confidence != null && (
         <div className="mt-3 flex items-start gap-1.5">
           <Info className="w-3 h-3 text-gray-600 mt-0.5 flex-shrink-0" />
@@ -226,7 +271,7 @@ export default function RiskScore({
         </div>
       )}
 
-      {/* Phase 1 -- Time horizons */}
+      {/* Time horizons */}
       {timeHorizons && (
         <div className="mt-4 space-y-1 border-t border-white/5 pt-3">
           {[timeHorizons.short_term, timeHorizons.near_term, timeHorizons.outlook].map((line, i) => (
