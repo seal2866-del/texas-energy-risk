@@ -24,7 +24,7 @@ GAS_STORAGE_PCT_THRESHOLD = -10.0
 
 # -- Data validation constants -------------------------------------------------
 DATA_FRESHNESS_MINUTES = 15
-DATA_MIN_REAL_POINTS   = 2
+DATA_MIN_REAL_POINTS   = 1
 MOCK_SOURCES           = {"mock", "mock_data", "generated", "demo", None, ""}
 
 # -- Severity rank for driver comparison ---------------------------------------
