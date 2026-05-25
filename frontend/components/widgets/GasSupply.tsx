@@ -1,16 +1,25 @@
 "use client";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
-import { Flame } from "lucide-react";
-import type { GasRecord, Signal } from "@/lib/api";
+import { Flame, Zap } from "lucide-react";
+import type { GasRecord, Signal, GasToPowerImpact } from "@/lib/api";
 import { cn, riskBg, riskColor } from "@/lib/utils";
 
 interface Props {
-  records: GasRecord[];
-  latest:  GasRecord | null;
-  signal:  Signal;
+  records:          GasRecord[];
+  latest:           GasRecord | null;
+  signal:           Signal;
+  gasToPower?:      GasToPowerImpact;
 }
 
-export default function GasSupply({ records, latest, signal }: Props) {
+function gasToPowerCls(level: string) {
+  return level === "high"
+    ? "text-red-400 bg-red-500/10 border-red-500/25"
+    : level === "medium"
+    ? "text-amber-400 bg-amber-500/10 border-amber-500/25"
+    : "text-green-400 bg-green-500/10 border-green-500/25";
+}
+
+export default function GasSupply({ records, latest, signal, gasToPower }: Props) {
   const triggered = signal.triggered;
   const severity  = signal.severity;
 
@@ -37,7 +46,7 @@ export default function GasSupply({ records, latest, signal }: Props) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Natural Gas Supply Pressure</p>
-          <p className="text-xs text-gray-600 mt-0.5">EIA working gas storage</p>
+          <p className="text-xs text-gray-600 mt-0.5">EIA working gas storage · Henry Hub pricing</p>
         </div>
         <Flame className={cn("w-5 h-5", triggered ? riskColor(severity) : "text-gray-600")} />
       </div>
@@ -82,6 +91,31 @@ export default function GasSupply({ records, latest, signal }: Props) {
 
       {signal.time_horizon && (
         <p className="mt-3 text-xs text-gray-600 font-mono">{signal.time_horizon}</p>
+      )}
+
+      {/* Gas-to-Power Impact */}
+      {gasToPower && (
+        <div className="mt-4 pt-3 border-t border-white/5">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-yellow-400" />
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Gas-to-Power Impact
+              </span>
+            </div>
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded-full text-xs font-black border uppercase",
+                gasToPowerCls(gasToPower.level),
+              )}
+            >
+              {gasToPower.level}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed mt-1">
+            {gasToPower.explanation}
+          </p>
+        </div>
       )}
     </div>
   );

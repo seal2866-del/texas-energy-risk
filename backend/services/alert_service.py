@@ -236,6 +236,16 @@ def _row(label: str, value: str) -> str:
     )
 
 
+def _driver_badge(level: str) -> str:
+    colors = {"high": "#ef4444", "medium": "#f59e0b", "low": "#22c55e"}
+    c      = colors.get(level, "#6b7280")
+    return (
+        f"<span style='display:inline-block;background:{c}20;border:1px solid {c}40;"
+        f"border-radius:4px;padding:1px 8px;color:{c};font-size:11px;"
+        f"font-weight:700;text-transform:uppercase;'>{level}</span>"
+    )
+
+
 def _build_risk_email(
     risk_level:          str,
     previous_risk_level: str,
@@ -249,6 +259,10 @@ def _build_risk_email(
     gas_storage:         Optional[float],
     why_it_matters:      str,
     computed_at:         str,
+    demand_pressure:     Optional[dict] = None,
+    supply_pressure:     Optional[dict] = None,
+    market_reaction:     Optional[dict] = None,
+    gas_to_power_impact: Optional[dict] = None,
 ) -> str:
     color = RISK_COLOR.get(risk_level, "#6b7280")
     label = RISK_LABEL.get(risk_level, risk_level.upper())
@@ -270,6 +284,34 @@ def _build_risk_email(
     if gas_storage is not None:
         vs_avg = "below" if gas_storage < 0 else "above"
         rows += _row("Gas storage", f"{abs(gas_storage):.1f}% {vs_avg} 5-yr avg")
+
+    # Driver model rows
+    drivers_html = ""
+    driver_rows = []
+    if demand_pressure:
+        driver_rows.append(("Demand Pressure", demand_pressure.get("level", "low"), demand_pressure.get("explanation", "")))
+    if supply_pressure:
+        driver_rows.append(("Supply Pressure", supply_pressure.get("level", "low"), supply_pressure.get("explanation", "")))
+    if market_reaction:
+        driver_rows.append(("Market Reaction", market_reaction.get("level", "low"), market_reaction.get("explanation", "")))
+    if gas_to_power_impact:
+        driver_rows.append(("Gas-to-Power Impact", gas_to_power_impact.get("level", "low"), gas_to_power_impact.get("explanation", "")))
+
+    if driver_rows:
+        driver_items = "".join(
+            f"<tr><td style='padding:6px 12px 6px 0;color:#9ca3af;font-size:12px;white-space:nowrap;vertical-align:top;'>{name}</td>"
+            f"<td style='padding:6px 0;font-size:12px;vertical-align:top;'>{_driver_badge(level)}"
+            f"<span style='color:#9ca3af;font-size:12px;margin-left:6px;'>{expl}</span></td></tr>"
+            for name, level, expl in driver_rows
+        )
+        drivers_html = (
+            f"<div style='background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);"
+            f"border-radius:12px;padding:16px 18px;margin-bottom:18px;'>"
+            f"<p style='color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;"
+            f"letter-spacing:0.08em;margin:0 0 10px;'>ENERGY RISK DRIVERS</p>"
+            f"<table style='width:100%;border-collapse:collapse;'>{driver_items}</table>"
+            f"</div>"
+        )
 
     short  = time_horizons.get("short_term", "")
     near   = time_horizons.get("near_term",  "")
@@ -300,6 +342,8 @@ def _build_risk_email(
       {rows}
     </table>
   </div>
+
+  {drivers_html}
 
   {"<div style='background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.18);border-radius:12px;padding:16px 18px;margin-bottom:18px;'><p style='color:#fb923c;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;'>WHY THIS MATTERS</p><p style='color:#d1d5db;font-size:13px;line-height:1.65;margin:0;'>" + why_it_matters + "</p></div>" if why_it_matters else ""}
 
@@ -543,11 +587,17 @@ async def maybe_send_alert(
         except Exception:
             computed_str = computed_at
 
+    demand_pressure     = signals_data.get("demand_pressure")
+    supply_pressure     = signals_data.get("supply_pressure")
+    market_reaction     = signals_data.get("market_reaction")
+    gas_to_power_impact = signals_data.get("gas_to_power_impact")
+
     html     = _build_risk_email(
         risk_level, prev_level, confidence, primary_driver,
         risk_direction, time_horizons, city,
         ercot_price, weather_temp, gas_storage,
         impact, computed_str,
+        demand_pressure, supply_pressure, market_reaction, gas_to_power_impact,
     )
     subject  = _subject("risk_change", risk_level)
     delivered = False

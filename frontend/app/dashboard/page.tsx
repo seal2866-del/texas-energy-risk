@@ -12,6 +12,7 @@ import GasSupply from "@/components/widgets/GasSupply";
 import AISummary from "@/components/widgets/AISummary";
 import DataSources from "@/components/widgets/DataSources";
 import RecentAlerts from "@/components/widgets/RecentAlerts";
+import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
 import { supabase } from "@/lib/supabase";
 import {
   getSignals, getERCOTPrices, getWeatherForecast, getGasData,
@@ -123,7 +124,7 @@ export default function DashboardPage() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-black text-white">Energy Risk Dashboard</h1>
+              <h1 className="text-2xl font-black text-white">Texas Energy Intelligence Platform</h1>
               <p className="text-sm text-gray-500 mt-0.5">
                 {lastUpdated
                   ? `Updated ${lastUpdated.toLocaleTimeString("en-US", { timeZone: "America/Chicago", timeZoneName: "short" })}`
@@ -157,7 +158,7 @@ export default function DashboardPage() {
 
           {/* Disclaimer */}
           <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/60 text-center">
-            All data is for informational purposes only. Risk indicators are not investment, trading, or procurement advice.
+            TX Energy Risk provides informational analytics and market intelligence only. This does not constitute investment, trading, financial, legal, or procurement advice. Users are responsible for their own decisions.
           </div>
 
           {loading ? (
@@ -214,10 +215,16 @@ export default function DashboardPage() {
                   records={gasRecs}
                   latest={gasLatest}
                   signal={signals.signals.gas_supply ?? EMPTY_SIGNAL}
+                  gasToPower={signals.gas_to_power_impact}
                 />
               )}
 
-              {/* 6. Data Sources */}
+              {/* 6. Energy Risk Drivers panel */}
+              {signals && (
+                <EnergyRiskDrivers signals={signals} />
+              )}
+
+              {/* 7. Data Sources */}
               {signals && signals.data_sources && (
                 <DataSources
                   sources={signals.data_sources}
@@ -225,17 +232,14 @@ export default function DashboardPage() {
                 />
               )}
 
-              {/* 7. Recent Alerts (full width) */}
+              {/* 8. Recent Alerts (full width) */}
               <RecentAlerts />
 
-              {/* 8. AI Summary (full width) */}
+              {/* 9. AI Intelligence Summary (full width) */}
               {signals && (
                 <AISummary
-                  summary={signals.summary}
-                  riskScore={signals.risk_score}
-                  disclaimer={signals.disclaimer}
+                  signals={signals}
                   computedAt={signals.computed_at}
-                  timeHorizons={signals.time_horizons}
                 />
               )}
 

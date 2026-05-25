@@ -144,6 +144,11 @@ def _failsafe_response() -> Dict[str, Any]:
         "secondary_factors":  [],
         "data_valid":         False,
         "data_status":        "unavailable",
+        "demand_pressure":    {"level": "low", "explanation": "Demand pressure unavailable — data source offline.", "score": 0},
+        "supply_pressure":    {"level": "low", "explanation": "Supply pressure unavailable — data source offline.", "score": 0},
+        "market_reaction":    {"level": "low", "explanation": "Market reaction unavailable — data source offline.", "score": 0},
+        "gas_to_power_impact": {"level": "low", "explanation": "Gas-to-power impact unavailable — data source offline."},
+        "events":             [],
         "time_horizons": {
             "short_term": "Short-term (0-6h): unavailable",
             "near_term":  "Near-term (6-24h): unavailable",
@@ -161,8 +166,9 @@ def _failsafe_response() -> Dict[str, Any]:
         },
         "summary":    "Live data unavailable. Monitoring paused. Risk signals will resume automatically once real-time ERCOT data is confirmed.",
         "disclaimer": (
-            "This information is provided for situational awareness only. "
-            "It does not constitute investment, trading, or procurement advice."
+            "TX Energy Risk provides informational analytics and market intelligence only. "
+            "This does not constitute investment, trading, financial, legal, or procurement advice. "
+            "Users are responsible for their own decisions."
         ),
     }
 
@@ -834,17 +840,348 @@ def _build_narrative(
 
 
 # ------------------------------------------------------------------------------
-# Composite risk score
+# Composite risk score — Phase 3 numerical sum model
 # ------------------------------------------------------------------------------
 
+def _driver_score(signal: Dict) -> int:
+    """Score a single driver: triggered high=2, triggered medium=1, else 0."""
+    if not signal.get("triggered"):
+        return 0
+    return {"high": 2, "medium": 1, "low": 0}.get(signal.get("severity", "low"), 0)
+
+
 def compute_risk_score(signals: List[Dict]) -> Tuple[str, int]:
-    active = [s for s in signals if s.get("triggered")]
-    count  = len(active)
-    if count >= 2:
-        return "high", count
-    elif count == 1:
-        return "medium", count
-    return "low", count
+    """
+    Numerical sum scoring across three drivers.
+    Demand + Supply + Market: each 0 (low) / 1 (medium) / 2 (high).
+    Total  0-1 = LOW RISK
+    Total  2-3 = MEDIUM RISK
+    Total  4-6 = HIGH RISK
+    Returns (risk_label, active_driver_count).
+    """
+    total  = sum(_driver_score(s) for s in signals)
+    active = len([s for s in signals if s.get("triggered")])
+    if total >= 4:
+        return "high", active
+    elif total >= 2:
+        return "medium", active
+    return "low", active
+
+
+# ------------------------------------------------------------------------------
+# Phase 1 — Driver model: Demand Pressure / Supply Pressure / Market Reaction
+# ------------------------------------------------------------------------------
+
+def _compute_demand_pressure(weather_sig: Dict) -> Dict[str, Any]:
+    """Map weather signal → Demand Pressure driver level + plain-language explanation."""
+    triggered = weather_sig.get("triggered", False)
+    severity  = weather_sig.get("severity", "low")
+    val       = float(weather_sig.get("value") or 0)
+    score     = _driver_score(weather_sig)
+
+    if triggered and severity == "high":
+        level = "high"
+        if val >= TEMP_HIGH_THRESHOLD_F:
+            expl = (
+                f"Demand pressure is elevated due to forecast temperatures of {val:.0f}°F, "
+                "which may significantly increase cooling load across the Texas grid."
+            )
+        else:
+            expl = (
+                f"Demand pressure is elevated due to extreme cold at {val:.0f}°F, "
+                "which may significantly increase heating load across the Texas grid."
+            )
+    elif triggered and severity == "medium":
+        level = "medium"
+        if val >= TEMP_HIGH_THRESHOLD_F:
+            expl = (
+                f"Demand pressure is moderate. Forecast temperatures of {val:.0f}°F "
+                "may increase cooling load during peak afternoon hours."
+            )
+        else:
+            expl = (
+                f"Demand pressure is moderate. Cold temperatures of {val:.0f}°F "
+                "may increase heating load on the Texas grid."
+            )
+    else:
+        level = "low"
+        expl  = (
+            "Demand pressure is low. Weather conditions are within normal seasonal range "
+            "with no significant demand signals active."
+        )
+
+    return {"level": level, "explanation": expl, "score": score}
+
+
+def _compute_supply_pressure(gas_sig: Dict, gas_records: List[Dict]) -> Dict[str, Any]:
+    """Map gas signal → Supply Pressure driver level + explanation including Henry Hub trend."""
+    triggered = gas_sig.get("triggered", False)
+    severity  = gas_sig.get("severity", "low")
+    pct_val   = float(gas_sig.get("value") or 0)
+    score     = _driver_score(gas_sig)
+
+    # Henry Hub trend
+    henry_hub   = None
+    henry_trend = "stable"
+    if len(gas_records) >= 2:
+        lp = gas_records[-1].get("henry_hub_price")
+        pp = gas_records[-2].get("henry_hub_price")
+        henry_hub = lp
+        if lp and pp and pp > 0:
+            pct_chg = ((lp - pp) / pp) * 100
+            if pct_chg > 5:
+                henry_trend = "rising"
+            elif pct_chg < -5:
+                henry_trend = "falling"
+
+    henry_note = (
+        f" Henry Hub at ${henry_hub:.2f}/MMBtu ({henry_trend})."
+        if henry_hub else ""
+    )
+
+    if triggered and severity == "high":
+        level = "high"
+        expl  = (
+            f"Supply pressure is high. Natural gas storage stands {abs(pct_val):.1f}% "
+            "below the 5-year seasonal average, indicating a significant supply buffer reduction."
+            + henry_note
+        )
+    elif triggered and severity == "medium":
+        level = "medium"
+        expl  = (
+            f"Supply pressure is moderate. Natural gas storage is {abs(pct_val):.1f}% "
+            "below seasonal averages, which may increase sensitivity to demand spikes."
+            + henry_note
+        )
+    else:
+        level    = "low"
+        pct_str  = f"{abs(pct_val):.1f}% {'above' if pct_val >= 0 else 'below'}"
+        expl     = (
+            f"Supply pressure is low. Natural gas storage is {pct_str} the 5-year average, "
+            "suggesting adequate fuel supply buffer."
+            + henry_note
+        )
+
+    return {"level": level, "explanation": expl, "score": score}
+
+
+def _compute_market_reaction(price_sig: Dict) -> Dict[str, Any]:
+    """Map price signal → Market Reaction driver level + explanation."""
+    triggered = price_sig.get("triggered", False)
+    severity  = price_sig.get("severity", "low")
+    val       = float(price_sig.get("value") or 0)
+    score     = _driver_score(price_sig)
+
+    if triggered and severity == "high":
+        level = "high"
+        expl  = (
+            f"Market reaction is elevated. ERCOT Houston Hub pricing reached ${val:.0f}/MWh, "
+            "indicating extreme settlement price conditions and significant market stress."
+        )
+    elif triggered and severity == "medium":
+        level = "medium"
+        expl  = (
+            f"Market reaction is elevated. ERCOT prices moved to ${val:.0f}/MWh, "
+            "reflecting increasing pricing uncertainty in the real-time settlement market."
+        )
+    elif val >= PRICE_ABS_HIGH_MWH * 0.7 and val > 0:
+        level = "low"
+        expl  = (
+            f"Market reaction remains low but approaching elevated thresholds. "
+            f"ERCOT pricing at ${val:.0f}/MWh is within range but warrants monitoring."
+        )
+    else:
+        price_str = f"${val:.0f}/MWh" if val > 0 else "within normal range"
+        level     = "low"
+        expl      = (
+            f"Market reaction remains low. ERCOT Houston Hub pricing at {price_str} "
+            "is stable and within normal operating range."
+        )
+
+    return {"level": level, "explanation": expl, "score": score}
+
+
+# ------------------------------------------------------------------------------
+# Phase 2 — Gas-to-Power Impact Engine
+# ------------------------------------------------------------------------------
+
+def _compute_gas_to_power_impact(
+    gas_sig:     Dict,
+    weather_sig: Dict,
+    gas_records: List[Dict],
+) -> Dict[str, Any]:
+    """
+    Composite intelligence signal: how much does gas supply pressure
+    compound with power demand to affect generation cost sensitivity?
+    HIGH  : storage sharply below + Henry Hub rising + elevated weather demand
+    MEDIUM: storage below seasonal OR henry rising with some demand pressure
+    LOW   : storage near normal, stable pricing
+    """
+    gas_triggered     = gas_sig.get("triggered", False)
+    gas_severity      = gas_sig.get("severity", "low")
+    weather_triggered = weather_sig.get("triggered", False)
+    weather_severity  = weather_sig.get("severity", "low")
+
+    henry_hub    = None
+    henry_rising = False
+    if len(gas_records) >= 2:
+        lp = gas_records[-1].get("henry_hub_price")
+        pp = gas_records[-2].get("henry_hub_price")
+        henry_hub = lp
+        if lp and pp and pp > 0:
+            henry_rising = ((lp - pp) / pp) * 100 > 5
+
+    henry_note = (
+        f" Henry Hub at ${henry_hub:.2f}/MMBtu ({'rising' if henry_rising else 'stable'})."
+        if henry_hub else ""
+    )
+
+    high_condition = (
+        (gas_severity == "high" and gas_triggered)
+        or (
+            gas_triggered and henry_rising
+            and weather_triggered and weather_severity in ("medium", "high")
+        )
+    )
+    medium_condition = (
+        gas_triggered
+        or (henry_rising and weather_triggered)
+    )
+
+    if high_condition:
+        level = "high"
+        expl  = (
+            "Natural gas supply pressure may significantly increase power generation cost "
+            "sensitivity. Below-average storage combined with elevated weather demand "
+            "creates compounding risk." + henry_note
+        )
+    elif medium_condition:
+        level = "medium"
+        expl  = (
+            "Natural gas supply pressure may increase power generation cost sensitivity "
+            "if high demand persists. Storage is below seasonal averages, reducing "
+            "the fuel supply buffer." + henry_note
+        )
+    else:
+        level = "low"
+        expl  = (
+            "Gas-to-power impact is low. Natural gas storage and pricing conditions "
+            "suggest adequate fuel supply for current power generation demand." + henry_note
+        )
+
+    return {"level": level, "explanation": expl}
+
+
+# ------------------------------------------------------------------------------
+# Phase 5 — Event Detection
+# ------------------------------------------------------------------------------
+
+def _detect_events(
+    prices:       List[Dict],
+    forecasts:    List[Dict],
+    gas_records:  List[Dict],
+    data_sources: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """
+    Detect discrete energy risk events. Returns a list of event dicts.
+    Events are informational only — they do not modify the risk score.
+    """
+    events: List[Dict[str, Any]] = []
+
+    # 1. Heatwave
+    if forecasts:
+        hot_days = sum(
+            1 for f in forecasts[:3]
+            if float(f.get("temp_high_f", 0)) >= TEMP_HIGH_THRESHOLD_F
+        )
+        first_high = float(forecasts[0].get("temp_high_f", 0))
+        if hot_days >= 2:
+            events.append({
+                "type":     "heatwave",
+                "severity": "high",
+                "message":  (
+                    "Heatwave conditions detected across multiple forecast days. "
+                    "Cooling demand pressure may increase significantly across Texas."
+                ),
+            })
+        elif first_high >= TEMP_HIGH_THRESHOLD_F:
+            events.append({
+                "type":     "heatwave",
+                "severity": "medium",
+                "message":  (
+                    f"Heat conditions detected with forecast high of {first_high:.0f}°F. "
+                    "Cooling demand may increase across the Texas grid."
+                ),
+            })
+
+    # 2. Cold snap
+    if forecasts:
+        cold_temp = float(forecasts[0].get("temp_low_f", 70))
+        if cold_temp <= TEMP_LOW_THRESHOLD_F:
+            events.append({
+                "type":     "cold_snap",
+                "severity": "high" if cold_temp <= 20 else "medium",
+                "message":  (
+                    f"Cold weather conditions detected with forecast low of {cold_temp:.0f}°F. "
+                    "Heating demand may increase grid load."
+                ),
+            })
+
+    # 3. ERCOT price volatility
+    if len(prices) >= 2:
+        current = float(prices[-1].get("price_mwh", 0))
+        prev    = float(prices[-2].get("price_mwh", 0))
+        if current >= PRICE_ABS_HIGH_MWH:
+            events.append({
+                "type":     "ercot_volatility",
+                "severity": "high" if current >= 500 else "medium",
+                "message":  (
+                    f"ERCOT price volatility detected at ${current:.0f}/MWh. "
+                    "Short-term pricing uncertainty may be elevated."
+                ),
+            })
+        elif prev > PRICE_LOW_FLOOR and prev > 0:
+            move_pct = abs(current - prev) / prev
+            if move_pct >= PRICE_SPIKE_THRESHOLD_PCT / 100:
+                events.append({
+                    "type":     "ercot_volatility",
+                    "severity": "medium",
+                    "message":  (
+                        "Significant ERCOT price movement detected. "
+                        "Short-term pricing uncertainty may be elevated."
+                    ),
+                })
+
+    # 4. Gas storage anomaly (>10% below 5-year average)
+    if gas_records:
+        latest_pct = float(gas_records[-1].get("storage_pct_vs_avg", 0))
+        if latest_pct <= GAS_STORAGE_PCT_THRESHOLD:
+            events.append({
+                "type":     "gas_storage_anomaly",
+                "severity": "high" if latest_pct <= -20 else "medium",
+                "message":  (
+                    f"Natural gas storage is {abs(latest_pct):.1f}% below seasonal average, "
+                    "increasing supply pressure sensitivity."
+                ),
+            })
+
+    # 5. Data source degradation
+    degraded = [
+        src.upper()
+        for src, status in data_sources.items()
+        if status.get("status") in ("stale", "unavailable")
+    ]
+    if degraded:
+        events.append({
+            "type":     "data_source_degraded",
+            "severity": "low",
+            "message":  (
+                f"One or more energy data sources are delayed or unavailable "
+                f"({', '.join(degraded)}). Confidence scores have been adjusted."
+            ),
+        })
+
+    return events
 
 
 # ------------------------------------------------------------------------------
@@ -886,6 +1223,17 @@ def run_all_signals(
 
     # Phase 3: Explainable confidence
     confidence, confidence_note = _compute_confidence(prices, all_signals, data_sources)
+
+    # Phase 1: Driver model
+    demand_pressure  = _compute_demand_pressure(weather_signal)
+    supply_pressure  = _compute_supply_pressure(gas_signal, gas_records)
+    market_reaction  = _compute_market_reaction(price_signal)
+
+    # Phase 2: Gas-to-Power Impact
+    gas_to_power_impact = _compute_gas_to_power_impact(gas_signal, weather_signal, gas_records)
+
+    # Phase 5: Event detection
+    events = _detect_events(prices, forecasts, gas_records, data_sources)
 
     for sig in all_signals:
         if sig.get("triggered") and sig.get("confidence") is None:
@@ -956,6 +1304,13 @@ def run_all_signals(
         "data_status":            data_status,
         "time_horizons":          time_horizons,
         "data_sources":           data_sources,
+        # Phase 1-2: Driver model
+        "demand_pressure":        demand_pressure,
+        "supply_pressure":        supply_pressure,
+        "market_reaction":        market_reaction,
+        "gas_to_power_impact":    gas_to_power_impact,
+        # Phase 5: Events
+        "events":                 events,
         "signals": {
             "price_volatility": price_signal,
             "weather_demand":   weather_signal,
@@ -963,9 +1318,9 @@ def run_all_signals(
         },
         "summary":    summary,
         "disclaimer": (
-            "This information is provided for situational awareness only. "
-            "It does not constitute investment, trading, or procurement advice. "
-            "Risk may be rising -- consult qualified advisors before making decisions."
+            "TX Energy Risk provides informational analytics and market intelligence only. "
+            "This does not constitute investment, trading, financial, legal, or procurement advice. "
+            "Users are responsible for their own decisions."
         ),
     }
 

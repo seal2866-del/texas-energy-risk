@@ -1,3 +1,4 @@
+"use client";
 import Link from "next/link";
 import Image from "next/image";
 import { TrendingUp, CloudLightning, Flame, Bell, Brain, ArrowRight, Shield, BarChart3, AlertTriangle } from "lucide-react";
@@ -47,67 +48,100 @@ export default function LandingPage() {
   return (
     <>
       <Navbar />
-      <main className="pt-24 min-h-screen">
+      <main className="min-h-screen">
 
-        {/* Hero */}
-        <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-24 text-center">
-          {/* Brand logo */}
-          <div className="flex justify-center mb-8">
-            <Image
-              src="/logo.png"
-              alt="TX Energy Risk"
-              width={500}
-              height={280}
-              className="h-20 w-auto object-contain"
-              priority
-            />
+        {/* ── Hero Banner ── */}
+        <section className="relative w-full overflow-hidden" style={{ minHeight: "92vh" }}>
+
+          {/* Background photo */}
+          <Image
+            src="/grid-bg.jpg"
+            alt="Texas power grid at night"
+            fill
+            priority
+            className="object-cover object-center"
+            sizes="100vw"
+          />
+
+          {/* Layered gradient overlays for readability */}
+          {/* Bottom-to-top: deep navy so the page continues seamlessly */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080d1a] via-[#080d1a]/60 to-transparent" />
+          {/* Top fade so navbar blends */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#080d1a]/70 via-transparent to-transparent" />
+          {/* Teal tint to echo the network lines in the photo */}
+          <div className="absolute inset-0 bg-[#0d2a3a]/30" />
+
+          {/* Hero content */}
+          <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 lg:px-8"
+               style={{ minHeight: "92vh", paddingTop: "96px" }}>
+
+            {/* Logo */}
+            <div className="mb-8">
+              <Image
+                src="/logo.png"
+                alt="TX Energy Risk"
+                width={500}
+                height={280}
+                className="h-20 w-auto object-contain drop-shadow-2xl"
+                priority
+              />
+            </div>
+
+            {/* Live indicator */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-500/15 border border-teal-400/30 text-teal-300 text-xs font-semibold mb-6 backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+              Live Texas Grid Monitoring
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6 drop-shadow-xl">
+              Real-Time Texas<br />
+              <span className="text-orange-400">Energy Risk</span> Intelligence
+            </h1>
+
+            <p className="text-base sm:text-lg font-semibold text-teal-300/90 italic mb-6 drop-shadow-md tracking-wide">
+              Don&rsquo;t Get Caught at the Wrong Time &mdash; Detect Risk Before It Impacts Cost.
+            </p>
+
+            <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-10 leading-relaxed drop-shadow-md">
+              Monitor ERCOT pricing, weather-driven demand, and natural gas supply pressure
+              before risk turns into cost.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/login?signup=true"
+                className="flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-base transition-all shadow-lg shadow-orange-500/30"
+              >
+                Start Monitoring Free
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/pricing"
+                className="flex items-center gap-2 px-8 py-4 rounded-xl backdrop-blur-sm bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-base transition-all"
+              >
+                View Pricing
+              </Link>
+            </div>
+
+            <p className="mt-6 text-xs text-gray-500">
+              Free tier available &middot; No credit card required &middot; Informational data only
+            </p>
+
+            {/* Risk level pills — anchored near bottom of hero */}
+            <div className="mt-16 grid grid-cols-3 gap-3 w-full max-w-lg">
+              {RISK_LEVELS.map(({ level, color, bg }) => (
+                <div key={level}
+                     className={`backdrop-blur-sm border rounded-xl py-2.5 text-center ${bg}`}>
+                  <p className={`text-xl font-black ${color}`}>{level}</p>
+                  <p className="text-[10px] text-gray-400 font-medium tracking-wide uppercase mt-0.5">Risk</p>
+                </div>
+              ))}
+            </div>
           </div>
-
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6">
-            Real-Time Texas<br />
-            <span className="text-orange-400">Energy Risk</span> Intelligence
-          </h1>
-
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Monitor ERCOT pricing, weather-driven demand, and natural gas supply pressure
-            before risk turns into cost.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/login?signup=true"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-base transition-all shadow-lg shadow-orange-500/25"
-            >
-              Start Monitoring Free
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/pricing"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold text-base transition-all"
-            >
-              View Pricing
-            </Link>
-          </div>
-
-          <p className="mt-6 text-xs text-gray-600">
-            Free tier available &middot; No credit card required &middot; Informational data only
-          </p>
         </section>
 
-        {/* Risk score preview */}
-        <section className="max-w-3xl mx-auto px-4 sm:px-6 mb-24">
-          <div className="grid grid-cols-3 gap-4">
-            {RISK_LEVELS.map(({ level, color, bg, desc }) => (
-              <div key={level} className={`card-glass border rounded-xl p-4 text-center ${bg}`}>
-                <p className={`text-2xl font-black ${color}`}>{level}</p>
-                <p className="text-xs text-gray-400 mt-1 leading-snug hidden sm:block">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Problem */}
-        <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
+        {/* ── Problem ── */}
+        <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
           <div className="card-glass border border-white/5 rounded-2xl p-10">
             <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-4" />
             <h2 className="text-3xl font-black text-white mb-4">The Problem</h2>
@@ -123,7 +157,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Solution */}
+        {/* ── Solution ── */}
         <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6">
             <Shield className="w-3.5 h-3.5" />
@@ -142,7 +176,7 @@ export default function LandingPage() {
           </p>
         </section>
 
-        {/* Features */}
+        {/* ── Features ── */}
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">What you get</h2>
@@ -163,7 +197,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* CTA */}
+        {/* ── CTA ── */}
         <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 text-center">
           <div className="card-glass border border-orange-500/20 bg-orange-500/5 rounded-2xl p-10">
             <h2 className="text-3xl font-black text-white mb-4">
@@ -191,7 +225,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Disclaimer */}
+        {/* ── Disclaimer ── */}
         <section className="max-w-3xl mx-auto px-4 pb-16 text-center">
           <p className="text-xs text-gray-600 leading-relaxed">
             Informational analytics only. Not investment, trading, or procurement advice.

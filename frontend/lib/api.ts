@@ -55,6 +55,23 @@ export interface SignalDriver {
   severity: RiskScore;
 }
 
+export interface DriverLevel {
+  level:       RiskScore;
+  explanation: string;
+  score?:      number;
+}
+
+export interface GasToPowerImpact {
+  level:       RiskScore;
+  explanation: string;
+}
+
+export interface EnergyEvent {
+  type:     string;
+  severity: RiskScore;
+  message:  string;
+}
+
 export interface SignalsResponse {
   computed_at:             string;
   risk_score:              RiskScore;
@@ -75,6 +92,13 @@ export interface SignalsResponse {
   data_status:             string;
   time_horizons:           TimeHorizons;
   data_sources:            DataSources;
+  // Phase 1-2: Driver model
+  demand_pressure?:     DriverLevel;
+  supply_pressure?:     DriverLevel;
+  market_reaction?:     DriverLevel;
+  gas_to_power_impact?: GasToPowerImpact;
+  // Phase 5: Events
+  events?:              EnergyEvent[];
   signals: {
     price_volatility: Signal;
     weather_demand:   Signal;
