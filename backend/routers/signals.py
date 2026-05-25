@@ -7,6 +7,7 @@ DISCLAIMER: All output is informational only. This does not constitute
 investment, trading, or procurement advice.
 """
 import os
+import asyncio
 import logging
 from fastapi import APIRouter, Query, Header
 from services.external_apis import fetch_ercot_prices, fetch_weather_forecast, fetch_gas_data
@@ -66,20 +67,35 @@ async def _maybe_trigger_alert(result: dict, location: str, authorization: str) 
 
 
 @router.get("")
+@router.get("/")
 async def get_signals(
     location:      str = Query(default="Houston"),
     authorization: str = Header(default=""),
 ):
-    prices    = await fetch_ercot_prices(hours=4)
-    forecasts = await fetch_weather_forecast(location=location, days=3)
-    gas_data  = await fetch_gas_data(weeks=4)
+    logger.warning("[SIGNALS] Request received for location=%s", location)
+    try:
+        # Fetch all three data sources concurrently (was sequential — too slow)
+        prices, forecasts, gas_data = await asyncio.gather(
+            fetch_ercot_prices(hours=4),
+            fetch_weather_forecast(location=location, days=3),
+            fetch_gas_data(weeks=4),
+        )
 
-    result = run_all_signals(prices, forecasts, gas_data)
+        logger.warning("[SIGNALS] Data fetched: prices=%d forecasts=%d gas=%d",
+                       len(prices), len(forecasts), len(gas_data))
 
-    # Phase 4 — trigger email alert if conditions warrant
-    await _maybe_trigger_alert(result, location, authorization)
+        result = run_all_signals(prices, forecasts, gas_data)
 
-    return result
+        logger.warning("[SIGNALS] Signal engine done: risk=%s data_valid=%s",
+                       result.get("risk_score"), result.get("data_valid"))
+
+        # Phase 4 — trigger email alert if conditions warrant
+        await _maybe_trigger_alert(result, location, authorization)
+
+        return result
+    except Exception as exc:
+        logger.error("[SIGNALS] Unhandled exception: %s", exc, exc_info=True)
+        raise
 
 
 @router.get("/risk-score")
