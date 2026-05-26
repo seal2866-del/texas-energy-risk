@@ -10,7 +10,6 @@ procurement, or investment advice is expressed or implied.
 import logging
 from typing import Dict, Any, List, Tuple, Optional
 from datetime import datetime, timezone, timedelta
-from services.data_verification import verify_ercot_price, get_last_known_good, ErcotVerification
 
 logger = logging.getLogger(__name__)
 
@@ -1612,34 +1611,8 @@ def run_all_signals(
         market_condition = _compute_market_condition(risk_score, risk_direction, demand_pressure, supply_pressure, market_reaction)
         alert_severity   = _compute_alert_severity(risk_score, active_count, demand_pressure, supply_pressure, market_reaction)
 
-        # ── ERCOT data verification ───────────────────────────────────────────
-        latest_price = prices[-1] if prices else {}
-        prev_price   = prices[-2] if len(prices) >= 2 else {}
-        ercot_verif  = verify_ercot_price(
-            current_price  = latest_price.get("price_mwh"),
-            previous_price = prev_price.get("price_mwh"),
-            timestamp      = latest_price.get("timestamp"),
-            location       = latest_price.get("settlement_point", "HB_HOUSTON"),
-            market         = "ERCOT Real-Time Market",
-        )
-        # Enrich ERCOT data-source entry with verification detail
-        data_sources["ercot"]["verification_status"] = ercot_verif.status
-        data_sources["ercot"]["verification_reason"] = ercot_verif.reason
-        data_sources["ercot"]["last_valid_price"]    = ercot_verif.last_known_price
-        data_sources["ercot"]["price_range"]         = ercot_verif.price_range
-
         # ── Narrative + confidence ────────────────────────────────────────────
         confidence, confidence_note = _compute_confidence(prices, all_sigs, data_sources)
-        # Apply verification penalty on top of data-source confidence
-        if ercot_verif.confidence_adjustment < 0:
-            penalty_pct = abs(ercot_verif.confidence_adjustment)
-            confidence  = max(50, confidence - penalty_pct)
-            if ercot_verif.status in ("stale", "unavailable"):
-                confidence_note += f" Confidence adjusted due to ERCOT data {ercot_verif.status}."
-            elif ercot_verif.status == "pending_confirmation":
-                confidence_note += " Confidence reduced while large price movement is being verified."
-            elif ercot_verif.status == "delayed":
-                confidence_note += " Confidence adjusted due to ERCOT data delay."
         time_horizons = _build_time_horizons(risk_score, all_sigs, risk_direction, primary_driver)
         summary, explanation, impact, market_ctx = _build_narrative(risk_score, all_sigs, primary_driver, risk_direction)
 
@@ -1681,15 +1654,6 @@ def run_all_signals(
             "data_status":            data_status,
             "time_horizons":          time_horizons,
             "data_sources":           data_sources,
-            "ercot_verification": {
-                "is_valid":              ercot_verif.is_valid,
-                "status":                ercot_verif.status,
-                "confidence_adjustment": ercot_verif.confidence_adjustment,
-                "reason":                ercot_verif.reason,
-                "last_known_price":      ercot_verif.last_known_price,
-                "last_known_ts":         ercot_verif.last_known_ts,
-                "price_range":           ercot_verif.price_range,
-            },
             "demand_pressure":        demand_pressure,
             "supply_pressure":        supply_pressure,
             "market_reaction":        market_reaction,

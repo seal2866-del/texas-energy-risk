@@ -246,7 +246,7 @@ export default function DashboardPage() {
                 alertSeverity={signals.alert_severity}
               />
 
-              <ERCOTPriceMonitor prices={prices} loading={!signalsReady} ercotVerification={signals?.ercot_verification} />
+              <ERCOTPriceMonitor prices={prices} />
 
               <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
 
