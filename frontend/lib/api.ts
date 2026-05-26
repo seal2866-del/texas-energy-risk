@@ -30,10 +30,25 @@ export interface Signal {
 }
 
 export interface DataSourceStatus {
-  status:       "active" | "stale" | "unavailable";
-  last_updated: string | null;
-  age_minutes:  number | null;
-  source?:      string;
+  status:                "active" | "stale" | "unavailable";
+  last_updated:          string | null;
+  age_minutes:           number | null;
+  source?:               string;
+  // ERCOT verification fields (populated by signal_engine for ERCOT only)
+  verification_status?:  "real-time" | "delayed" | "stale" | "unavailable" | "pending_confirmation";
+  verification_reason?:  string;
+  last_valid_price?:     number | null;
+  price_range?:          "normal" | "elevated" | "extreme";
+}
+
+export interface ErcotVerification {
+  is_valid:              boolean;
+  status:                "real-time" | "delayed" | "stale" | "unavailable" | "pending_confirmation";
+  confidence_adjustment: number;
+  reason:                string;
+  last_known_price:      number | null;
+  last_known_ts:         string | null;
+  price_range:           "normal" | "elevated" | "extreme";
 }
 
 export interface DataSources {
@@ -124,6 +139,8 @@ export interface SignalsResponse {
   gas_to_power_impact?: GasToPowerImpact;
   // Phase 5: Events
   events?:              EnergyEvent[];
+  // Data verification layer
+  ercot_verification?:  ErcotVerification;
   // Phase 11: Premium Intelligence
   risk_narrative?:      RiskNarrative;
   cost_impact?:         CostImpact;
