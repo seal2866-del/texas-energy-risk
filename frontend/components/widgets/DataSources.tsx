@@ -1,5 +1,5 @@
 "use client";
-import { Database, CheckCircle2, AlertTriangle, XCircle, Clock } from "lucide-react";
+import { Database, CheckCircle2, AlertTriangle, XCircle, Clock, ShieldCheck } from "lucide-react";
 import type { DataSources as DataSourcesType } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -14,10 +14,17 @@ const SOURCE_META = {
   eia:   { label: "EIA Natural Gas",         detail: "Weekly storage report" },
 };
 
-function StatusBadge({ status }: { status: "active" | "stale" | "unavailable" }) {
+type DisplayStatus = "active" | "stale" | "unavailable" | "pending_confirmation";
+
+function StatusBadge({ status }: { status: DisplayStatus }) {
   if (status === "active") return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/10 border border-green-500/20 text-green-400">
       <CheckCircle2 className="w-3 h-3" />Active
+    </span>
+  );
+  if (status === "pending_confirmation") return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 border border-blue-500/20 text-blue-400">
+      <ShieldCheck className="w-3 h-3" />Confirming
     </span>
   );
   if (status === "stale") return (
@@ -39,6 +46,10 @@ function formatAge(minutes: number | null): string {
   const h = Math.floor(minutes / 60);
   const m = Math.round(minutes % 60);
   return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
+}
+
+function formatPrice(p: number): string {
+  return p < 0 ? `-$${Math.abs(p).toFixed(2)}` : `$${p.toFixed(2)}`;
 }
 
 export default function DataSources({ sources, computedAt }: Props) {
@@ -63,18 +74,51 @@ export default function DataSources({ sources, computedAt }: Props) {
       <div className="space-y-3">
         {(Object.entries(SOURCE_META) as [keyof typeof SOURCE_META, typeof SOURCE_META[keyof typeof SOURCE_META]][]).map(([key, meta]) => {
           const src = sources[key];
+
+          // For ERCOT, use verification_status if available for richer display
+          const displayStatus: DisplayStatus =
+            key === "ercot" && src.verification_status
+              ? (src.verification_status === "real-time" ? "active" : src.verification_status as DisplayStatus)
+              : src.status;
+
+          const hasVerifDetail = key === "ercot" && (src.last_valid_price != null || src.verification_reason);
+
           return (
-            <div key={key} className="flex items-center justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-300 truncate">{meta.label}</p>
-                <p className="text-xs text-gray-600">{meta.detail}</p>
+            <div key={key}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-300 truncate">{meta.label}</p>
+                  <p className="text-xs text-gray-600">{meta.detail}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <StatusBadge status={displayStatus} />
+                  {src.age_minutes !== null && (
+                    <span className="text-xs text-gray-600 font-mono">{formatAge(src.age_minutes)}</span>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <StatusBadge status={src.status} />
-                {src.age_minutes !== null && (
-                  <span className="text-xs text-gray-600 font-mono">{formatAge(src.age_minutes)}</span>
-                )}
-              </div>
+
+              {/* ERCOT verification detail panel */}
+              {hasVerifDetail && (
+                <div className="mt-1.5 ml-0 pl-2 border-l border-white/10 space-y-0.5">
+                  {src.last_valid_price != null && (
+                    <p className="text-xs text-gray-500">
+                      Last valid price:{" "}
+                      <span className={cn(
+                        "font-semibold",
+                        src.price_range === "extreme"  ? "text-red-400" :
+                        src.price_range === "elevated" ? "text-amber-400" :
+                        "text-gray-300"
+                      )}>
+                        {formatPrice(src.last_valid_price)}/MWh
+                      </span>
+                    </p>
+                  )}
+                  {src.verification_reason && (
+                    <p className="text-xs text-gray-600 italic">{src.verification_reason}</p>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

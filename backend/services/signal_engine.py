@@ -11,6 +11,12 @@ import logging
 from typing import Dict, Any, List, Tuple, Optional
 from datetime import datetime, timezone, timedelta
 
+try:
+    from services.data_verification import verify_ercot_price, get_last_known_good
+    _VERIFICATION_ENABLED = True
+except ImportError:
+    _VERIFICATION_ENABLED = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -1574,6 +1580,36 @@ def run_all_signals(
             resp["data_sources"]  = data_sources
             return resp
 
+        # ── ERCOT data verification layer ─────────────────────────────────────
+        ercot_verification = None
+        if _VERIFICATION_ENABLED and prices:
+            try:
+                latest_p   = prices[-1]
+                prev_p     = prices[-2] if len(prices) >= 2 else {}
+                ercot_v    = verify_ercot_price(
+                    current_price  = latest_p.get("price_mwh"),
+                    prev_price     = prev_p.get("price_mwh"),
+                    timestamp      = latest_p.get("timestamp"),
+                    location       = latest_p.get("settlement_point", "HB_HOUSTON"),
+                    market         = "ERCOT Real-Time Market",
+                )
+                ercot_verification = {
+                    "is_valid":              ercot_v.is_valid,
+                    "status":                ercot_v.status,
+                    "confidence_adjustment": ercot_v.confidence_adjustment,
+                    "reason":                ercot_v.reason,
+                    "last_known_price":      ercot_v.last_known_price,
+                    "last_known_ts":         ercot_v.last_known_ts,
+                    "price_range":           ercot_v.price_range,
+                }
+                # Enrich data_sources ERCOT entry with verification detail
+                data_sources["ercot"]["verification_status"] = ercot_v.status
+                data_sources["ercot"]["verification_reason"] = ercot_v.reason
+                data_sources["ercot"]["last_valid_price"]    = ercot_v.last_known_price
+                data_sources["ercot"]["price_range"]         = ercot_v.price_range
+            except Exception as _ve:
+                logger.warning("[VERIFY] Verification error: %s", _ve)
+
         # ── Run the three individual signal checks ────────────────────────────
         price_sig   = check_price_volatility(prices)
         weather_sig = check_weather_demand(forecasts)
@@ -1613,6 +1649,15 @@ def run_all_signals(
 
         # ── Narrative + confidence ────────────────────────────────────────────
         confidence, confidence_note = _compute_confidence(prices, all_sigs, data_sources)
+
+        # Apply verification confidence penalty
+        if ercot_verification and ercot_verification.get("confidence_adjustment", 0) < 0:
+            adj = ercot_verification["confidence_adjustment"]
+            confidence = max(50, (confidence or 70) + adj)
+            verif_note = ercot_verification.get("reason", "")
+            if verif_note:
+                confidence_note = confidence_note + f" {verif_note}"
+
         time_horizons = _build_time_horizons(risk_score, all_sigs, risk_direction, primary_driver)
         summary, explanation, impact, market_ctx = _build_narrative(risk_score, all_sigs, primary_driver, risk_direction)
 
@@ -1659,6 +1704,7 @@ def run_all_signals(
             "market_reaction":        market_reaction,
             "gas_to_power_impact":    gas_to_power,
             "events":                 events,
+            "ercot_verification":     ercot_verification,
             "risk_narrative":         risk_narrative,
             "cost_impact":            cost_impact,
             "market_condition":       market_condition,

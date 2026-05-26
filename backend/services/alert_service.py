@@ -561,6 +561,18 @@ async def maybe_send_alert(
     if not signals_data.get("data_valid", False):
         return
 
+    # ── ERCOT verification safety gate ───────────────────────────────────────
+    # Block price-driven alerts when ERCOT data is invalid/stale/unconfirmed.
+    ercot_v      = signals_data.get("ercot_verification") or {}
+    verif_valid  = ercot_v.get("is_valid", True)
+    verif_status = ercot_v.get("status", "real-time")
+    _BLOCKED = {"stale", "unavailable", "pending_confirmation"}
+    primary_raw  = signals_data.get("primary_driver", "").lower()
+    _price_driven = any(kw in primary_raw for kw in ("ercot", "price", "volatility", "market"))
+    if not verif_valid and _price_driven and verif_status in _BLOCKED:
+        logger.warning("[ALERT] Blocked price-volatility alert — ERCOT data %s", verif_status)
+        return
+
     risk_level     = signals_data.get("risk_score", "low")
     primary_driver = signals_data.get("primary_driver", "No active risk drivers")
     confidence     = signals_data.get("confidence")
