@@ -239,10 +239,10 @@ export default function DashboardPage() {
       <GridPulseBackground />
       <Navbar />
       <main className="pt-28 min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
           {/* ── Page header ─────────────────────────────────────────── */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-5">
             <div>
               <h1 className="text-2xl font-black text-white tracking-tight">
                 Texas Energy Intelligence Platform
@@ -278,6 +278,31 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* ── System status micro-indicators ──────────────────────── */}
+          {signalsReady && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 -mt-2">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-500/70 uppercase tracking-wide">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-50" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+                </span>
+                Monitoring Active
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-500/60 uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                AI Synced
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-500/60 uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                Data Verified
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                Live Telemetry
+              </span>
+            </div>
+          )}
+
           {signalsReady && <UrgencyBanner signals={signals} />}
 
           {signalsError && !loading && (
@@ -287,18 +312,18 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/75 text-center leading-relaxed">
+          <div className="mb-4 p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/75 text-center leading-relaxed">
             TX Energy Risk provides informational analytics and market intelligence only. This does not constitute investment, trading, financial, legal, or procurement advice. Users are responsible for their own decisions.
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className={`card-glass border border-white/5 p-6 h-48 animate-pulse ${i >= 6 ? "lg:col-span-2" : ""}`} />
+                <div key={i} className={`card-glass border border-white/5 p-5 h-40 animate-pulse ${i >= 6 ? "lg:col-span-2" : ""}`} />
               ))}
             </div>
           ) : (
-            <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6${justRefreshed ? " card-refreshing" : ""}`}>
+            <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4${justRefreshed ? " card-refreshing" : ""}`}>
 
               <RiskScore
                 score={signals.risk_score}

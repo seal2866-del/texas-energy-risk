@@ -293,3 +293,13 @@ body::after {
   background: linear-gradient(90deg,
     transparent 0%, rgba(239,68,68,0.06) 50%, transparent 100%);
 }
+
+/* ── Mobile responsiveness ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .card-glass {
+    padding: 1rem !important;
+  }
+  .card-glass.lg\:col-span-2 {
+    padding: 1rem !important;
+  }
+}

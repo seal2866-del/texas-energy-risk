@@ -23,6 +23,41 @@ _PRICE_CACHE: Dict[str, deque] = {}
 _CACHE_MAXLEN = 48
 _MIN_INTERVAL_SECONDS = 60   # don't add duplicate if fetched within 60s
 
+# ── Weather + Gas TTL caches ─────────────────────────────────────────────────
+# Weather changes slowly — cache 30 min per (location, days).
+# Gas storage is weekly EIA data — cache 4 hours.
+_WEATHER_CACHE: Dict[str, Any] = {}   # key → {data, expires}
+_GAS_CACHE:     Dict[str, Any] = {}   # key → {data, expires}
+_WEATHER_TTL = 30 * 60    # 30 minutes
+_GAS_TTL     = 4 * 3600   # 4 hours
+
+def _wx_cache_key(location: str, days: int) -> str:
+    return f"{location.lower()}:{days}"
+
+def _get_weather_cache(location: str, days: int):
+    entry = _WEATHER_CACHE.get(_wx_cache_key(location, days))
+    if entry and datetime.now(timezone.utc).timestamp() < entry["expires"]:
+        return entry["data"]
+    return None
+
+def _set_weather_cache(location: str, days: int, data):
+    _WEATHER_CACHE[_wx_cache_key(location, days)] = {
+        "data":    data,
+        "expires": datetime.now(timezone.utc).timestamp() + _WEATHER_TTL,
+    }
+
+def _get_gas_cache(weeks: int):
+    entry = _GAS_CACHE.get(str(weeks))
+    if entry and datetime.now(timezone.utc).timestamp() < entry["expires"]:
+        return entry["data"]
+    return None
+
+def _set_gas_cache(weeks: int, data):
+    _GAS_CACHE[str(weeks)] = {
+        "data":    data,
+        "expires": datetime.now(timezone.utc).timestamp() + _GAS_TTL,
+    }
+
 def _get_cache(settlement_point: str) -> deque:
     if settlement_point not in _PRICE_CACHE:
         _PRICE_CACHE[settlement_point] = deque(maxlen=_CACHE_MAXLEN)
@@ -303,9 +338,16 @@ async def fetch_weather_forecast(
     location: str = "Houston",
     days: int = 7,
 ) -> List[Dict[str, Any]]:
+    # Check cache first (30-min TTL)
+    cached = _get_weather_cache(location, days)
+    if cached is not None:
+        return cached
+
     noaa_base = os.getenv("NOAA_BASE_URL", "")
     if not noaa_base:
-        return mock_data.mock_weather_forecast(days, location)
+        result = mock_data.mock_weather_forecast(days, location)
+        _set_weather_cache(location, days, result)
+        return result
 
     try:
         office = NOAA_OFFICES.get(location, NOAA_OFFICES["Houston"])
@@ -316,9 +358,13 @@ async def fetch_weather_forecast(
         async with httpx.AsyncClient(timeout=10) as client:
             r = await client.get(url, headers={"User-Agent": "TexasEnergyRisk/1.0"})
             r.raise_for_status()
-        return _transform_noaa(r.json(), location, days)
+        result = _transform_noaa(r.json(), location, days)
+        _set_weather_cache(location, days, result)
+        return result
     except Exception:
-        return mock_data.mock_weather_forecast(days, location)
+        result = mock_data.mock_weather_forecast(days, location)
+        _set_weather_cache(location, days, result)
+        return result
 
 
 def _transform_noaa(data: dict, location: str, days: int) -> List[Dict[str, Any]]:

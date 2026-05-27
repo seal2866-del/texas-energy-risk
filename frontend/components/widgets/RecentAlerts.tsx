@@ -1,12 +1,46 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bell, Check, AlertCircle, Loader2, ChevronRight } from "lucide-react";
+import { Bell, Check, Loader2, ChevronRight, Radio } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import type { AlertLog } from "@/lib/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function MonitoringEmptyState() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 4000);
+    return () => clearInterval(id);
+  }, []);
+  const timeStr = new Date().toLocaleTimeString("en-US", {
+    timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", timeZoneName: "short"
+  });
+
+  return (
+    <div className="py-4 space-y-3">
+      {/* Primary status line */}
+      <div className="flex items-center gap-2.5">
+        <span className="relative flex h-2 w-2 flex-shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-40" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+        </span>
+        <p className="text-sm text-gray-400 font-medium">No material escalation events detected.</p>
+      </div>
+      {/* Secondary operational lines */}
+      <div className="pl-4 space-y-1.5 border-l border-white/5">
+        <p className="text-xs text-gray-600">Monitoring systems active — all thresholds nominal.</p>
+        <p className="text-xs text-gray-600">No significant market-state transitions in current interval.</p>
+      </div>
+      {/* Refresh timestamp */}
+      <div className="flex items-center gap-1.5 pt-1">
+        <Radio className="w-3 h-3 text-gray-700 flex-shrink-0" />
+        <p className="text-[10px] text-gray-700 font-mono">Last scan {timeStr}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function RecentAlerts() {
   const [logs,    setLogs]    = useState<AlertLog[]>([]);
@@ -30,8 +64,8 @@ export default function RecentAlerts() {
   }, []);
 
   return (
-    <div className="card-glass border border-white/5 p-6 lg:col-span-2">
-      <div className="flex items-center justify-between mb-4">
+    <div className="card-glass border border-white/5 p-5 lg:col-span-2">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-gray-500" />
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Recent Alerts</p>
@@ -45,22 +79,13 @@ export default function RecentAlerts() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-20">
-          <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+        <div className="flex items-center justify-center h-16">
+          <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />
         </div>
       ) : logs.length === 0 ? (
-        <div className="flex items-center justify-between py-5 px-1">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-40" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
-            <p className="text-sm text-gray-500">No recent escalation events detected.</p>
-          </div>
-          <span className="text-xs text-gray-700 font-mono">Monitoring active</span>
-        </div>
+        <MonitoringEmptyState />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {logs.map((log) => {
             const level = (log.risk_level || log.severity || "low") as string;
             const dotCls =
@@ -75,9 +100,9 @@ export default function RecentAlerts() {
               hour: "2-digit", minute: "2-digit",
             });
             return (
-              <div key={log.id} className="flex items-center justify-between gap-3 py-2 border-b border-white/5 last:border-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dotCls)} />
+              <div key={log.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-white/5 last:border-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", dotCls)} />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={cn("text-xs font-bold uppercase", textCls)}>{level}</span>

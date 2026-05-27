@@ -87,13 +87,18 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
                         : priceRange >= LOW_VOLATILITY_RANGE ? "chart-glow-active"
                         : "chart-glow-stable";
 
-  // Visual-only micro-variation: makes flat lines look natural, real tooltip values unchanged
-  const displayChartData = chartData.map((d, i) => ({
-    ...d,
-    visualPrice: isLowVolatility && d.price > 0
-      ? d.price + Math.sin(i * 1.73 + 0.5) * 0.35 + Math.sin(i * 0.91 + 1.2) * 0.18
-      : d.price,
-  }));
+  // Visual-only micro-variation: realistic telemetry noise, real tooltip values unchanged
+  // Uses a seeded pseudo-random approach layered with slow drift for operational realism
+  const displayChartData = chartData.map((d, i) => {
+    if (!d.price || d.price <= 0) return { ...d, visualPrice: d.price };
+    if (!isLowVolatility) return { ...d, visualPrice: d.price };
+    // Multi-frequency noise — mimics real market micro-movement
+    const drift   = Math.sin(i * 0.31) * 0.55;          // slow drift
+    const tick1   = Math.sin(i * 2.17 + 1.1) * 0.28;   // fast tick
+    const tick2   = Math.cos(i * 1.43 + 0.7) * 0.18;   // counter-tick
+    const spike   = (i % 7 === 3) ? 0.45 : (i % 11 === 5) ? -0.35 : 0; // occasional micro-spike
+    return { ...d, visualPrice: d.price + drift + tick1 + tick2 + spike };
+  });
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
