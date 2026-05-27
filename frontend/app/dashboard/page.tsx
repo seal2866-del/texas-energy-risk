@@ -13,6 +13,7 @@ import AISummary from "@/components/widgets/AISummary";
 import DataSources from "@/components/widgets/DataSources";
 import RecentAlerts from "@/components/widgets/RecentAlerts";
 import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
+import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
   getSignals, getERCOTPrices, getWeatherForecast, getGasData,
@@ -29,7 +30,6 @@ const EMPTY_SIGNAL = {
   confidence: null, computed_at: "",
 };
 
-// Full placeholder — every field the widgets touch, so nothing crashes before real data arrives
 const PLACEHOLDER_SIGNALS: SignalsResponse = {
   computed_at:          "",
   risk_score:           "low",
@@ -80,7 +80,7 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   if (score === "high") {
     const driverList = drivers.length > 0 ? drivers.join(", ") : driver;
     return (
-      <div className="mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm text-red-300">
+      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm text-red-300">
         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
         <span><span className="font-bold">Elevated Risk:</span> Multiple signals detected including {driverList}. Short-term volatility risk is elevated.</span>
       </div>
@@ -88,14 +88,22 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   }
   if (score === "medium") {
     return (
-      <div className="mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
+      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
         <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
         <span><span className="font-bold">Monitoring Recommended:</span> {driver} is elevating near-term conditions in Texas.</span>
       </div>
     );
   }
+  if (signals.active_signals > 0) {
+    return (
+      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400">
+        <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+        <span><span className="font-bold">Conditions Stable</span> — Minor risk signals detected. Monitoring recommended.</span>
+      </div>
+    );
+  }
   return (
-    <div className="mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400">
+    <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400">
       <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
       <span><span className="font-bold">Conditions Stable:</span> No significant risk signals detected.</span>
     </div>
@@ -115,9 +123,10 @@ export default function DashboardPage() {
   const [gasRecs,      setGasRecs]      = useState<GasRecord[]>([]);
   const [gasLatest,    setGasLatest]    = useState<GasRecord | null>(null);
 
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [refreshing,    setRefreshing]    = useState(false);
+  const [justRefreshed, setJustRefreshed] = useState(false);
+  const [lastUpdated,   setLastUpdated]   = useState<Date | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -151,6 +160,8 @@ export default function DashboardPage() {
         setGasLatest(gasData.value.latest);
       }
       setLastUpdated(new Date());
+      setJustRefreshed(true);
+      setTimeout(() => setJustRefreshed(false), 900);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -165,8 +176,14 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
+  const atmClass = signals.risk_score === "high"   ? "atm-high"
+                 : signals.risk_score === "medium" ? "atm-medium"
+                 : "atm-low";
+
   return (
     <>
+      <div className={`atm-overlay ${atmClass}`} />
+      <GridPulseBackground />
       <Navbar />
       <main className="pt-24 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -222,7 +239,7 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6${justRefreshed ? " card-refreshing" : ""}`}>
 
               <RiskScore
                 score={signals.risk_score}

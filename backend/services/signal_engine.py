@@ -473,7 +473,7 @@ def _determine_risk_direction(prices: List[Dict], signals: List[Dict]) -> Tuple[
             context = "risk conditions improving"
     else:  # stable
         if not triggered:
-            context = "balanced supply and demand conditions"
+            context = "no directional pressure detected"
         elif "price_volatility" in triggered_types:
             context = "price conditions stabilizing"
         else:

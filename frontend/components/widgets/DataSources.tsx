@@ -14,7 +14,15 @@ const SOURCE_META = {
   eia:   { label: "EIA Natural Gas",         detail: "Weekly storage report" },
 };
 
-type DisplayStatus = "active" | "stale" | "unavailable" | "pending_confirmation";
+type DisplayStatus = "active" | "delayed" | "stale" | "unavailable" | "pending_confirmation";
+
+// Age-based tiers: Active < 5 min, Delayed 5–60 min, Stale > 60 min
+function ageStatus(age: number | null): "active" | "delayed" | "stale" {
+  if (age === null || age > 1440) return "stale";
+  if (age < 5)  return "active";
+  if (age < 60) return "delayed";
+  return "stale";
+}
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
   if (status === "active") return (
@@ -25,6 +33,11 @@ function StatusBadge({ status }: { status: DisplayStatus }) {
   if (status === "pending_confirmation") return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 border border-blue-500/20 text-blue-400">
       <ShieldCheck className="w-3 h-3" />Confirming
+    </span>
+  );
+  if (status === "delayed") return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/10 border border-yellow-500/20 text-yellow-400">
+      <Clock className="w-3 h-3" />Delayed
     </span>
   );
   if (status === "stale") return (
@@ -53,7 +66,10 @@ function formatPrice(p: number): string {
 }
 
 export default function DataSources({ sources, computedAt }: Props) {
-  const anyIssue = Object.values(sources).some(s => s.status !== "active");
+  const anyIssue = Object.values(sources).some(s => {
+    const age = s.age_minutes;
+    return age === null || age >= 5;
+  });
 
   return (
     <div className={cn(
@@ -75,11 +91,14 @@ export default function DataSources({ sources, computedAt }: Props) {
         {(Object.entries(SOURCE_META) as [keyof typeof SOURCE_META, typeof SOURCE_META[keyof typeof SOURCE_META]][]).map(([key, meta]) => {
           const src = sources[key];
 
-          // For ERCOT, use verification_status if available for richer display
+          // ERCOT: use verification_status for richer display
+          // All others: derive from age_minutes using universal tiers
           const displayStatus: DisplayStatus =
             key === "ercot" && src.verification_status
               ? (src.verification_status === "real-time" ? "active" : src.verification_status as DisplayStatus)
-              : src.status;
+              : src.status === "unavailable"
+                ? "unavailable"
+                : ageStatus(src.age_minutes);
 
           const hasVerifDetail = key === "ercot" && (src.last_valid_price != null || src.verification_reason);
 

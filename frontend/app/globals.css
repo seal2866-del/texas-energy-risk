@@ -10,13 +10,6 @@
   --background: #060c1a;
 }
 
-/* ── Background: html holds the dark fallback, body is transparent ────────── */
-/*
-  CRITICAL: body must be transparent.
-  If body has a background-color, it paints over ::before and hides the image.
-  The html element provides the dark fallback if the image fails to load.
-*/
-
 html {
   min-height: 100%;
   background-color: var(--background);
@@ -25,28 +18,27 @@ html {
 body {
   position: relative;
   min-height: 100vh;
-  background-color: transparent;   /* ← transparent so ::before shows through */
+  background-color: transparent;
   color: rgb(var(--foreground-rgb));
   font-family: "Inter", system-ui, sans-serif;
   overflow-x: hidden;
 }
 
-/* ── Layer 1: Background image (blurred, dimmed) ─────────────────────────── */
+/* Layer 1: Background image */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -2;
-  background-image:      url("/grid-bg.jpg");
-  background-size:       cover;
-  background-position:   center;
-  background-repeat:     no-repeat;
-  /* Scale slightly to prevent blurred fringe at edges */
-  transform:             scale(1.06);
-  filter:                blur(8px) brightness(0.65);
+  background-image:    url("/grid-bg.jpg");
+  background-size:     cover;
+  background-position: center;
+  background-repeat:   no-repeat;
+  transform:           scale(1.06);
+  filter:              blur(8px) brightness(0.65);
 }
 
-/* ── Layer 2: Dark overlay with blue tint on top of image ────────────────── */
+/* Layer 2: Dark overlay */
 body::after {
   content: "";
   position: fixed;
@@ -66,23 +58,109 @@ body::after {
 ::-webkit-scrollbar-track { background: #060c1a; }
 ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
 
-/* ── Glass cards — elevated above the background ─────────────────────────── */
+/* ── Glass cards ─────────────────────────────────────────────────────────── */
 .card-glass {
-  background:              rgba(255, 255, 255, 0.055);
+  background:              rgba(6, 8, 20, 0.82);
   border:                  1px solid rgba(255, 255, 255, 0.09);
-  backdrop-filter:         blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  backdrop-filter:         blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
   border-radius:           12px;
   box-shadow:
-    0 1px 2px  rgba(0, 0, 0, 0.45),
-    0 4px 16px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 1px 2px  rgba(0, 0, 0, 0.6),
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-/* Pulse animation for active alerts */
+/* ── Pulse animation for active alerts ────────────────────────────────── */
 @keyframes pulse-ring {
   0%   { transform: scale(0.95); box-shadow: 0 0 0 0  rgba(239, 68, 68, 0.5); }
   70%  { transform: scale(1);    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);   }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0  rgba(239, 68, 68, 0);   }
 }
 .alert-pulse { animation: pulse-ring 2s infinite; }
+
+/* ── Risk badge breathing animations ──────────────────────────────────── */
+@keyframes breathe-green {
+  0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  50%     { box-shadow: 0 0 0 5px rgba(34,197,94,0.12), 0 0 18px 0 rgba(34,197,94,0.08); }
+}
+@keyframes breathe-amber {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+  50%     { box-shadow: 0 0 0 5px rgba(245,158,11,0.15), 0 0 20px 0 rgba(245,158,11,0.10); }
+}
+@keyframes breathe-red {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  50%     { box-shadow: 0 0 0 6px rgba(239,68,68,0.20), 0 0 24px 0 rgba(239,68,68,0.12); }
+}
+.risk-breathe-low    { animation: breathe-green 4s ease-in-out infinite; }
+.risk-breathe-medium { animation: breathe-amber 3s ease-in-out infinite; }
+.risk-breathe-high   { animation: breathe-red   2.2s ease-in-out infinite; }
+
+/* ── Atmospheric ambient overlay ──────────────────────────────────────── */
+.atm-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: background 2s ease;
+}
+.atm-low {
+  background: radial-gradient(ellipse 80% 50% at 50% 0%,
+    rgba(6,182,212,0.045) 0%, transparent 70%);
+}
+.atm-medium {
+  background: radial-gradient(ellipse 80% 50% at 50% 0%,
+    rgba(245,158,11,0.055) 0%, transparent 70%);
+}
+.atm-high {
+  background: radial-gradient(ellipse 80% 50% at 50% 0%,
+    rgba(239,68,68,0.065) 0%, transparent 70%);
+}
+
+/* ── Banner scan glow ─────────────────────────────────────────────────── */
+@keyframes scan-sweep {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+.banner-scan {
+  position: relative;
+  overflow: hidden;
+}
+.banner-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,255,255,0.04) 50%,
+    transparent 100%);
+  animation: scan-sweep 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Card refresh flash ───────────────────────────────────────────────── */
+@keyframes card-refresh-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(99,179,237,0),  0 4px 16px rgba(0,0,0,0.5); }
+  30%  { box-shadow: 0 0 0 2px rgba(99,179,237,0.18), 0 4px 20px rgba(99,179,237,0.10); }
+  100% { box-shadow: 0 0 0 0 rgba(99,179,237,0),  0 4px 16px rgba(0,0,0,0.5); }
+}
+.card-refreshing { animation: card-refresh-flash 0.8s ease-out forwards; }
+
+/* ── ERCOT chart glow ─────────────────────────────────────────────────── */
+@keyframes chart-breathe-stable {
+  0%,100% { box-shadow: 0 0 0 0 rgba(99,179,237,0); }
+  50%     { box-shadow: 0 0 8px 2px rgba(99,179,237,0.06); }
+}
+@keyframes chart-breathe-active {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+  50%     { box-shadow: 0 0 10px 3px rgba(245,158,11,0.10); }
+}
+@keyframes chart-breathe-high {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  50%     { box-shadow: 0 0 12px 4px rgba(239,68,68,0.12); }
+}
+.chart-glow-stable { animation: chart-breathe-stable 5s ease-in-out infinite; }
+.chart-glow-active { animation: chart-breathe-active 2.5s ease-in-out infinite; }
+.chart-glow-high   { animation: chart-breathe-high   1.8s ease-in-out infinite; }

@@ -116,7 +116,7 @@ export default function RiskScore({
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Texas Energy Risk Score</p>
           <div className="flex items-center gap-3 mt-2">
-            <div className={cn("w-14 h-14 rounded-full flex items-center justify-center ring-4", cfg.ring, score === "high" ? "alert-pulse" : "")}>
+            <div className={cn("w-14 h-14 rounded-full flex items-center justify-center ring-4", cfg.ring, score === "high" ? "alert-pulse risk-breathe-high" : score === "medium" ? "risk-breathe-medium" : "risk-breathe-low")}>
               <span className="text-2xl">{cfg.icon}</span>
             </div>
             <div>

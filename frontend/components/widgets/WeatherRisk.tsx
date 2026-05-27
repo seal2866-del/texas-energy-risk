@@ -41,8 +41,10 @@ export default function WeatherRisk({ forecasts, signal }: Props) {
             <div className="flex items-center gap-2 mt-1">
               {CONDITION_ICON[tomorrow.condition] ?? <Sun className="w-4 h-4 text-gray-400" />}
               <span className="text-xs text-gray-400 capitalize">{tomorrow.condition?.replace("_", " ")}</span>
-              <span className={cn("ml-auto px-2 py-0.5 rounded-full text-xs font-semibold capitalize", riskBadge(tomorrow.demand_risk))}>
-                {tomorrow.demand_risk} demand
+              <span className={cn("ml-auto px-2 py-0.5 rounded-full text-xs font-semibold", riskBadge(tomorrow.demand_risk))}>
+                {tomorrow.demand_risk === "high" ? "Elevated Demand Conditions"
+                 : tomorrow.demand_risk === "medium" ? "Moderate Demand"
+                 : "Normal Demand"}
               </span>
             </div>
           </div>

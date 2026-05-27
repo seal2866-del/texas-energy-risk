@@ -1,6 +1,7 @@
 "use client";
+import { useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { TrendingUp, TrendingDown, Clock, Wifi, WifiOff, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Clock, WifiOff, AlertTriangle } from "lucide-react";
 import type { ERCOTPrice } from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
 
@@ -11,12 +12,15 @@ interface Props {
 
 const PRICE_LOW_FLOOR    = 10;
 const PRICE_HIGH_WARNING = 150;
+const LOW_VOLATILITY_RANGE = 8;
 
 function safePctChange(current: number, prev: number): { pct: number | null; display: string; reliable: boolean } {
   if (prev < PRICE_LOW_FLOOR) return { pct: null, display: "Large movement detected", reliable: false };
-  const pct  = ((current - prev) / prev) * 100;
-  const sign = pct >= 0 ? "+" : "";
-  return { pct, display: `${sign}${Math.abs(pct).toFixed(1)}% vs prev`, reliable: true };
+  const pct = ((current - prev) / prev) * 100;
+  if (Math.abs(pct) < 0.5) return { pct: 0, display: "Stable vs previous interval", reliable: true };
+  const sign = pct > 0 ? "+" : "";
+  const pressure = pct > 0 ? "upward pressure" : "easing";
+  return { pct, display: `${sign}${pct.toFixed(1)}% — ${pressure}`, reliable: true };
 }
 
 function getAgeMinutes(timestamp: string): number {
@@ -49,6 +53,8 @@ const F = {
 };
 
 export default function ERCOTPriceMonitor({ prices, loading }: Props) {
+  const [hours, setHours] = useState<12 | 24>(12);
+
   const latest  = prices[prices.length - 1];
   const prev    = prices[prices.length - 2];
   const current = latest?.price_mwh ?? 0;
@@ -69,10 +75,17 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
   const strokeColor = outsideNormal ? "#ef4444" : "#f97316";
   const gradientId  = outsideNormal ? "priceGradHigh" : "priceGrad";
 
-  const chartData = prices.slice(-24).map((p) => ({
+  const chartData = prices.slice(-hours).map((p) => ({
     time:  new Date(p.timestamp).toLocaleTimeString("en-US", { hour: "numeric", timeZone: "America/Chicago" }),
     price: p.price_mwh,
   }));
+
+  const chartPrices    = chartData.map(d => d.price).filter(p => p > 0);
+  const priceRange     = chartPrices.length > 1 ? Math.max(...chartPrices) - Math.min(...chartPrices) : 0;
+  const isLowVolatility = priceRange < LOW_VOLATILITY_RANGE && chartPrices.length > 3;
+  const chartGlowClass  = outsideNormal ? "chart-glow-high"
+                        : priceRange >= LOW_VOLATILITY_RANGE ? "chart-glow-active"
+                        : "chart-glow-stable";
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -85,7 +98,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
   };
 
   return (
-    <div className={`card-glass p-6 border transition-all ${outsideNormal ? "border-red-500/20" : "border-white/5"}`}>
+    <div className={`card-glass p-4 border transition-all h-full flex flex-col ${outsideNormal ? "border-red-500/20" : "border-white/5"}`}>
 
       {/* Header row */}
       <div className="flex items-start justify-between mb-1">
@@ -114,7 +127,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
 
       {/* Timestamp row */}
       {!loading && lastUpdate && (
-        <div className="flex items-center gap-1.5 mb-3">
+        <div className="flex items-center gap-1.5 mb-1.5">
           <Clock className="w-3 h-3 text-gray-600" />
           <span className="text-xs text-gray-600">
             Last update: <span className="text-gray-400">{lastUpdate}</span>
@@ -124,7 +137,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
       )}
 
       {/* Price + change row */}
-      <div className="flex items-end justify-between mb-4">
+      <div className="flex items-end justify-between mb-2">
         <div className="flex flex-col gap-1">
           {!loading && cacheSize < 2 && (
             <span className="inline-block px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 text-xs">
@@ -143,12 +156,12 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
           {loading ? (
             <div className="h-8 w-24 bg-white/5 rounded animate-pulse" />
           ) : cacheSize === 0 ? (
-            <p className="text-2xl font-black text-gray-500">
+            <p className="text-xl font-black text-gray-500">
               &mdash;<span className="text-sm font-normal text-gray-600">/MWh</span>
             </p>
           ) : (
             <>
-              <p className={`text-2xl font-black ${outsideNormal ? "text-red-400" : "text-white"}`}>
+              <p className={`text-xl font-black ${outsideNormal ? "text-red-400" : "text-white"}`}>
                 {formatPrice(current)}<span className="text-sm font-normal text-gray-400">/MWh</span>
               </p>
               {reliable && (
@@ -162,8 +175,30 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
         </div>
       </div>
 
+      {/* Chart header: volatility label + time toggle */}
+      {!loading && cacheSize > 0 && (
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-gray-600">
+            {isLowVolatility ? "Low volatility conditions" : priceRange > 0 ? `$${priceRange.toFixed(0)} range` : ""}
+          </span>
+          <div className="flex items-center gap-0.5 bg-white/5 rounded-lg p-0.5">
+            {([12, 24] as const).map((h) => (
+              <button
+                key={h}
+                onClick={() => setHours(h)}
+                className={`px-2 py-0.5 rounded text-xs font-semibold transition-all ${
+                  hours === h ? "bg-white/10 text-gray-200" : "text-gray-500 hover:text-gray-400"
+                }`}
+              >
+                {h}h
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Chart */}
-      <div className="h-32">
+      <div className={`flex-1 min-h-[96px] rounded-lg ${!loading && cacheSize > 0 ? chartGlowClass : ""}`}>
         {loading ? (
           <div className="h-full bg-white/5 rounded animate-pulse" />
         ) : (
@@ -180,9 +215,14 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
                 </linearGradient>
               </defs>
               <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#6b7280" }} interval="preserveStartEnd" axisLine={false} tickLine={false} />
-              <YAxis hide domain={["auto", "auto"]} />
+              <YAxis hide domain={([dataMin, dataMax]: [number, number]) => {
+                const pad = Math.max((dataMax - dataMin) * 0.3, 5);
+                return [Math.max(0, dataMin - pad), dataMax + pad];
+              }} />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={PRICE_HIGH_WARNING} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
+              {current >= PRICE_HIGH_WARNING * 0.6 && (
+                <ReferenceLine y={PRICE_HIGH_WARNING} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
+              )}
               <Area type="monotone" dataKey="price" stroke={strokeColor} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
@@ -190,7 +230,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-2 flex items-center justify-between">
         <p className="text-xs text-gray-600">Informational only. Not trading advice.</p>
         {isRealSource && <p className="text-xs text-gray-600">Source: ERCOT CDR</p>}
       </div>

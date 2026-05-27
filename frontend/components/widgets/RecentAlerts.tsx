@@ -51,7 +51,7 @@ export default function RecentAlerts() {
       ) : logs.length === 0 ? (
         <div className="text-center py-8">
           <Bell className="w-6 h-6 text-gray-700 mx-auto mb-2" />
-          <p className="text-sm text-gray-600">Alerts will appear here when risk conditions change.</p>
+          <p className="text-sm text-gray-600">No recent alerts — system monitoring normal conditions.</p>
         </div>
       ) : (
         <div className="space-y-2">
