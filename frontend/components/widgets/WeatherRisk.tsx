@@ -6,6 +6,7 @@ import { cn, riskBg, riskColor, riskBadge } from "@/lib/utils";
 interface Props {
   forecasts: WeatherForecast[];
   signal:    Signal;
+  panelGlow?: string;
 }
 
 const CONDITION_ICON: Record<string, React.ReactNode> = {
@@ -16,13 +17,13 @@ const CONDITION_ICON: Record<string, React.ReactNode> = {
   rain:          <CloudRain className="w-4 h-4 text-blue-400" />,
 };
 
-export default function WeatherRisk({ forecasts, signal }: Props) {
+export default function WeatherRisk({ forecasts, signal, panelGlow }: Props) {
   const tomorrow  = forecasts[0];
   const triggered = signal.triggered;
   const severity  = signal.severity;
 
   return (
-    <div className={cn("card-glass p-6 border", triggered ? riskBg(severity) : "border-white/5")}>
+    <div className={cn("card-glass p-6 border", triggered ? riskBg(severity) : "border-white/5", panelGlow ?? "")}>
       <div className="flex items-start justify-between mb-4">
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Texas Weather Demand Risk</p>

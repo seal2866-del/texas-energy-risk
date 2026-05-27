@@ -13,6 +13,7 @@ import AISummary from "@/components/widgets/AISummary";
 import DataSources from "@/components/widgets/DataSources";
 import RecentAlerts from "@/components/widgets/RecentAlerts";
 import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
+import MarketInterpretation from "@/components/widgets/MarketInterpretation";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
@@ -72,6 +73,35 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
   disclaimer: "",
 };
 
+// Task 8 — rotating system activity messages
+const ACTIVITY_MESSAGES = [
+  "Monitoring live feeds",
+  "Analyzing demand pressure",
+  "Checking market response",
+  "Updating confidence score",
+  "Processing ERCOT data stream",
+  "Evaluating risk indicators",
+  "Scanning weather patterns",
+  "Cross-referencing gas supply",
+];
+
+function SystemActivity({ signalsReady }: { signalsReady: boolean }) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (!signalsReady) return;
+    const id = setInterval(() => setIdx(i => (i + 1) % ACTIVITY_MESSAGES.length), 12000);
+    return () => clearInterval(id);
+  }, [signalsReady]);
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="activity-dot" />
+      <span className="text-xs text-gray-600 transition-opacity duration-500">
+        {signalsReady ? ACTIVITY_MESSAGES[idx] : "Initializing data feeds..."}
+      </span>
+    </div>
+  );
+}
+
 function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   if (!signals.data_valid) return null;
   const score   = signals.risk_score;
@@ -80,7 +110,7 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   if (score === "high") {
     const driverList = drivers.length > 0 ? drivers.join(", ") : driver;
     return (
-      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm text-red-300">
+      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-sm text-red-300 leading-relaxed">
         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
         <span><span className="font-bold">Elevated Risk:</span> Multiple signals detected including {driverList}. Short-term volatility risk is elevated.</span>
       </div>
@@ -88,7 +118,7 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   }
   if (score === "medium") {
     return (
-      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
+      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300 leading-relaxed">
         <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
         <span><span className="font-bold">Monitoring Recommended:</span> {driver} is elevating near-term conditions in Texas.</span>
       </div>
@@ -96,14 +126,14 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
   }
   if (signals.active_signals > 0) {
     return (
-      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400">
+      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400 leading-relaxed">
         <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
         <span><span className="font-bold">Conditions Stable</span> — Minor risk signals detected. Monitoring recommended.</span>
       </div>
     );
   }
   return (
-    <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400">
+    <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400 leading-relaxed">
       <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
       <span><span className="font-bold">Conditions Stable:</span> No significant risk signals detected.</span>
     </div>
@@ -180,22 +210,37 @@ export default function DashboardPage() {
                  : signals.risk_score === "medium" ? "atm-medium"
                  : "atm-low";
 
+  // Panel glows — T4
+  const riskGlow  = signals.risk_score === "high"   ? "panel-glow-red"
+                  : signals.risk_score === "medium" ? "panel-glow-amber"
+                  : "panel-glow-green";
+  const demandLvl = signals.demand_pressure?.level ?? "low";
+  const gasLvl    = signals.gas_to_power_impact?.level ?? "low";
+  const weatherGlow = demandLvl === "high" ? "panel-glow-amber" : "";
+  const gasGlow     = (gasLvl === "high" || gasLvl === "medium") ? "panel-glow-orange" : "";
+
   return (
     <>
       <div className={`atm-overlay ${atmClass}`} />
       <GridPulseBackground />
       <Navbar />
       <main className="pt-28 min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          {/* ── Page header ─────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-black text-white">Texas Energy Intelligence Platform</h1>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <h1 className="text-2xl font-black text-white tracking-tight">
+                Texas Energy Intelligence Platform
+              </h1>
+              <p className="text-sm text-gray-500 mt-1 leading-relaxed">
                 {lastUpdated
                   ? `Updated ${lastUpdated.toLocaleTimeString("en-US", { timeZone: "America/Chicago", timeZoneName: "short" })}`
                   : "Loading market data..."}
               </p>
+              <div className="mt-2">
+                <SystemActivity signalsReady={signalsReady} />
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300">
@@ -228,7 +273,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/60 text-center">
+          <div className="mb-6 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/75 text-center leading-relaxed">
             TX Energy Risk provides informational analytics and market intelligence only. This does not constitute investment, trading, financial, legal, or procurement advice. Users are responsible for their own decisions.
           </div>
 
@@ -261,6 +306,7 @@ export default function DashboardPage() {
                 timeHorizons={signals.time_horizons}
                 marketCondition={signals.market_condition}
                 alertSeverity={signals.alert_severity}
+                panelGlow={riskGlow}
               />
 
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} />
@@ -270,6 +316,7 @@ export default function DashboardPage() {
               <WeatherRisk
                 forecasts={forecasts}
                 signal={signals.signals?.weather_demand ?? EMPTY_SIGNAL}
+                panelGlow={weatherGlow}
               />
 
               <GasSupply
@@ -277,6 +324,7 @@ export default function DashboardPage() {
                 latest={gasLatest}
                 signal={signals.signals?.gas_supply ?? EMPTY_SIGNAL}
                 gasToPower={signals.gas_to_power_impact}
+                panelGlow={gasGlow}
               />
 
               <EnergyRiskDrivers signals={signals} />
@@ -287,6 +335,8 @@ export default function DashboardPage() {
               />
 
               <RecentAlerts />
+
+              <MarketInterpretation signals={signals} prices={prices} />
 
               <AISummary
                 signals={signals}

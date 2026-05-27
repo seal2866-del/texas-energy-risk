@@ -9,19 +9,38 @@ interface Props {
 }
 
 const SOURCE_META = {
-  ercot: { label: "ERCOT Real-Time Market", detail: "Power prices (HB_HOUSTON)" },
-  noaa:  { label: "NOAA / NWS Weather",     detail: "Forecast demand risk" },
-  eia:   { label: "EIA Natural Gas",         detail: "Weekly storage report" },
+  ercot: { label: "ERCOT Real-Time Market", detail: "Power prices (HB_HOUSTON)",  latencyBase: 45 },
+  noaa:  { label: "NOAA / NWS Weather",     detail: "Forecast demand risk",        latencyBase: 90 },
+  eia:   { label: "EIA Natural Gas",         detail: "Weekly storage report",       latencyBase: 300 },
 };
 
 type DisplayStatus = "active" | "delayed" | "stale" | "unavailable" | "pending_confirmation";
 
-// Age-based tiers: Active < 5 min, Delayed 5–60 min, Stale > 60 min
 function ageStatus(age: number | null): "active" | "delayed" | "stale" {
   if (age === null || age > 1440) return "stale";
   if (age < 5)  return "active";
   if (age < 60) return "delayed";
   return "stale";
+}
+
+function computeConfidence(status: DisplayStatus, age: number | null): number {
+  if (status === "unavailable") return 0;
+  if (age === null) return 55;
+  if (age < 1)   return 98;
+  if (age < 5)   return 95;
+  if (age < 30)  return 87;
+  if (age < 60)  return 78;
+  if (age < 120) return 68;
+  return 55;
+}
+
+function computeLatency(age: number | null, latencyBase: number): string {
+  if (age === null) return "—";
+  const seconds = Math.round((age * 60 + latencyBase));
+  if (seconds < 60)  return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
@@ -61,8 +80,30 @@ function formatAge(minutes: number | null): string {
   return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
 }
 
+function formatFreshness(minutes: number | null): string {
+  if (minutes === null) return "—";
+  if (minutes < 1)  return "< 1 min";
+  if (minutes < 60) return `< ${Math.ceil(minutes)} min`;
+  const h = Math.floor(minutes / 60);
+  return `${h}h+`;
+}
+
 function formatPrice(p: number): string {
   return p < 0 ? `-$${Math.abs(p).toFixed(2)}` : `$${p.toFixed(2)}`;
+}
+
+function ConfidenceBar({ pct }: { pct: number }) {
+  const color = pct >= 90 ? "bg-green-400" : pct >= 75 ? "bg-amber-400" : pct >= 55 ? "bg-orange-400" : "bg-red-400";
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-xs font-mono font-semibold ${pct >= 90 ? "text-green-400" : pct >= 75 ? "text-amber-400" : "text-orange-400"}`}>
+        {pct}%
+      </span>
+    </div>
+  );
 }
 
 export default function DataSources({ sources, computedAt }: Props) {
@@ -71,28 +112,33 @@ export default function DataSources({ sources, computedAt }: Props) {
     return age === null || age >= 5;
   });
 
+  const computedTime = computedAt
+    ? new Date(computedAt).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit" })
+    : "—";
+
   return (
     <div className={cn(
       "panel-scan card-glass p-6 border",
       anyIssue ? "border-amber-500/20" : "border-white/5"
     )}>
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-5">
         <div className="flex items-center gap-2">
           <Database className={cn("w-4 h-4", anyIssue ? "text-amber-400" : "text-gray-500")} />
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Data Sources</p>
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Data Sources</p>
+            <p className="text-xs text-gray-500 mt-0.5">Feed health & reliability</p>
+          </div>
         </div>
-        <div className="flex items-center gap-1 text-xs text-gray-600">
+        <div className="flex items-center gap-1 text-xs text-gray-500">
           <Clock className="w-3 h-3" />
-          {new Date(computedAt).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit" })}
+          {computedTime} CDT
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {(Object.entries(SOURCE_META) as [keyof typeof SOURCE_META, typeof SOURCE_META[keyof typeof SOURCE_META]][]).map(([key, meta]) => {
           const src = sources[key];
 
-          // ERCOT: use verification_status for richer display
-          // All others: derive from age_minutes using universal tiers
           const displayStatus: DisplayStatus =
             key === "ercot" && src.verification_status
               ? (src.verification_status === "real-time" ? "active" : src.verification_status as DisplayStatus)
@@ -100,29 +146,53 @@ export default function DataSources({ sources, computedAt }: Props) {
                 ? "unavailable"
                 : ageStatus(src.age_minutes);
 
+          const confidence = computeConfidence(displayStatus, src.age_minutes);
+          const latency    = computeLatency(src.age_minutes, meta.latencyBase);
+          const freshness  = formatFreshness(src.age_minutes);
+          const lastVerified = src.age_minutes !== null
+            ? formatAge(src.age_minutes)
+            : "—";
+
           const hasVerifDetail = key === "ercot" && (src.last_valid_price != null || src.verification_reason);
 
           return (
-            <div key={key}>
-              <div className="flex items-center justify-between gap-3">
+            <div key={key} className="pb-3 border-b border-white/5 last:border-0 last:pb-0">
+              <div className="flex items-start justify-between gap-3 mb-1.5">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-300 truncate">{meta.label}</p>
-                  <p className="text-xs text-gray-500">{meta.detail}</p>
+                  <p className="text-xs font-semibold text-gray-300">{meta.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{meta.detail}</p>
                 </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <StatusBadge status={displayStatus} />
-                  {src.age_minutes !== null && (
-                    <span className="text-xs text-gray-500 font-mono">{formatAge(src.age_minutes)}</span>
-                  )}
+                <StatusBadge status={displayStatus} />
+              </div>
+
+              {/* Trust metrics grid */}
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-0.5">Last Verified</p>
+                  <p className="text-xs text-gray-400 font-mono">{lastVerified}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-0.5">Freshness</p>
+                  <p className="text-xs text-gray-400 font-mono">{freshness}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-0.5">Latency</p>
+                  <p className="text-xs text-gray-400 font-mono">{displayStatus === "unavailable" ? "—" : latency}</p>
                 </div>
               </div>
 
-              {/* ERCOT verification detail panel */}
+              {/* Confidence bar */}
+              <div className="mt-1.5">
+                <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-0.5">Data Confidence</p>
+                <ConfidenceBar pct={confidence} />
+              </div>
+
+              {/* ERCOT verification detail */}
               {hasVerifDetail && (
-                <div className="mt-1.5 ml-0 pl-2 border-l border-white/10 space-y-0.5">
+                <div className="mt-1.5 pl-2 border-l border-white/10 space-y-0.5">
                   {src.last_valid_price != null && (
                     <p className="text-xs text-gray-500">
-                      Last valid price:{" "}
+                      Last valid:{" "}
                       <span className={cn(
                         "font-semibold",
                         src.price_range === "extreme"  ? "text-red-400" :
@@ -144,13 +214,13 @@ export default function DataSources({ sources, computedAt }: Props) {
       </div>
 
       {anyIssue && (
-        <div className="mt-4 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/70 leading-relaxed">
+        <div className="mt-4 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/15 text-xs text-amber-200/75 leading-relaxed">
           One or more data sources are delayed. Confidence scores are adjusted accordingly.
         </div>
       )}
 
       <p className="mt-3 text-xs text-gray-500 leading-relaxed">
-        Data source health affects signal confidence. Unavailable sources reduce confidence by 15%.
+        Data reliability affects signal confidence. Unavailable sources reduce confidence by 15%.
       </p>
     </div>
   );

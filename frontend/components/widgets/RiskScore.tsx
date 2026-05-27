@@ -23,6 +23,7 @@ interface Props {
   timeHorizons?:           TimeHorizons;
   marketCondition?:        MarketCondition;
   alertSeverity?:          AlertSeverityInfo;
+  panelGlow?:            string;
 }
 
 const MARKET_CLS: Record<string, string> = {
@@ -80,7 +81,7 @@ export default function RiskScore({
   confidence, confidenceNote, explanation, impact,
   primaryDriver, riskDirection, riskDirectionContext, signalDrivers,
   secondaryFactors, dataValid, dataStatus, riskHeadline, timeHorizons,
-  marketCondition, alertSeverity,
+  marketCondition, alertSeverity, panelGlow,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
 
@@ -111,7 +112,7 @@ export default function RiskScore({
   }
 
   return (
-    <div className={cn("card-glass p-6 border", riskBg(score))}>
+    <div className={cn("card-glass p-6 border", riskBg(score), panelGlow ?? "")}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Texas Energy Risk Score</p>

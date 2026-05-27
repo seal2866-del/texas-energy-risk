@@ -9,6 +9,7 @@ interface Props {
   latest:           GasRecord | null;
   signal:           Signal;
   gasToPower?:      GasToPowerImpact;
+  panelGlow?:  string;
 }
 
 function gasToPowerCls(level: string) {
@@ -19,7 +20,7 @@ function gasToPowerCls(level: string) {
     : "text-green-400 bg-green-500/10 border-green-500/25";
 }
 
-export default function GasSupply({ records, latest, signal, gasToPower }: Props) {
+export default function GasSupply({ records, latest, signal, gasToPower, panelGlow }: Props) {
   const triggered = signal.triggered;
   const severity  = signal.severity;
 
@@ -42,7 +43,7 @@ export default function GasSupply({ records, latest, signal, gasToPower }: Props
   };
 
   return (
-    <div className={cn("card-glass p-6 border", triggered ? riskBg(severity) : "border-white/5")}>
+    <div className={cn("card-glass p-6 border", panelGlow ?? "", triggered ? riskBg(severity) : "border-white/5")}>
       <div className="flex items-start justify-between mb-4">
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Natural Gas Supply Pressure</p>

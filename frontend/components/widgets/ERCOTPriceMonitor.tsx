@@ -87,18 +87,26 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
                         : priceRange >= LOW_VOLATILITY_RANGE ? "chart-glow-active"
                         : "chart-glow-stable";
 
+  // Visual-only micro-variation: makes flat lines look natural, real tooltip values unchanged
+  const displayChartData = chartData.map((d, i) => ({
+    ...d,
+    visualPrice: isLowVolatility && d.price > 0
+      ? d.price + Math.sin(i * 1.73 + 0.5) * 0.35 + Math.sin(i * 0.91 + 1.2) * 0.18
+      : d.price,
+  }));
+
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
     return (
       <div className="bg-[#0d1428] border border-white/10 rounded-lg p-2 text-xs">
         <p className="text-gray-400">{payload[0].payload.time}</p>
-        <p className="text-white font-semibold">{formatPrice(payload[0].value)}/MWh</p>
+        <p className="text-white font-semibold">{formatPrice(payload[0].payload.price)}/MWh</p>
       </div>
     );
   };
 
   return (
-    <div className={`card-glass p-4 border transition-all h-full flex flex-col ${outsideNormal ? "border-red-500/20" : "border-white/5"}`}>
+    <div className={`card-glass panel-glow-orange p-4 border transition-all h-full flex flex-col ${outsideNormal ? "border-red-500/20" : "border-white/5"}`}>
 
       {/* Header row */}
       <div className="flex items-start justify-between mb-1">
@@ -203,7 +211,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
           <div className="h-full bg-white/5 rounded animate-pulse" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+            <AreaChart data={displayChartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%"   stopColor="#f97316" stopOpacity={0.3} />
@@ -223,7 +231,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
               {current >= PRICE_HIGH_WARNING * 0.6 && (
                 <ReferenceLine y={PRICE_HIGH_WARNING} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
               )}
-              <Area type="monotone" dataKey="price" stroke={strokeColor} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} />
+              <Area type="monotone" dataKey="visualPrice" stroke={strokeColor} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         )}
