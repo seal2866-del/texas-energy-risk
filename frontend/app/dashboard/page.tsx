@@ -10,6 +10,7 @@ import VolatilityAlert from "@/components/widgets/VolatilityAlert";
 import WeatherRisk from "@/components/widgets/WeatherRisk";
 import GasSupply from "@/components/widgets/GasSupply";
 import AISummary from "@/components/widgets/AISummary";
+import AIMarketReasoning from "@/components/widgets/AIMarketReasoning";
 import DataSources from "@/components/widgets/DataSources";
 import RecentAlerts from "@/components/widgets/RecentAlerts";
 import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
@@ -17,8 +18,8 @@ import MarketInterpretation from "@/components/widgets/MarketInterpretation";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
-  getSignals, getERCOTPrices, getWeatherForecast, getGasData,
-  type SignalsResponse, type ERCOTPrice, type WeatherForecast, type GasRecord,
+  getSignals, getERCOTPrices, getWeatherForecast, getGasData, getAIReasoning,
+  type SignalsResponse, type ERCOTPrice, type WeatherForecast, type GasRecord, type AIReasoningResponse,
 } from "@/lib/api";
 
 const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
@@ -152,6 +153,9 @@ export default function DashboardPage() {
   const [forecasts,    setForecasts]    = useState<WeatherForecast[]>([]);
   const [gasRecs,      setGasRecs]      = useState<GasRecord[]>([]);
   const [gasLatest,    setGasLatest]    = useState<GasRecord | null>(null);
+  const [aiReasoning,  setAiReasoning]  = useState<AIReasoningResponse | null>(null);
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const [aiError,      setAiError]      = useState(false);
 
   const [loading,       setLoading]       = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
@@ -189,6 +193,13 @@ export default function DashboardPage() {
         setGasRecs(gasData.value.records);
         setGasLatest(gasData.value.latest);
       }
+      // AI reasoning — fire independently so it never blocks the dashboard
+      setAiLoading(true);
+      setAiError(false);
+      getAIReasoning(location)
+        .then((r) => { setAiReasoning(r); setAiLoading(false); })
+        .catch(() => { setAiError(true); setAiLoading(false); });
+
       setLastUpdated(new Date());
       setJustRefreshed(true);
       setTimeout(() => setJustRefreshed(false), 900);
@@ -337,6 +348,13 @@ export default function DashboardPage() {
               <RecentAlerts />
 
               <MarketInterpretation signals={signals} prices={prices} />
+
+              <AIMarketReasoning
+                reasoning={aiReasoning}
+                loading={aiLoading}
+                error={aiError}
+                computedAt={signals.computed_at}
+              />
 
               <AISummary
                 signals={signals}

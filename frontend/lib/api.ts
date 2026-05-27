@@ -242,3 +242,22 @@ export interface AlertPrefs {
 
 export const updateAlertPrefs = (prefs: AlertPrefs, token: string) =>
   apiFetch<{ success: boolean }>(`/api/alerts/prefs/`, token);
+
+// ── AI Reasoning Layer ────────────────────────────────────────────────────────
+
+export interface AIReasoningResponse {
+  executive_summary:             string;
+  current_market_interpretation: string;
+  key_driver_analysis:           string;
+  escalation_watch:              string;
+  confidence_note:               string;
+  recommended_monitoring_focus:  string;
+  generated_at:                  string;
+  model:                         string;
+  disclaimer:                    string;
+  ai_powered:                    boolean;
+  from_cache:                    boolean;
+}
+
+export const getAIReasoning = (location = "Houston") =>
+  apiFetch<AIReasoningResponse>(`/api/ai-reasoning?location=${location}`);

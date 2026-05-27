@@ -267,6 +267,7 @@ def _build_risk_email(
     cost_impact:         Optional[dict] = None,
     market_condition:    Optional[dict] = None,
     alert_severity:      Optional[dict] = None,
+    ai_reasoning:        Optional[dict] = None,
 ) -> str:
     color = RISK_COLOR.get(risk_level, "#6b7280")
     label = RISK_LABEL.get(risk_level, risk_level.upper())
@@ -372,6 +373,9 @@ def _build_risk_email(
   </div>
 
   {drivers_html}
+
+
+  {"<div style='background:rgba(20,184,166,0.05);border:1px solid rgba(20,184,166,0.18);border-radius:12px;padding:16px 18px;margin-bottom:18px;'><p style='color:#2dd4bf;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;'>&#129504; AI MARKET REASONING</p><p style='color:#f3f4f6;font-size:13px;font-weight:600;line-height:1.65;margin:0 0 6px;'>" + (ai_reasoning.get("executive_summary","") if ai_reasoning else "") + "</p><p style='color:#9ca3af;font-size:12px;line-height:1.65;margin:0 0 8px;'>" + (ai_reasoning.get("escalation_watch","") if ai_reasoning else "") + "</p><p style='color:#4b5563;font-size:11px;line-height:1.55;margin:0;font-style:italic;'>" + (ai_reasoning.get("recommended_monitoring_focus","") if ai_reasoning else "") + "</p></div>" if ai_reasoning and ai_reasoning.get("executive_summary") else ""}
 
   {"<div style='background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.18);border-radius:12px;padding:16px 18px;margin-bottom:18px;'><p style='color:#fb923c;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;'>WHY THIS MATTERS</p><p style='color:#d1d5db;font-size:13px;line-height:1.65;margin:0;'>" + why_it_matters + "</p></div>" if why_it_matters else ""}
 
@@ -638,6 +642,39 @@ async def maybe_send_alert(
     market_condition    = signals_data.get("market_condition")
     alert_severity_data = signals_data.get("alert_severity")
 
+    # -- AI reasoning for alert email (best-effort, non-blocking)
+    ai_reasoning_data: Optional[dict] = None
+    try:
+        from services.ai_reasoning import generate_ai_reasoning
+        ercot_vals   = []  # not available in alert context; use signal level as proxy
+        ai_inputs = {
+            "location":                  city,
+            "overall_risk_level":        risk_level,
+            "confidence_score":          confidence,
+            "market_state":              (market_condition or {}).get("label", "Stable"),
+            "risk_direction":            risk_direction,
+            "primary_driver":            primary_driver,
+            "secondary_drivers":         signals_data.get("secondary_factors", []),
+            "ercot_price":               ercot_price or 0,
+            "ercot_price_behavior":      "stable",
+            "ercot_volatility_level":    "low" if risk_level == "low" else "medium",
+            "weather_temperature":       weather_temp,
+            "weather_forecast_high":     weather_temp,
+            "weather_demand_pressure":   (demand_pressure or {}).get("level", "low"),
+            "natural_gas_storage":       gas_storage,
+            "gas_storage_vs_5yr_avg":    gas_storage,
+            "henry_hub_price":           0,
+            "gas_supply_pressure":       (supply_pressure or {}).get("level", "low"),
+            "gas_to_power_impact":       (gas_to_power_impact or {}).get("level", "low"),
+            "active_events":             signals_data.get("events", []),
+            "data_source_health":        "active",
+            "data_valid":                signals_data.get("data_valid", True),
+            "time_horizon":              time_horizons.get("short_term", "next 24-48 hours"),
+        }
+        ai_reasoning_data = await generate_ai_reasoning(ai_inputs)
+    except Exception as _ai_exc:
+        logger.warning("[ALERT] AI reasoning fetch failed (non-fatal): %s", _ai_exc)
+
     html     = _build_risk_email(
         risk_level, prev_level, confidence, primary_driver,
         risk_direction, time_horizons, city,
@@ -645,6 +682,7 @@ async def maybe_send_alert(
         impact, computed_str,
         demand_pressure, supply_pressure, market_reaction, gas_to_power_impact,
         risk_narrative, cost_impact, market_condition, alert_severity_data,
+        ai_reasoning_data,
     )
     subject  = _subject("risk_change", risk_level)
     delivered = False
