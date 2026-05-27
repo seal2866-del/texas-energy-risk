@@ -63,7 +63,7 @@ export default function AISummary({ signals, computedAt }: Props) {
   const ccCls  = COST_CLS[cost_impact?.level ?? "low"];
 
   return (
-    <div className="card-glass border border-white/5 p-6 lg:col-span-2">
+    <div className="panel-scan card-glass border border-white/5 p-6 lg:col-span-2">
 
       {/* Header */}
       <div className="flex items-start justify-between mb-5">
@@ -73,10 +73,10 @@ export default function AISummary({ signals, computedAt }: Props) {
           </div>
           <div>
             <p className="text-sm font-semibold text-white">Risk Intelligence Summary</p>
-            <p className="text-xs text-gray-600">Synthesized across demand, supply, and market signals</p>
+            <p className="text-xs text-gray-500">Synthesized across demand, supply, and market signals</p>
           </div>
         </div>
-        <span className="text-xs text-gray-600 font-mono">{time}</span>
+        <span className="text-xs text-gray-400 font-mono">{time}</span>
       </div>
 
       {/* Status badges */}
@@ -107,7 +107,7 @@ export default function AISummary({ signals, computedAt }: Props) {
               {risk_narrative.body}
             </p>
             {risk_narrative.next_period_note && (
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed italic">
+              <p className="text-xs text-gray-400 mt-2 leading-relaxed italic">
                 {risk_narrative.next_period_note}
               </p>
             )}
@@ -147,12 +147,12 @@ export default function AISummary({ signals, computedAt }: Props) {
                     <span className="mt-0.5 px-1.5 py-0.5 rounded text-xs font-semibold border text-gray-500 bg-white/5 border-white/8 flex-shrink-0">
                       SECONDARY
                     </span>
-                    <p className="text-xs text-gray-500">{f}</p>
+                    <p className="text-xs text-gray-400">{f}</p>
                   </div>
                 ))}
               {(!primary_driver || primary_driver === "No active risk drivers") && (
-                <p className="text-xs text-gray-600">
-                  No active risk drivers. All monitored signals are within normal range.
+                <p className="text-xs text-gray-500">
+                  No active escalation signals detected. All monitored channels within normal operating range.
                 </p>
               )}
             </div>
@@ -209,7 +209,7 @@ export default function AISummary({ signals, computedAt }: Props) {
                 Signal Confidence
               </p>
             </div>
-            <p className="text-xs text-gray-500 leading-relaxed">{confidence_note}</p>
+            <p className="text-xs text-gray-400 leading-relaxed">{confidence_note}</p>
           </div>
         )}
 
@@ -217,8 +217,8 @@ export default function AISummary({ signals, computedAt }: Props) {
 
       {/* System model explainer */}
       <div className="mt-5 pt-4 border-t border-white/5">
-        <p className="text-xs text-gray-700 leading-relaxed">
-          <span className="text-gray-600 font-medium">How this works:</span>{" "}
+        <p className="text-xs text-gray-500 leading-relaxed">
+          <span className="text-gray-400 font-medium">How this works:</span>{" "}
           Weather drives demand &rarr; Natural gas drives generation cost &rarr; ERCOT reflects
           the real-time balance. All three are analyzed together to produce this summary.
         </p>

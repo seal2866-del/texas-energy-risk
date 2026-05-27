@@ -40,7 +40,7 @@ const SEVERITY_ICON_CLS: Record<string, string> = {
 };
 
 const SCORE_CONFIG = {
-  low:    { label: "LOW RISK",    icon: "\u{1F7E2}", ring: "ring-green-500/40",  bar: "bg-green-500" },
+  low:    { label: "LOW RISK",    icon: "\u{1F7E2}", ring: "ring-green-400/55",  bar: "bg-green-500" },
   medium: { label: "MEDIUM RISK", icon: "\u{1F7E1}", ring: "ring-amber-500/40",  bar: "bg-amber-500" },
   high:   { label: "HIGH RISK",   icon: "\u{1F534}", ring: "ring-red-500/40",    bar: "bg-red-500"   },
 };
@@ -116,8 +116,13 @@ export default function RiskScore({
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Texas Energy Risk Score</p>
           <div className="flex items-center gap-3 mt-2">
-            <div className={cn("w-14 h-14 rounded-full flex items-center justify-center ring-4", cfg.ring, score === "high" ? "alert-pulse risk-breathe-high" : score === "medium" ? "risk-breathe-medium" : "risk-breathe-low")}>
-              <span className="text-2xl">{cfg.icon}</span>
+            <div className={cn(
+                "risk-halo-wrap",
+                score === "high" ? "risk-halo-high" : score === "medium" ? "risk-halo-medium" : "risk-halo-low"
+              )}>
+              <div className={cn("w-14 h-14 rounded-full flex items-center justify-center ring-4", cfg.ring, score === "high" ? "alert-pulse risk-breathe-high" : score === "medium" ? "risk-breathe-medium" : "risk-breathe-low")}>
+                <span className="text-2xl">{cfg.icon}</span>
+              </div>
             </div>
             <div>
               <p className={cn("text-3xl font-black tracking-tight", riskColor(score))}>{cfg.label}</p>

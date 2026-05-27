@@ -38,9 +38,9 @@ export default function Navbar() {
       ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0f1e]/90 backdrop-blur-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-24">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/8 bg-[#080d1c]/92 backdrop-blur-xl">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10">
+        <div className="flex items-center justify-between h-28">
 
           {/* Logo */}
           <Link href="/" className="flex items-center">
@@ -55,7 +55,7 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-8">
             {navLinks.map((l) => (
               <Link
                 key={l.href}
@@ -73,7 +73,7 @@ export default function Navbar() {
           </div>
 
           {/* Right side */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-4">
             {user ? (
               <>
                 <Link href="/alerts" className="relative p-2 text-gray-400 hover:text-white transition-colors">

@@ -26,7 +26,7 @@ function ageStatus(age: number | null): "active" | "delayed" | "stale" {
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
   if (status === "active") return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/10 border border-green-500/20 text-green-400">
+    <span className="data-live inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/10 border border-green-500/20 text-green-400">
       <CheckCircle2 className="w-3 h-3" />Active
     </span>
   );
@@ -73,7 +73,7 @@ export default function DataSources({ sources, computedAt }: Props) {
 
   return (
     <div className={cn(
-      "card-glass p-6 border",
+      "panel-scan card-glass p-6 border",
       anyIssue ? "border-amber-500/20" : "border-white/5"
     )}>
       <div className="flex items-start justify-between mb-4">
@@ -107,12 +107,12 @@ export default function DataSources({ sources, computedAt }: Props) {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-gray-300 truncate">{meta.label}</p>
-                  <p className="text-xs text-gray-600">{meta.detail}</p>
+                  <p className="text-xs text-gray-500">{meta.detail}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                   <StatusBadge status={displayStatus} />
                   {src.age_minutes !== null && (
-                    <span className="text-xs text-gray-600 font-mono">{formatAge(src.age_minutes)}</span>
+                    <span className="text-xs text-gray-500 font-mono">{formatAge(src.age_minutes)}</span>
                   )}
                 </div>
               </div>
@@ -134,7 +134,7 @@ export default function DataSources({ sources, computedAt }: Props) {
                     </p>
                   )}
                   {src.verification_reason && (
-                    <p className="text-xs text-gray-600 italic">{src.verification_reason}</p>
+                    <p className="text-xs text-gray-500 italic">{src.verification_reason}</p>
                   )}
                 </div>
               )}
@@ -149,7 +149,7 @@ export default function DataSources({ sources, computedAt }: Props) {
         </div>
       )}
 
-      <p className="mt-3 text-xs text-gray-700 leading-relaxed">
+      <p className="mt-3 text-xs text-gray-500 leading-relaxed">
         Data source health affects signal confidence. Unavailable sources reduce confidence by 15%.
       </p>
     </div>

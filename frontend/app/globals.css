@@ -164,3 +164,78 @@ body::after {
 .chart-glow-stable { animation: chart-breathe-stable 5s ease-in-out infinite; }
 .chart-glow-active { animation: chart-breathe-active 2.5s ease-in-out infinite; }
 .chart-glow-high   { animation: chart-breathe-high   1.8s ease-in-out infinite; }
+
+/* ── Task 2 — Risk badge radial halo ──────────────────────────────────── */
+.risk-halo-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.risk-halo-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+.risk-halo-low::before {
+  background: radial-gradient(circle, rgba(34,197,94,0.16) 0%, transparent 65%);
+}
+.risk-halo-medium::before {
+  background: radial-gradient(circle, rgba(245,158,11,0.14) 0%, transparent 65%);
+}
+.risk-halo-high::before {
+  background: radial-gradient(circle, rgba(239,68,68,0.18) 0%, transparent 65%);
+}
+.risk-halo-wrap > * { position: relative; z-index: 1; }
+
+/* ── Task 3 — ERCOT chart live shimmer ────────────────────────────────── */
+@keyframes chart-shimmer {
+  0%   { left: -60%; }
+  100% { left: 160%; }
+}
+.chart-live {
+  position: relative;
+  overflow: hidden;
+}
+.chart-live::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; width: 40%;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(249,115,22,0.038) 50%, transparent 100%);
+  animation: chart-shimmer 10s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: 8px;
+}
+
+/* ── Task 5 — Panel periodic intelligence scan ────────────────────────── */
+@keyframes panel-scan-sweep {
+  0%, 80%  { transform: translateX(-120%); opacity: 0; }
+  82%      { opacity: 1; }
+  94%      { opacity: 1; }
+  100%     { transform: translateX(220%); opacity: 0; }
+}
+.panel-scan {
+  position: relative;
+  overflow: hidden;
+}
+.panel-scan::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; width: 50%;
+  background: linear-gradient(90deg,
+    transparent, rgba(99,179,237,0.030), transparent);
+  animation: panel-scan-sweep 18s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Task 5 — Data source live status pulse ───────────────────────────── */
+@keyframes data-live-pulse {
+  0%, 88% { opacity: 1; }
+  93%     { opacity: 0.6; }
+  100%    { opacity: 1; }
+}
+.data-live { animation: data-live-pulse 8s ease-in-out infinite; }

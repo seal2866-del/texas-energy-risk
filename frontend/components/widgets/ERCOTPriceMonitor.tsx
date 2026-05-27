@@ -198,7 +198,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
       )}
 
       {/* Chart */}
-      <div className={`flex-1 min-h-[96px] rounded-lg ${!loading && cacheSize > 0 ? chartGlowClass : ""}`}>
+      <div className={`flex-1 min-h-[96px] rounded-lg chart-live ${!loading && cacheSize > 0 ? chartGlowClass : ""}`}>
         {loading ? (
           <div className="h-full bg-white/5 rounded animate-pulse" />
         ) : (
