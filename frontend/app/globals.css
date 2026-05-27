@@ -282,3 +282,14 @@ body::after {
   animation: breathe-green 3s ease-in-out infinite;
   flex-shrink: 0;
 }
+
+/* ── ERCOT chart live-edge tick pulse ─────────────────────────────────── */
+@keyframes live-tick {
+  0%, 90%, 100% { opacity: 0; transform: scaleY(0.6); }
+  45%            { opacity: 1; transform: scaleY(1); }
+}
+.chart-live-high::after {
+  animation: chart-shimmer 5s ease-in-out infinite;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(239,68,68,0.06) 50%, transparent 100%);
+}

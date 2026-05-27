@@ -19,6 +19,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Module-level memory for delta tracking (keyed by location)
+_PREV_SIGNALS: Dict[str, Dict[str, Any]] = {}
+
 
 # -- Thresholds ----------------------------------------------------------------
 PRICE_SPIKE_THRESHOLD_PCT = 50.0
@@ -1469,47 +1472,57 @@ def _compute_market_condition(
     market_reaction: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
-    Classify overall market condition.
-    Returns {label, description} where label is one of:
-    Stable | Tightening | Volatile | Elevated Risk
+    7-state market condition classifier.
+    States: Stable | Watch | Tightening | Elevated | Volatile | Stress Building | Critical
     """
     demand_level = demand_pressure.get("level", "low")
     supply_level = supply_pressure.get("level", "low")
     market_level = market_reaction.get("level", "low")
 
-    if risk_score == "high":
+    high_count = sum(1 for l in [demand_level, supply_level, market_level] if l == "high")
+    med_count  = sum(1 for l in [demand_level, supply_level, market_level] if l in ("medium", "high"))
+
+    # Critical: all 3 drivers high, or high risk + increasing direction + 2+ high
+    if high_count >= 3 or (risk_score == "high" and risk_direction == "increasing" and high_count >= 2):
+        return {
+            "label":       "Critical",
+            "description": "All risk drivers are simultaneously elevated and escalating. Conditions reflect severe near-term market stress.",
+        }
+    # Stress Building: 2+ high drivers and risk is increasing
+    if high_count >= 2 and risk_direction == "increasing":
+        return {
+            "label":       "Stress Building",
+            "description": "Multiple high-severity drivers are reinforcing each other with an increasing risk direction. Near-term conditions are tightening significantly.",
+        }
+    # Elevated Risk: high risk score or 2+ medium+ drivers
+    if risk_score == "high" or (med_count >= 2 and high_count >= 1):
         return {
             "label":       "Elevated Risk",
-            "description": (
-                "Multiple risk drivers are simultaneously elevated. "
-                "Market conditions reflect converging demand, supply, and pricing pressures."
-            ),
+            "description": "Multiple risk drivers are elevated. Market conditions reflect converging demand, supply, and pricing pressures.",
         }
-    elif market_level in ("medium", "high"):
+    # Volatile: market reaction elevated (ERCOT price moving)
+    if market_level in ("medium", "high"):
         return {
             "label":       "Volatile",
-            "description": (
-                "ERCOT pricing is showing volatility signals. "
-                "Market reaction to current conditions is elevated above normal."
-            ),
+            "description": "ERCOT pricing is showing volatility signals above normal operating range. Market reaction is elevated.",
         }
-    elif demand_level in ("medium", "high") or supply_level in ("medium", "high"):
-        direction_note = " and trending higher" if risk_direction == "increasing" else ""
+    # Tightening: demand or supply elevated + increasing direction
+    if (demand_level in ("medium", "high") or supply_level in ("medium", "high")) and risk_direction == "increasing":
         return {
             "label":       "Tightening",
-            "description": (
-                f"Supply or demand conditions are tightening{direction_note}. "
-                "Market balance is under moderate stress."
-            ),
+            "description": "Supply or demand conditions are tightening with an increasing risk direction. Market balance is under moderate pressure.",
         }
-    else:
+    # Watch: any single medium driver
+    if med_count >= 1:
         return {
-            "label":       "Stable",
-            "description": (
-                "All monitored market drivers are within normal ranges. "
-                "No significant supply, demand, or pricing stress detected."
-            ),
+            "label":       "Watch",
+            "description": "One or more risk drivers are at moderate levels. Conditions are manageable but warrant monitoring.",
         }
+    # Stable: all low
+    return {
+        "label":       "Stable",
+        "description": "All monitored market drivers are within normal ranges. No significant supply, demand, or pricing stress detected.",
+    }
 
 
 def _compute_alert_severity(
@@ -1554,6 +1567,134 @@ def _compute_alert_severity(
             "label":       "Informational",
             "description": "No active risk signals. Conditions are within normal ranges.",
         }
+
+
+
+# ------------------------------------------------------------------------------
+# Signal Alignment Score
+# ------------------------------------------------------------------------------
+
+def _compute_signal_alignment(all_sigs: List[Dict]) -> Dict[str, Any]:
+    """Measure how many risk drivers are reinforcing each other."""
+    triggered = [s for s in all_sigs if s.get("triggered")]
+    count     = len(triggered)
+    types     = [s.get("signal_type", "").replace("_", " ") for s in triggered]
+
+    if count == 0:
+        return {"label": "None",     "score": 0, "description": "No active risk drivers."}
+    if count == 1:
+        return {"label": "Weak",     "score": 1, "description": f"{types[0].capitalize()} is the sole active driver."}
+    if count == 2:
+        return {"label": "Moderate", "score": 2, "description": f"{types[0].capitalize()} and {types[1]} are reinforcing — monitoring recommended."}
+    return     {"label": "Strong",   "score": 3, "description": "All three risk drivers are simultaneously active — elevated near-term uncertainty."}
+
+
+# ------------------------------------------------------------------------------
+# Driver Trend Directions
+# ------------------------------------------------------------------------------
+
+def _compute_driver_trends(
+    prices:      List[Dict],
+    gas_records: List[Dict],
+    demand_pressure: Dict[str, Any],
+    supply_pressure: Dict[str, Any],
+    market_reaction: Dict[str, Any],
+) -> Dict[str, str]:
+    """Returns trend direction per driver: rising | stable | falling"""
+    trends: Dict[str, str] = {}
+
+    # ERCOT price trend
+    if len(prices) >= 3:
+        vals = [float(p.get("price_mwh", 0)) for p in prices[-3:] if float(p.get("price_mwh", 0)) > 1]
+        if len(vals) >= 2:
+            pct = ((vals[-1] - vals[0]) / max(vals[0], 1)) * 100
+            trends["price_volatility"] = "rising" if pct > 8 else "falling" if pct < -8 else "stable"
+        else:
+            trends["price_volatility"] = "stable"
+    else:
+        trends["price_volatility"] = "stable"
+
+    # Weather demand trend — based on current pressure level
+    demand_level = demand_pressure.get("level", "low")
+    trends["weather_demand"] = "rising" if demand_level == "high" else "stable" if demand_level == "low" else "rising"
+
+    # Gas supply trend — based on Henry Hub movement
+    if len(gas_records) >= 2:
+        lp = gas_records[-1].get("henry_hub_price") or 0
+        pp = gas_records[-2].get("henry_hub_price") or 0
+        if pp > 0:
+            pct = ((lp - pp) / pp) * 100
+            trends["gas_supply"] = "rising" if pct > 5 else "falling" if pct < -5 else "stable"
+        else:
+            trends["gas_supply"] = "stable"
+    else:
+        supply_level = supply_pressure.get("level", "low")
+        trends["gas_supply"] = "rising" if supply_level == "high" else "stable"
+
+    return trends
+
+
+# ------------------------------------------------------------------------------
+# What Changed Engine
+# ------------------------------------------------------------------------------
+
+def _compute_what_changed(
+    risk_score:      str,
+    demand_pressure: Dict[str, Any],
+    supply_pressure: Dict[str, Any],
+    market_reaction: Dict[str, Any],
+    prices:          List[Dict],
+    location:        str = "Houston",
+) -> List[Dict[str, str]]:
+    """Compare current state to previous interval. Returns change list."""
+    global _PREV_SIGNALS
+    prev    = _PREV_SIGNALS.get(location, {})
+    changes: List[Dict[str, str]] = []
+    rank    = {"low": 0, "medium": 1, "high": 2}
+
+    # Risk score change
+    prev_risk   = prev.get("risk_score")
+    if prev_risk and prev_risk != risk_score:
+        direction = "escalated" if rank.get(risk_score, 0) > rank.get(prev_risk, 0) else "improved"
+        changes.append({"driver": "Risk Score", "change": f"{prev_risk.capitalize()} → {risk_score.capitalize()}", "direction": direction})
+
+    # Demand change
+    curr_demand = demand_pressure.get("level", "low")
+    prev_demand = prev.get("demand_level")
+    if prev_demand and prev_demand != curr_demand:
+        direction = "rising" if rank.get(curr_demand, 0) > rank.get(prev_demand, 0) else "easing"
+        changes.append({"driver": "Demand Pressure", "change": curr_demand.capitalize(), "direction": direction})
+
+    # Supply change
+    curr_supply = supply_pressure.get("level", "low")
+    prev_supply = prev.get("supply_level")
+    if prev_supply and prev_supply != curr_supply:
+        direction = "rising" if rank.get(curr_supply, 0) > rank.get(prev_supply, 0) else "easing"
+        changes.append({"driver": "Supply Pressure", "change": curr_supply.capitalize(), "direction": direction})
+
+    # ERCOT price change
+    if len(prices) >= 2:
+        curr_price = float(prices[-1].get("price_mwh", 0))
+        prev_price = float(prices[-2].get("price_mwh", 0))
+        if prev_price > 1:
+            pct = ((curr_price - prev_price) / prev_price) * 100
+            if abs(pct) >= 5:
+                sign      = "+" if pct > 0 else ""
+                direction = "rising" if pct > 0 else "easing"
+                changes.append({"driver": "ERCOT Price", "change": f"${curr_price:.0f}/MWh ({sign}{pct:.0f}%)", "direction": direction})
+
+    # Stable fallback
+    if not changes:
+        changes.append({"driver": "All Drivers", "change": "No material changes since previous interval", "direction": "stable"})
+
+    # Store current state
+    _PREV_SIGNALS[location] = {
+        "risk_score":   risk_score,
+        "demand_level": curr_demand,
+        "supply_level": curr_supply,
+        "market_level": market_reaction.get("level", "low"),
+    }
+    return changes
 
 
 # ------------------------------------------------------------------------------
@@ -1676,6 +1817,18 @@ def run_all_signals(
                 "severity": sig.get("severity", "low"),
             })
 
+        # ── Signal alignment + driver trends + what changed ──────────────────
+        signal_alignment = _compute_signal_alignment(all_sigs)
+        driver_trends    = _compute_driver_trends(prices, gas_records, demand_pressure, supply_pressure, market_reaction)
+
+        # Enrich signal_drivers with trend direction
+        for sd in signal_drivers:
+            sd["trend"] = driver_trends.get(sd["type"], "stable")
+
+        what_changed = _compute_what_changed(
+            risk_score, demand_pressure, supply_pressure, market_reaction, prices
+        )
+
         # ── Risk headline ─────────────────────────────────────────────────────
         risk_headline = risk_narrative["headline"]
 
@@ -1709,6 +1862,8 @@ def run_all_signals(
             "cost_impact":            cost_impact,
             "market_condition":       market_condition,
             "alert_severity":         alert_severity,
+            "signal_alignment":       signal_alignment,
+            "what_changed":           what_changed,
             "signals": {
                 "price_volatility": price_sig,
                 "weather_demand":   weather_sig,

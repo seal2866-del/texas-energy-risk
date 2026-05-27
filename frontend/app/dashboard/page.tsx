@@ -15,6 +15,7 @@ import DataSources from "@/components/widgets/DataSources";
 import RecentAlerts from "@/components/widgets/RecentAlerts";
 import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
 import MarketInterpretation from "@/components/widgets/MarketInterpretation";
+import WhatChanged from "@/components/widgets/WhatChanged";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
@@ -70,6 +71,8 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
     weather_demand:   EMPTY_SIGNAL,
     gas_supply:       EMPTY_SIGNAL,
   },
+  signal_alignment: { label: "None", score: 0, description: "" },
+  what_changed:     [],
   summary:    "",
   disclaimer: "",
 };
@@ -317,6 +320,7 @@ export default function DashboardPage() {
                 timeHorizons={signals.time_horizons}
                 marketCondition={signals.market_condition}
                 alertSeverity={signals.alert_severity}
+                signalAlignment={signals.signal_alignment}
                 panelGlow={riskGlow}
               />
 
@@ -349,11 +353,16 @@ export default function DashboardPage() {
 
               <MarketInterpretation signals={signals} prices={prices} />
 
+              {signals.what_changed && signals.what_changed.length > 0 && (
+                <WhatChanged items={signals.what_changed} />
+              )}
+
               <AIMarketReasoning
                 reasoning={aiReasoning}
                 loading={aiLoading}
                 error={aiError}
                 computedAt={signals.computed_at}
+                confidence={signals.confidence}
               />
 
               <AISummary

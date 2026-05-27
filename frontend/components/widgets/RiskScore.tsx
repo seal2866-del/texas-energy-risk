@@ -1,6 +1,6 @@
 "use client";
 import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap, Info, AlertTriangle } from "lucide-react";
-import type { RiskScore as RiskScoreType, TimeHorizons, SignalDriver, MarketCondition, AlertSeverityInfo } from "@/lib/api";
+import type { RiskScore as RiskScoreType, TimeHorizons, SignalDriver, MarketCondition, AlertSeverityInfo, SignalAlignment } from "@/lib/api";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
 interface Props {
@@ -23,8 +23,16 @@ interface Props {
   timeHorizons?:           TimeHorizons;
   marketCondition?:        MarketCondition;
   alertSeverity?:          AlertSeverityInfo;
+  signalAlignment?:        SignalAlignment;
   panelGlow?:            string;
 }
+
+const ALIGN_CLS: Record<string, string> = {
+  "None":     "text-gray-500  bg-white/5       border-white/10",
+  "Weak":     "text-gray-400  bg-white/5       border-white/12",
+  "Moderate": "text-amber-400 bg-amber-500/10  border-amber-500/25",
+  "Strong":   "text-red-400   bg-red-500/10    border-red-500/25",
+};
 
 const MARKET_CLS: Record<string, string> = {
   "Stable":        "text-green-400  bg-green-500/10  border-green-500/25",
@@ -57,7 +65,7 @@ function dataStatusLabel(status: string): string {
   }
   if (status.startsWith("stale_")) return "Data feed interrupted -- waiting for fresh reading";
   if (status === "no_data")        return "No price data received yet";
-  return "Live data unavailable";
+  return "Monitoring feed pending confirmation";
 }
 
 function DirectionBadge({ direction, context }: { direction: "increasing" | "stable" | "decreasing"; context?: string }) {
@@ -81,7 +89,7 @@ export default function RiskScore({
   confidence, confidenceNote, explanation, impact,
   primaryDriver, riskDirection, riskDirectionContext, signalDrivers,
   secondaryFactors, dataValid, dataStatus, riskHeadline, timeHorizons,
-  marketCondition, alertSeverity, panelGlow,
+  marketCondition, alertSeverity, signalAlignment, panelGlow,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
 
@@ -98,7 +106,7 @@ export default function RiskScore({
           </div>
           <div>
             <p className="text-lg font-black text-gray-400 tracking-tight">MONITORING PAUSED</p>
-            <p className="text-xs text-gray-600 mt-0.5">Live data unavailable</p>
+            <p className="text-xs text-gray-600 mt-0.5">Data feed pending confirmation</p>
           </div>
         </div>
         <div className="mt-4 px-3 py-2.5 rounded-lg bg-white/5 border border-white/8 text-xs text-gray-500 leading-relaxed">
@@ -237,6 +245,20 @@ export default function RiskScore({
             {alertSeverity.label}
           </span>
           <span className="text-xs text-gray-600">{alertSeverity.description}</span>
+        </div>
+      )}
+
+      {/* Signal Alignment */}
+      {signalAlignment && signalAlignment.label !== "None" && (
+        <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Signal Alignment</span>
+          <span className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border",
+            ALIGN_CLS[signalAlignment.label] ?? "text-gray-400 bg-white/5 border-white/10",
+          )}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            {signalAlignment.label} Alignment
+          </span>
         </div>
       )}
 

@@ -68,43 +68,21 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
     ercot_price      = inputs.get("ercot_price", 0)
     data_health      = inputs.get("data_source_health", "active")
 
-    # -- Executive summary
+    # -- Executive summary (concise Bloomberg-style)
     if risk == "high":
-        exec_summary = (
-            f"Texas energy market conditions are elevated. {primary_driver} is the primary risk "
-            f"factor, with a {risk_direction} risk direction. Conditions warrant active monitoring."
-        )
+        exec_summary = f"Texas energy risk is elevated. {primary_driver} is the primary driver with a {risk_direction} outlook."
     elif risk == "medium":
-        exec_summary = (
-            f"Texas energy conditions are moderately elevated. {primary_driver} is building "
-            f"near-term pressure with a {risk_direction} outlook."
-        )
+        exec_summary = f"Texas conditions are moderately tightening. {primary_driver} is building near-term pressure."
     else:
-        exec_summary = (
-            "Texas energy conditions remain stable. No significant risk escalation signals "
-            "are currently active across ERCOT pricing, weather demand, or gas supply."
-        )
+        exec_summary = "Texas energy conditions remain stable. No escalation signals are currently active."
 
     # -- Current market interpretation
     if risk == "high":
-        interpretation = (
-            f"Current ERCOT market conditions reflect elevated stress. Real-time pricing of "
-            f"${ercot_price:.0f}/MWh, combined with {primary_driver.lower()}, suggests the "
-            f"Texas grid is operating under {market_state.lower()} conditions. "
-            f"Near-term pricing sensitivity is heightened."
-        )
+        interpretation = f"ERCOT pricing at ${ercot_price:.0f}/MWh reflects elevated stress. {primary_driver} is driving {market_state.lower()} conditions. Pricing sensitivity is heightened."
     elif risk == "medium":
-        interpretation = (
-            f"Market conditions are tightening modestly. ERCOT pricing at ${ercot_price:.0f}/MWh "
-            f"reflects {market_state.lower()} conditions, with {primary_driver.lower()} as the "
-            f"leading pressure factor. Conditions may shift if demand or supply dynamics change."
-        )
+        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh reflects {market_state.lower()} conditions. {primary_driver} is the leading pressure factor — conditions may shift if demand or supply dynamics change."
     else:
-        interpretation = (
-            f"ERCOT pricing at ${ercot_price:.0f}/MWh is within normal operating range. "
-            f"Weather-driven demand is manageable, and natural gas conditions are not creating "
-            f"significant generation cost pressure. Market state indicates {market_state.lower()} conditions."
-        )
+        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is within normal range. Weather demand is manageable and gas conditions are not creating generation cost pressure."
 
     # -- Driver analysis (synthesized)
     if weather_pressure == "high" and gas_pressure in ("medium", "high"):
@@ -148,23 +126,11 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
 
     # -- Escalation watch
     if risk == "high":
-        escalation = (
-            f"Conditions may escalate further if {primary_driver.lower()} intensifies or "
-            f"additional demand pressure emerges. Monitor ERCOT real-time pricing and "
-            f"weather forecast updates closely over the next 24-48 hours."
-        )
+        escalation = f"Monitor ERCOT real-time pricing and weather forecasts closely. Conditions may escalate if {primary_driver.lower()} intensifies."
     elif risk == "medium":
-        escalation = (
-            f"If weather demand or gas supply conditions worsen, near-term escalation risk "
-            f"may increase. Current signals suggest monitoring is warranted, with particular "
-            f"attention to {primary_driver.lower()} trends."
-        )
+        escalation = f"Near-term escalation risk may increase if {primary_driver.lower()} worsens. Continued monitoring is warranted."
     else:
-        escalation = (
-            "No active escalation signals detected. Routine monitoring of upcoming weather "
-            "forecasts, ERCOT pricing trends, and EIA gas storage reports is sufficient "
-            "under current stable conditions."
-        )
+        escalation = "No escalation signals active. Routine monitoring of ERCOT pricing and weather forecasts is sufficient."
 
     # -- Confidence note
     if not data_valid or data_health in ("stale", "unavailable", "degraded"):
@@ -192,17 +158,25 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
     # -- Monitoring focus
     monitoring_items = []
     if weather_pressure in ("medium", "high"):
-        monitoring_items.append("ERCOT real-time pricing and weather forecast updates")
+        monitoring_items.append("ERCOT pricing and weather forecasts")
     if gas_pressure in ("medium", "high"):
-        monitoring_items.append("Henry Hub price movements and EIA storage report")
+        monitoring_items.append("Henry Hub and EIA storage")
     if ercot_volatility in ("medium", "high"):
-        monitoring_items.append("ERCOT settlement prices and grid congestion indicators")
+        monitoring_items.append("ERCOT settlement prices")
     if not monitoring_items:
-        monitoring_items = ["routine ERCOT price trends and weekly EIA gas storage reports"]
-    monitoring = (
-        f"Monitor {', '.join(monitoring_items)}. "
-        f"Risk direction is {risk_direction}."
-    )
+        monitoring_items = ["ERCOT price trends and EIA gas storage"]
+    monitoring = f"Monitor {', '.join(monitoring_items)}. Risk direction: {risk_direction}."
+
+    # Historical context (generalized seasonal pattern language)
+    season_note = ""
+    if weather_pressure in ("medium", "high"):
+        season_note = "Current conditions reflect elevated summer demand patterns typical of Texas peak heat periods."
+    elif gas_pressure in ("medium", "high"):
+        season_note = "Current supply conditions resemble prior tightening periods during seasonal storage draws."
+    elif risk == "high":
+        season_note = "Conditions resemble prior elevated market stress periods with multiple active drivers."
+    else:
+        season_note = "Current conditions are within normal seasonal operating parameters."
 
     return {
         "executive_summary":             exec_summary,
@@ -211,6 +185,7 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
         "escalation_watch":              escalation,
         "confidence_note":               conf_note,
         "recommended_monitoring_focus":  monitoring,
+        "historical_context":            season_note,
         "generated_at":                  datetime.now(timezone.utc).isoformat(),
         "model":                         "rule-based-fallback",
         "disclaimer":                    DISCLAIMER,
@@ -260,14 +235,15 @@ Market data:
 - Data source health: {inputs.get("data_source_health", "active")}
 - Time horizon: {inputs.get("time_horizon", "next 24-48 hours")}
 
-Return this JSON structure exactly:
+Return this JSON structure exactly. Be concise — Bloomberg terminal style, not research paper. Each field is 1-2 short sentences maximum:
 {{
-  "executive_summary": "1-2 sentence professional overview of current Texas energy market conditions",
-  "current_market_interpretation": "2-3 sentences synthesizing ERCOT price, weather, and gas conditions together",
-  "key_driver_analysis": "2-3 sentences explaining the relationship between the dominant drivers and how they interact",
-  "escalation_watch": "1-2 sentences on what conditions could shift and what specific factors to monitor",
-  "confidence_note": "1 sentence on data quality and confidence level",
-  "recommended_monitoring_focus": "1-2 sentences naming specific metrics or data points to track"
+  "executive_summary": "1-2 sentences. Direct statement of current Texas energy market status.",
+  "current_market_interpretation": "2 sentences max. Synthesize ERCOT price vs weather vs gas. Use contrast if price is stable but demand elevated.",
+  "key_driver_analysis": "2 sentences. Name the driver relationship. E.g.: weather → demand → ERCOT price → gas cost sensitivity.",
+  "escalation_watch": "1 sentence. What specific condition could cause escalation. Be direct.",
+  "confidence_note": "1 sentence. Data quality status only.",
+  "recommended_monitoring_focus": "1 sentence. Name 1-2 specific metrics.",
+  "historical_context": "1 sentence. Generalized seasonal pattern similarity only. No fabricated events or dates."
 }}"""
 
 
@@ -311,6 +287,8 @@ async def generate_ai_reasoning(inputs: Dict[str, Any]) -> Dict[str, Any]:
             result["disclaimer"]   = DISCLAIMER
             result["ai_powered"]   = True
             result["from_cache"]   = False
+            if "historical_context" not in result:
+                result["historical_context"] = ""
             _set_cache(key, result)
             logger.info("[AI_REASONING] Generated via Claude, cached %d min", CACHE_TTL_MINUTES)
             return result

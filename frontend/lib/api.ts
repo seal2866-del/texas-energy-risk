@@ -68,6 +68,19 @@ export interface SignalDriver {
   type:     string;
   active:   boolean;
   severity: RiskScore;
+  trend?:   "rising" | "stable" | "falling";
+}
+
+export interface SignalAlignment {
+  label:       string;   // None | Weak | Moderate | Strong
+  score:       number;
+  description: string;
+}
+
+export interface WhatChangedItem {
+  driver:    string;
+  change:    string;
+  direction: "rising" | "easing" | "stable" | "escalated" | "improved";
 }
 
 export interface DriverLevel {
@@ -151,6 +164,8 @@ export interface SignalsResponse {
     weather_demand:   Signal;
     gas_supply:       Signal;
   };
+  signal_alignment?: SignalAlignment;
+  what_changed?:     WhatChangedItem[];
   summary:    string;
   disclaimer: string;
 }
@@ -252,6 +267,7 @@ export interface AIReasoningResponse {
   escalation_watch:              string;
   confidence_note:               string;
   recommended_monitoring_focus:  string;
+  historical_context?:           string;
   generated_at:                  string;
   model:                         string;
   disclaimer:                    string;

@@ -1,6 +1,7 @@
 "use client";
-import { BarChart3, Thermometer, Flame, TrendingUp, Zap, AlertTriangle } from "lucide-react";
-import type { SignalsResponse, RiskScore } from "@/lib/api";
+import { BarChart3, Thermometer, Flame, TrendingUp, Zap, AlertTriangle,
+         ArrowUp, ArrowRight, ArrowDown } from "lucide-react";
+import type { SignalsResponse, RiskScore, SignalDriver } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -15,18 +16,28 @@ function levelCls(level: RiskScore): string {
     : "text-green-400 bg-green-500/10 border-green-500/25";
 }
 
+function TrendIcon({ trend }: { trend?: "rising" | "stable" | "falling" }) {
+  if (trend === "rising")
+    return <ArrowUp className="w-3 h-3 text-red-400 flex-shrink-0" />;
+  if (trend === "falling")
+    return <ArrowDown className="w-3 h-3 text-green-400 flex-shrink-0" />;
+  return <ArrowRight className="w-3 h-3 text-gray-500 flex-shrink-0" />;
+}
+
 function DriverRow({
   label,
   icon: Icon,
   iconColor,
   level,
   explanation,
+  trend,
 }: {
-  label:       string;
-  icon:        React.ElementType;
-  iconColor:   string;
-  level:       RiskScore;
-  explanation: string;
+  label:        string;
+  icon:         React.ElementType;
+  iconColor:    string;
+  level:        RiskScore;
+  explanation:  string;
+  trend?:       "rising" | "stable" | "falling";
 }) {
   return (
     <div className="pb-4 border-b border-white/5 last:border-0 last:pb-0">
@@ -37,14 +48,17 @@ function DriverRow({
             {label}
           </span>
         </div>
-        <span
-          className={cn(
-            "px-2.5 py-0.5 rounded-full text-xs font-black border uppercase tracking-wide",
-            levelCls(level),
-          )}
-        >
-          {level}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <TrendIcon trend={trend} />
+          <span
+            className={cn(
+              "px-2.5 py-0.5 rounded-full text-xs font-black border uppercase tracking-wide",
+              levelCls(level),
+            )}
+          >
+            {level}
+          </span>
+        </div>
       </div>
       <p className="text-xs text-gray-400 leading-relaxed pl-6">{explanation}</p>
     </div>
@@ -58,9 +72,16 @@ export default function EnergyRiskDrivers({ signals }: Props) {
     market_reaction,
     gas_to_power_impact,
     events,
+    signal_drivers,
   } = signals;
 
   if (!demand_pressure && !supply_pressure && !market_reaction) return null;
+
+  // Build a quick lookup: driver type → trend
+  const trendByType: Record<string, "rising" | "stable" | "falling"> = {};
+  (signal_drivers ?? []).forEach((sd: SignalDriver) => {
+    if (sd.trend) trendByType[sd.type] = sd.trend;
+  });
 
   // Filter events - exclude data_source_degraded (DataSources widget covers it)
   const visibleEvents = (events ?? []).filter(
@@ -91,6 +112,7 @@ export default function EnergyRiskDrivers({ signals }: Props) {
             iconColor="text-amber-400"
             level={demand_pressure.level}
             explanation={demand_pressure.explanation}
+            trend={trendByType["weather_demand"]}
           />
         )}
         {supply_pressure && (
@@ -100,6 +122,7 @@ export default function EnergyRiskDrivers({ signals }: Props) {
             iconColor="text-orange-400"
             level={supply_pressure.level}
             explanation={supply_pressure.explanation}
+            trend={trendByType["gas_supply"]}
           />
         )}
         {market_reaction && (
@@ -109,6 +132,7 @@ export default function EnergyRiskDrivers({ signals }: Props) {
             iconColor="text-blue-400"
             level={market_reaction.level}
             explanation={market_reaction.explanation}
+            trend={trendByType["price_volatility"]}
           />
         )}
       </div>

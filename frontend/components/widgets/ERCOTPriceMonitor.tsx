@@ -214,12 +214,14 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
             <AreaChart data={displayChartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#f97316" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                  <stop offset="0%"   stopColor="#f97316" stopOpacity={0.55} />
+                  <stop offset="40%"  stopColor="#f97316" stopOpacity={0.22} />
+                  <stop offset="100%" stopColor="#f97316" stopOpacity={0.02} />
                 </linearGradient>
                 <linearGradient id="priceGradHigh" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#ef4444" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                  <stop offset="0%"   stopColor="#ef4444" stopOpacity={0.60} />
+                  <stop offset="40%"  stopColor="#ef4444" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#6b7280" }} interval="preserveStartEnd" axisLine={false} tickLine={false} />
@@ -231,7 +233,7 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
               {current >= PRICE_HIGH_WARNING * 0.6 && (
                 <ReferenceLine y={PRICE_HIGH_WARNING} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
               )}
-              <Area type="monotone" dataKey="visualPrice" stroke={strokeColor} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} />
+              <Area type="monotone" dataKey="visualPrice" stroke={strokeColor} strokeWidth={2.5} fill={`url(#${gradientId})`} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         )}

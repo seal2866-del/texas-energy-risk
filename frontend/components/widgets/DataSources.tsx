@@ -66,7 +66,7 @@ function StatusBadge({ status }: { status: DisplayStatus }) {
   );
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-400">
-      <XCircle className="w-3 h-3" />Unavailable
+      <XCircle className="w-3 h-3" />Offline
     </span>
   );
 }
@@ -220,7 +220,7 @@ export default function DataSources({ sources, computedAt }: Props) {
       )}
 
       <p className="mt-3 text-xs text-gray-500 leading-relaxed">
-        Data reliability affects signal confidence. Unavailable sources reduce confidence by 15%.
+        Data reliability affects signal confidence. Offline sources reduce confidence by 15%.
       </p>
     </div>
   );
