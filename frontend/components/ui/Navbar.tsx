@@ -49,7 +49,7 @@ export default function Navbar() {
               alt="TX Energy Risk"
               width={500}
               height={280}
-              className="h-20 w-auto object-contain"
+              className="h-24 w-auto object-contain"
               priority
             />
           </Link>
