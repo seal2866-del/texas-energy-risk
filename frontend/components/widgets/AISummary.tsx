@@ -40,6 +40,12 @@ const ESC_CLS: Record<string, string> = {
   "Elevated":     "text-red-400   bg-red-500/8     border-red-500/20",
 };
 
+const SENS_CLS: Record<string, string> = {
+  "Low Sensitivity":      "text-gray-500  bg-white/4       border-white/8",
+  "Moderate Sensitivity": "text-blue-400  bg-blue-500/8    border-blue-500/20",
+  "Elevated Sensitivity": "text-orange-400 bg-orange-500/8 border-orange-500/20",
+};
+
 const HORIZON_LABEL: Record<string, string> = {
   short_term: "0–6h",
   near_term:  "6–24h",
@@ -60,6 +66,8 @@ export default function AISummary({ signals, computedAt }: Props) {
     primary_driver,
     secondary_factors,
     escalation_probability,
+    market_sensitivity,
+    potential_escalation_drivers,
   } = signals;
 
   const time = new Date(computedAt).toLocaleTimeString("en-US", {
@@ -70,7 +78,8 @@ export default function AISummary({ signals, computedAt }: Props) {
   const mcCls  = MARKET_CLS[market_condition?.label ?? "Unavailable"] ?? MARKET_CLS["Unavailable"];
   const sevCls = SEVERITY_CLS[alert_severity?.level ?? "informational"] ?? SEVERITY_CLS.informational;
   const ccCls  = COST_CLS[cost_impact?.level ?? "low"];
-  const escCls = ESC_CLS[escalation_probability?.level ?? "Low"] ?? ESC_CLS["Low"];
+  const escCls  = ESC_CLS[escalation_probability?.level ?? "Low"] ?? ESC_CLS["Low"];
+  const sensCls = SENS_CLS[market_sensitivity?.level ?? "Low Sensitivity"] ?? SENS_CLS["Low Sensitivity"];
 
   return (
     <div className="panel-scan card-glass border border-white/5 p-5 sm:p-6 lg:col-span-2">
@@ -104,6 +113,12 @@ export default function AISummary({ signals, computedAt }: Props) {
           <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border", escCls)}>
             <TrendingUp className="w-3 h-3" />
             {escalation_probability.level} Escalation Probability
+          </span>
+        )}
+        {market_sensitivity && market_sensitivity.level !== "Low Sensitivity" && (
+          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border", sensCls)}>
+            <Activity className="w-3 h-3" />
+            {market_sensitivity.level}
           </span>
         )}
         {alert_severity && alert_severity.level !== "informational" && (
@@ -210,7 +225,23 @@ export default function AISummary({ signals, computedAt }: Props) {
           </div>
         )}
 
-        {/* 6. Confidence */}
+        {/* 6. Potential Escalation Drivers */}
+        {potential_escalation_drivers && potential_escalation_drivers.length > 0 &&
+         !(potential_escalation_drivers.length === 1 && potential_escalation_drivers[0].includes("No material")) && (
+          <div className="border-t border-white/5 pt-3">
+            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Potential Escalation Drivers</p>
+            <div className="space-y-1">
+              {potential_escalation_drivers.map((d: string, i: number) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="w-1 h-1 rounded-full bg-gray-600 mt-1.5 flex-shrink-0" />
+                  <p className="text-xs text-gray-500 leading-relaxed">{d}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 7. Confidence */}
         {confidence != null && confidence_note && (
           <div className="border-t border-white/5 pt-3">
             <div className="flex items-center gap-1.5 mb-1.5">

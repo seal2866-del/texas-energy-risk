@@ -16,6 +16,7 @@ import RecentAlerts from "@/components/widgets/RecentAlerts";
 import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
 import MarketInterpretation from "@/components/widgets/MarketInterpretation";
 import WhatChanged from "@/components/widgets/WhatChanged";
+import AIExecutiveBrief from "@/components/widgets/AIExecutiveBrief";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
@@ -354,6 +355,15 @@ export default function DashboardPage() {
 
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} />
 
+              {/* ── AI Executive Brief — full width below top row ─────── */}
+              <AIExecutiveBrief
+                signals={signals}
+                reasoning={aiReasoning}
+                aiLoading={aiLoading}
+                computedAt={signals.computed_at}
+                location={location}
+              />
+
               <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
 
               <WeatherRisk
@@ -384,6 +394,7 @@ export default function DashboardPage() {
               {signals.what_changed && signals.what_changed.length > 0 && (
                 <WhatChanged items={signals.what_changed} />
               )}
+
 
               <AIMarketReasoning
                 reasoning={aiReasoning}
