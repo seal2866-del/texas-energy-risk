@@ -207,23 +207,39 @@ export default function AnalyticsPage() {
   const fetchAll = useCallback(async (loc: string) => {
     setLoading(true);
     setError(false);
-    try {
-      const [signals, history, analytics] = await Promise.all([
-        getSignals(loc),
-        getSignalHistory(loc, 168),
-        getHistoricalAnalytics(loc, riskNum),
-      ]);
-      const numeric = (signals as any).risk_score_numeric ?? (
-        signals.risk_score === "high" ? 8.5 : signals.risk_score === "medium" ? 5.0 : 2.0
+    const [sigR, histR, analyticsR] = await Promise.allSettled([
+      getSignals(loc),
+      getSignalHistory(loc, 168),
+      getHistoricalAnalytics(loc, riskNum),
+    ]);
+
+    // Signals — soft fail (just leaves riskNum at default)
+    if (sigR.status === "fulfilled") {
+      const s = sigR.value;
+      const numeric = (s as any).risk_score_numeric ?? (
+        s.risk_score === "high" ? 8.5 : s.risk_score === "medium" ? 5.0 : 2.0
       );
       setRiskNum(numeric);
-      setSnapshots(history.snapshots ?? []);
-      setData(analytics);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
     }
+
+    // Signal history — soft fail (predictive features need this)
+    if (histR.status === "fulfilled") {
+      setSnapshots(histR.value.snapshots ?? []);
+    }
+
+    // Historical analytics — soft fail (historical tab will show empty state)
+    if (analyticsR.status === "fulfilled") {
+      setData(analyticsR.value);
+    } else {
+      setData(null);
+    }
+
+    // Only show the top-level error banner if ALL three failed
+    if (sigR.status === "rejected" && histR.status === "rejected" && analyticsR.status === "rejected") {
+      setError(true);
+    }
+
+    setLoading(false);
   }, [riskNum]);
 
   useEffect(() => { if (user) fetchAll(location); }, [user, location]); // eslint-disable-line
@@ -306,7 +322,14 @@ export default function AnalyticsPage() {
               <RiskMomentumChart snapshots={snapshots} windowSize={48} />
 
               {tab === "predictive" && <PredictiveOutlook snapshots={snapshots} />}
-              {tab === "historical" && data && <HistoricalAnalyticsWidget data={data} />}
+              {tab === "historical" && (data
+                ? <HistoricalAnalyticsWidget data={data} />
+                : <div className="card-glass border border-white/5 rounded-2xl p-10 text-center">
+                    <p className="text-sm text-gray-500 mb-1">Historical analytics unavailable for this location.</p>
+                    <p className="text-xs text-gray-600">Data accumulates over time — check back after a few hours.</p>
+                    <button onClick={() => fetchAll(location)} className="mt-4 text-xs text-orange-400 hover:text-orange-300 underline">Retry</button>
+                  </div>
+              )}
               {tab === "transitions" && <TransitionsPanel snapshots={snapshots} />}
               {tab === "patterns"    && <PatternsPanel    snapshots={snapshots} />}
             </div>
