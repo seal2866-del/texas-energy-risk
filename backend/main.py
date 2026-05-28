@@ -19,7 +19,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron      import CronTrigger
 
 from routers import ercot, weather, gas, signals, alerts, stripe_webhooks, stripe_checkout, ai_reasoning, export
-from routers import digest
+from routers import digest, grid, history
 
 load_dotenv()
 
@@ -129,6 +129,8 @@ app.include_router(stripe_checkout.router)
 app.include_router(ai_reasoning.router)
 app.include_router(export.router)
 app.include_router(digest.router)
+app.include_router(grid.router)
+app.include_router(history.router)
 
 
 # ── Health check ──────────────────────────────────────────────

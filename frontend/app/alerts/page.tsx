@@ -19,6 +19,14 @@ const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const DEFAULT_PREFS = {
   email_alerts:              true,
   sms_alerts:                false,
+  sms_enabled:               false,
+  sms_phone:                 "",
+  slack_enabled:             false,
+  slack_webhook_url:         "",
+  teams_enabled:             false,
+  teams_webhook_url:         "",
+  escalation_enabled:        false,
+  escalation_minutes:        30,
   voice_enabled:             false,
   alert_frequency:           "immediate",
   risk_threshold:            "medium",
@@ -38,7 +46,10 @@ const DEFAULT_PREFS = {
   digest_email:              "",
 };
 
-const LOCATIONS   = ["Houston", "Dallas", "Austin", "San Antonio"];
+const LOCATIONS   = [
+  "Houston", "Dallas", "Austin", "San Antonio",
+  "Midland", "Odessa", "Corpus Christi", "Lubbock",
+];
 const FREQUENCIES = [
   { value: "immediate", label: "Immediate",     desc: "Alert sent as soon as risk level changes" },
   { value: "daily",     label: "Daily summary", desc: "One digest each morning at 7am CDT" },
@@ -411,7 +422,9 @@ export default function AlertsPage() {
                   <Mail className="w-4 h-4 text-gray-400" />
                   Delivery Channels
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-5">
+
+                  {/* Email */}
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-semibold text-gray-200">Email alerts</p>
@@ -419,31 +432,137 @@ export default function AlertsPage() {
                     </div>
                     <Toggle on={prefs.email_alerts} onToggle={() => set("email_alerts", !prefs.email_alerts)} />
                   </div>
-                  <div className="flex items-center justify-between gap-4 opacity-50">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-                        SMS alerts
-                        <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/15 border border-blue-500/20 text-blue-400">Coming soon</span>
-                      </p>
-                      <p className="text-xs text-gray-500">Immediate SMS for High risk events</p>
+
+                  {/* SMS */}
+                  <div className="space-y-2 border-t border-white/5 pt-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                          <Phone className="w-3.5 h-3.5 text-green-400" />
+                          SMS alerts
+                        </p>
+                        <p className="text-xs text-gray-500">Immediate text message for High risk events</p>
+                      </div>
+                      <Toggle
+                        on={prefs.sms_enabled}
+                        onToggle={() => set("sms_enabled", !prefs.sms_enabled)}
+                        disabled={!isPro}
+                      />
                     </div>
-                    <Toggle on={false} onToggle={() => {}} disabled />
+                    {prefs.sms_enabled && isPro && (
+                      <div className="mt-2">
+                        <label className="text-xs text-gray-400 font-medium block mb-1">Phone number (E.164 format)</label>
+                        <input
+                          type="tel"
+                          value={prefs.sms_phone}
+                          onChange={e => set("sms_phone", e.target.value)}
+                          placeholder="+12145550100"
+                          className="w-full max-w-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
+                        />
+                        <p className="text-xs text-gray-600 mt-1">Include country code (e.g. +1 for US).</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between gap-4 opacity-50">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-                        Voice alerts
-                        <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/15 border border-blue-500/20 text-blue-400">Coming soon</span>
-                      </p>
-                      <p className="text-xs text-gray-500">Automated phone call for High risk</p>
+
+                  {/* Slack */}
+                  <div className="space-y-2 border-t border-white/5 pt-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                          <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+                          Slack notifications
+                        </p>
+                        <p className="text-xs text-gray-500">Post alerts to a Slack channel via webhook</p>
+                      </div>
+                      <Toggle
+                        on={prefs.slack_enabled}
+                        onToggle={() => set("slack_enabled", !prefs.slack_enabled)}
+                        disabled={!isPro}
+                      />
                     </div>
-                    <Toggle on={false} onToggle={() => {}} disabled />
+                    {prefs.slack_enabled && isPro && (
+                      <div className="mt-2">
+                        <label className="text-xs text-gray-400 font-medium block mb-1">Slack Incoming Webhook URL</label>
+                        <input
+                          type="url"
+                          value={prefs.slack_webhook_url}
+                          onChange={e => set("slack_webhook_url", e.target.value)}
+                          placeholder="https://hooks.slack.com/services/..."
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
+                        />
+                        <p className="text-xs text-gray-600 mt-1">Create an Incoming Webhook in your Slack App configuration.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Teams */}
+                  <div className="space-y-2 border-t border-white/5 pt-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                          <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                          Microsoft Teams notifications
+                        </p>
+                        <p className="text-xs text-gray-500">Post alerts to a Teams channel via webhook</p>
+                      </div>
+                      <Toggle
+                        on={prefs.teams_enabled}
+                        onToggle={() => set("teams_enabled", !prefs.teams_enabled)}
+                        disabled={!isPro}
+                      />
+                    </div>
+                    {prefs.teams_enabled && isPro && (
+                      <div className="mt-2">
+                        <label className="text-xs text-gray-400 font-medium block mb-1">Teams Incoming Webhook URL</label>
+                        <input
+                          type="url"
+                          value={prefs.teams_webhook_url}
+                          onChange={e => set("teams_webhook_url", e.target.value)}
+                          placeholder="https://yourorg.webhook.office.com/webhookb2/..."
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
+                        />
+                        <p className="text-xs text-gray-600 mt-1">Add an Incoming Webhook connector to your Teams channel.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Escalation */}
+                  <div className="space-y-2 border-t border-white/5 pt-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                          Escalation alerts
+                        </p>
+                        <p className="text-xs text-gray-500">Re-send High risk alerts if not acknowledged within the escalation window</p>
+                      </div>
+                      <Toggle
+                        on={prefs.escalation_enabled}
+                        onToggle={() => set("escalation_enabled", !prefs.escalation_enabled)}
+                        disabled={!isPro}
+                      />
+                    </div>
+                    {prefs.escalation_enabled && isPro && (
+                      <div className="mt-2 flex items-center gap-3">
+                        <label className="text-xs text-gray-400 font-medium">Escalate after</label>
+                        <select
+                          value={prefs.escalation_minutes}
+                          onChange={e => set("escalation_minutes", Number(e.target.value))}
+                          className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-orange-500/50"
+                        >
+                          {[15, 30, 60, 120].map(m => (
+                            <option key={m} value={m}>{m} min</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-500">if unacknowledged</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Test send (Pro only) */}
                 {isPro && (
-                  <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-3">
+                  <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-3 flex-wrap">
                     <button
                       onClick={handleTestSend}
                       disabled={testSending}

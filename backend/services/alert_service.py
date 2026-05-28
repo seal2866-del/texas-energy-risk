@@ -21,6 +21,11 @@ RESEND_URL     = "https://api.resend.com/emails"
 DASHBOARD_URL  = "https://texas-energy-risk.vercel.app/dashboard"
 ALERTS_URL     = "https://texas-energy-risk.vercel.app/alerts"
 
+# ── Twilio / Slack ────────────────────────────────────────────
+TWILIO_SID   = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM  = os.getenv("TWILIO_FROM_NUMBER", "")
+
 COMPLIANCE = (
     "TX Energy Risk provides informational analytics and market intelligence only. "
     "This alert does not constitute investment, trading, financial, legal, or procurement advice. "
@@ -550,6 +555,149 @@ async def _send_email(to: str, subject: str, html: str) -> bool:
         return False
 
 
+# ── SMS delivery (Twilio REST) ────────────────────────────────
+
+async def _send_sms(to_phone: str, body: str) -> bool:
+    """Send SMS via Twilio REST API (no SDK required)."""
+    if not all([TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM, to_phone]):
+        logger.debug("[SMS] Twilio not configured or no phone number")
+        return False
+    try:
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json"
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                url,
+                data={"From": TWILIO_FROM, "To": to_phone, "Body": body},
+                auth=(TWILIO_SID, TWILIO_TOKEN),
+            )
+        if r.status_code == 201:
+            logger.info("[SMS] Sent to %s", to_phone[-4:].rjust(len(to_phone), "*"))
+            return True
+        logger.error("[SMS] Twilio %s: %s", r.status_code, r.text[:200])
+        return False
+    except Exception as exc:
+        logger.error("[SMS] Exception: %s", exc)
+        return False
+
+
+def _build_sms_body(risk_level: str, city: str, primary_driver: str,
+                    ercot_price: Optional[float]) -> str:
+    """Compact SMS: ≤160 chars for standard SMS, longer for MMS."""
+    level_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(risk_level, "⚪")
+    price_str = f" | ${ercot_price:.0f}/MWh" if ercot_price else ""
+    driver_str = f" | {primary_driver}" if primary_driver else ""
+    return (
+        f"{level_emoji} TX Energy Risk — {city}{price_str}\n"
+        f"Risk: {risk_level.upper()}{driver_str}\n"
+        f"Dashboard: {DASHBOARD_URL}"
+    )
+
+
+# ── Slack delivery (Incoming Webhook) ────────────────────────
+
+async def _send_slack(webhook_url: str, risk_level: str, city: str,
+                      primary_driver: str, ercot_price: Optional[float],
+                      confidence: Optional[float]) -> bool:
+    """Post a formatted alert to a Slack channel via Incoming Webhook."""
+    if not webhook_url:
+        return False
+    color = {"high": "#ef4444", "medium": "#f59e0b", "low": "#22c55e"}.get(risk_level, "#6b7280")
+    price_str = f"${ercot_price:.0f}/MWh" if ercot_price else "—"
+    conf_str  = f"{confidence:.0f}%" if confidence else "—"
+    payload = {
+        "text": f"TX Energy Risk Alert — {city} — {risk_level.upper()}",
+        "attachments": [{
+            "color": color,
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*TX Energy Risk Alert — {city}*\n"
+                            f"Risk Level: *{risk_level.upper()}*  |  ERCOT: *{price_str}*  |  Confidence: *{conf_str}*"
+                        ),
+                    },
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*Primary Driver*\n{primary_driver or 'N/A'}"},
+                        {"type": "mrkdwn", "text": f"*Location*\n{city}, Texas"},
+                    ],
+                },
+                {
+                    "type": "actions",
+                    "elements": [{
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Open Dashboard"},
+                        "url": DASHBOARD_URL,
+                        "style": "primary" if risk_level == "high" else None,
+                    }],
+                },
+                {
+                    "type": "context",
+                    "elements": [{"type": "mrkdwn", "text": f"_{COMPLIANCE}_"}],
+                },
+            ],
+        }],
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(webhook_url, json=payload)
+        if r.status_code == 200:
+            logger.info("[SLACK] Alert delivered")
+            return True
+        logger.error("[SLACK] %s: %s", r.status_code, r.text[:200])
+        return False
+    except Exception as exc:
+        logger.error("[SLACK] Exception: %s", exc)
+        return False
+
+
+# ── Teams delivery (Power Automate / Incoming Webhook) ───────
+
+async def _send_teams(webhook_url: str, risk_level: str, city: str,
+                      primary_driver: str, ercot_price: Optional[float]) -> bool:
+    """Post to Microsoft Teams via an Incoming Webhook connector."""
+    if not webhook_url:
+        return False
+    color = {"high": "attention", "medium": "warning", "low": "good"}.get(risk_level, "default")
+    price_str = f"${ercot_price:.0f}/MWh" if ercot_price else "—"
+    payload = {
+        "@type": "MessageCard",
+        "@context": "https://schema.org/extensions",
+        "themeColor": {"high": "FF4444", "medium": "F59E0B", "low": "22C55E"}.get(risk_level, "6B7280"),
+        "summary": f"TX Energy Risk Alert — {city} — {risk_level.upper()}",
+        "sections": [{
+            "activityTitle": f"TX Energy Risk Alert — {city}",
+            "activitySubtitle": f"{risk_level.upper()} | ERCOT {price_str}",
+            "facts": [
+                {"name": "Risk Level", "value": risk_level.upper()},
+                {"name": "Primary Driver", "value": primary_driver or "N/A"},
+                {"name": "ERCOT Price", "value": price_str},
+            ],
+            "markdown": True,
+        }],
+        "potentialAction": [{
+            "@type": "OpenUri",
+            "name": "Open Dashboard",
+            "targets": [{"os": "default", "uri": DASHBOARD_URL}],
+        }],
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(webhook_url, json=payload)
+        if r.status_code == 200:
+            logger.info("[TEAMS] Alert delivered")
+            return True
+        logger.error("[TEAMS] %s: %s", r.status_code, r.text[:200])
+        return False
+    except Exception as exc:
+        logger.error("[TEAMS] Exception: %s", exc)
+        return False
+
+
 # ── Public dispatch ────────────────────────────────────────────
 
 async def maybe_send_alert(
@@ -685,15 +833,41 @@ async def maybe_send_alert(
         ai_reasoning_data,
     )
     subject  = _subject("risk_change", risk_level)
-    delivered = False
+    delivered_email = False
+    delivered_sms   = False
+    delivered_slack = False
+    delivered_teams = False
 
+    # ── Email ─────────────────────────────────────────────────
+    if prefs.get("email_alerts", True):
+        delivered_email = await _send_email(to_email, subject, html)
+
+    # ── SMS (Twilio) ──────────────────────────────────────────
+    if prefs.get("sms_enabled", False):
+        sms_phone = prefs.get("sms_phone", "")
+        if sms_phone:
+            sms_body = _build_sms_body(risk_level, city, primary_driver, ercot_price)
+            delivered_sms = await _send_sms(sms_phone, sms_body)
+
+    # ── Slack ─────────────────────────────────────────────────
+    if prefs.get("slack_enabled", False):
+        slack_url = prefs.get("slack_webhook_url", "")
+        if slack_url:
+            delivered_slack = await _send_slack(
+                slack_url, risk_level, city, primary_driver, ercot_price, confidence
+            )
+
+    # ── Teams ─────────────────────────────────────────────────
+    if prefs.get("teams_enabled", False):
+        teams_url = prefs.get("teams_webhook_url", "")
+        if teams_url:
+            delivered_teams = await _send_teams(teams_url, risk_level, city, primary_driver, ercot_price)
+
+    delivered     = delivered_email or delivered_sms or delivered_slack or delivered_teams
     email_enabled = prefs.get("email_alerts", True)
-    if email_enabled:
-        delivered = await _send_email(to_email, subject, html)
 
     freq = prefs.get("alert_frequency", "immediate")
     if freq != "immediate":
-        # For daily/weekly users, still log but mark as pending digest
         delivery_status = "logged_for_digest"
     else:
         delivery_status = "sent" if delivered else ("failed" if email_enabled else "email_disabled")
@@ -706,7 +880,8 @@ async def maybe_send_alert(
         alert_type="risk_change", previous_risk_level=prev_level,
         risk_direction=risk_direction,
         delivery_status=delivery_status,
-        delivered_email=delivered, delivered_sms=False, voice_sent=False,
+        delivered_email=delivered_email, delivered_sms=delivered_sms,
+        voice_sent=False,
     )
 
 

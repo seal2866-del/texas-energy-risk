@@ -21,6 +21,14 @@ router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
 class AlertPrefs(BaseModel):
     email_alerts:              Optional[bool]  = True
     sms_alerts:                Optional[bool]  = False
+    sms_enabled:               Optional[bool]  = False
+    sms_phone:                 Optional[str]   = None
+    slack_enabled:             Optional[bool]  = False
+    slack_webhook_url:         Optional[str]   = None
+    teams_enabled:             Optional[bool]  = False
+    teams_webhook_url:         Optional[str]   = None
+    escalation_enabled:        Optional[bool]  = False
+    escalation_minutes:        Optional[int]   = 30
     voice_enabled:             Optional[bool]  = False
     alert_frequency:           Optional[str]   = "immediate"
     risk_threshold:            Optional[str]   = "medium"

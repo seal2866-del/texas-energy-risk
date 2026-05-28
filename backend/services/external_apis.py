@@ -326,12 +326,70 @@ async def fetch_all_hub_prices() -> Dict[str, float]:
 
 
 # ── NOAA / NWS ────────────────────────────────────────────────────────────────
+# Static fast-path for the original four locations.
 NOAA_OFFICES = {
     "Houston":     {"office": "HGX", "gridX": 66,  "gridY": 97},
     "Dallas":      {"office": "FWD", "gridX": 90,  "gridY": 104},
     "Austin":      {"office": "EWX", "gridX": 155, "gridY": 88},
     "San Antonio": {"office": "EWX", "gridX": 148, "gridY": 80},
 }
+
+# Lat/lon for all 8 monitored cities — used by the dynamic NWS resolver.
+LOCATION_COORDS: Dict[str, Dict[str, float]] = {
+    "Houston":        {"lat": 29.7604,  "lon": -95.3698},
+    "Dallas":         {"lat": 32.7767,  "lon": -96.7970},
+    "Austin":         {"lat": 30.2672,  "lon": -97.7431},
+    "San Antonio":    {"lat": 29.4241,  "lon": -98.4936},
+    "Midland":        {"lat": 31.9973,  "lon": -102.0779},
+    "Odessa":         {"lat": 31.8457,  "lon": -102.3676},
+    "Corpus Christi": {"lat": 27.8006,  "lon": -97.3964},
+    "Lubbock":        {"lat": 33.5779,  "lon": -101.8552},
+}
+
+# Runtime cache for dynamically resolved NWS grid coordinates.
+# Populated lazily on first request for each city.
+_GRID_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+async def _resolve_noaa_office(location: str) -> Optional[Dict[str, Any]]:
+    """
+    Resolve NWS gridpoint for a location using the /points/{lat},{lon} API.
+    Result is cached in _GRID_CACHE for the lifetime of the process.
+    Returns dict like NOAA_OFFICES entries: {office, gridX, gridY}, or None on failure.
+    """
+    # Static fast-path
+    if location in NOAA_OFFICES:
+        return NOAA_OFFICES[location]
+
+    # Runtime cache hit
+    if location in _GRID_CACHE:
+        return _GRID_CACHE[location]
+
+    coords = LOCATION_COORDS.get(location)
+    if not coords:
+        logger.warning("[NWS] No coordinates configured for '%s'", location)
+        return None
+
+    url = f"https://api.weather.gov/points/{coords['lat']},{coords['lon']}"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(url, headers={"User-Agent": "TexasEnergyRisk/1.0 seal2866@gmail.com"})
+            r.raise_for_status()
+        props = r.json().get("properties", {})
+        office = props.get("gridId")
+        grid_x = props.get("gridX")
+        grid_y = props.get("gridY")
+        if office and grid_x is not None and grid_y is not None:
+            entry = {"office": office, "gridX": grid_x, "gridY": grid_y}
+            _GRID_CACHE[location] = entry
+            logger.info("[NWS] Resolved '%s' → office=%s gridX=%d gridY=%d",
+                        location, office, grid_x, grid_y)
+            return entry
+        logger.warning("[NWS] /points response missing grid fields for '%s': %s", location, props)
+        return None
+    except Exception as exc:
+        logger.warning("[NWS] _resolve_noaa_office failed for '%s': %s", location, exc)
+        return None
 
 
 async def fetch_weather_forecast(
@@ -350,8 +408,12 @@ async def fetch_weather_forecast(
         return result
 
     try:
-        office = NOAA_OFFICES.get(location, NOAA_OFFICES["Houston"])
-        url    = (
+        # Use dynamic resolver (falls back to static dict for original 4 cities)
+        office = await _resolve_noaa_office(location)
+        if not office:
+            office = NOAA_OFFICES.get("Houston")   # last-resort fallback
+
+        url = (
             f"{noaa_base.rstrip('/')}"
             f"/gridpoints/{office['office']}/{office['gridX']},{office['gridY']}/forecast"
         )

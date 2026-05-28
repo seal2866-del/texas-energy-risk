@@ -264,24 +264,49 @@ export const getAlertLogs = (limit = 20) =>
   apiFetch<{ alerts: AlertLog[] }>(`/api/alerts/log/?limit=${limit}`);
 
 export interface AlertPrefs {
-  email_alerts?:           boolean;
-  sms_alerts?:             boolean;
-  voice_enabled?:          boolean;
-  alert_frequency?:        string;
-  risk_threshold?:         string;
-  city?:                   string;
-  price_volatility_alert?: boolean;
-  weather_demand_alert?:   boolean;
-  gas_supply_alert?:       boolean;
-  data_source_alert?:      boolean;
-  quiet_hours_enabled?:    boolean;
-  quiet_hours_start?:      string;
-  quiet_hours_end?:        string;
-  phone_number?:           string;
+  email_alerts?:              boolean;
+  sms_alerts?:                boolean;
+  sms_enabled?:               boolean;
+  sms_phone?:                 string;
+  slack_enabled?:             boolean;
+  slack_webhook_url?:         string;
+  teams_enabled?:             boolean;
+  teams_webhook_url?:         string;
+  escalation_enabled?:        boolean;
+  escalation_minutes?:        number;
+  voice_enabled?:             boolean;
+  alert_frequency?:           string;
+  risk_threshold?:            string;
+  city?:                      string;
+  price_volatility_alert?:    boolean;
+  weather_demand_alert?:      boolean;
+  gas_supply_alert?:          boolean;
+  data_source_alert?:         boolean;
+  quiet_hours_enabled?:       boolean;
+  quiet_start_time?:          string;
+  quiet_end_time?:            string;
+  price_threshold_mwh?:       number;
+  temp_high_threshold_f?:     number;
+  temp_low_threshold_f?:      number;
+  gas_storage_pct_threshold?: number;
+  digest_enabled?:            boolean;
+  digest_email?:              string;
 }
 
-export const updateAlertPrefs = (prefs: AlertPrefs, token: string) =>
-  apiFetch<{ success: boolean }>(`/api/alerts/prefs/`, token);
+export const updateAlertPrefs = async (prefs: AlertPrefs, token: string): Promise<{ status: string }> => {
+  const headers: HeadersInit = {
+    "Content-Type":  "application/json",
+    "Authorization": `Bearer ${token}`,
+  };
+  const res = await fetch(`${BASE}/api/alerts/preferences`, {
+    method:  "PUT",
+    headers,
+    body:    JSON.stringify(prefs),
+    cache:   "no-store",
+  });
+  if (!res.ok) throw new Error(`updateAlertPrefs error ${res.status}`);
+  return res.json();
+};
 
 // ── Phase 12 — Enterprise Operational Intelligence Types ──────────────────────
 
@@ -377,7 +402,7 @@ export interface AIReasoningResponse {
 export const getAIReasoning = (location = "Houston") =>
   apiFetch<AIReasoningResponse>(`/api/ai-reasoning?location=${location}`);
 
-// ── Historical signal snapshots ───────────────────────────────────────────────
+// -- Historical signal snapshots
 
 export interface SignalSnapshot {
   computed_at:          string;
@@ -403,3 +428,105 @@ export interface SignalHistory {
 
 export const getSignalHistory = (location = "Houston", hours = 168) =>
   apiFetch<SignalHistory>(`/api/signals/history?location=${encodeURIComponent(location)}&hours=${hours}`);
+
+
+// -- Phase 7: Multi-Location Grid Intelligence
+
+export interface GridZoneEntry {
+  location:        string;
+  ercot_zone:      string;
+  risk_score:      RiskScore | "unknown";
+  risk_direction:  string;
+  confidence:      number | null;
+  ercot_price:     number | null;
+  primary_driver:  string | null;
+  computed_at:     string | null;
+  is_stale:        boolean;
+}
+
+export interface GridSummary {
+  total_locations:   number;
+  reporting_count:   number;
+  high_risk_count:   number;
+  medium_risk_count: number;
+  statewide_status:  "low" | "medium" | "high";
+  worst_location:    string | null;
+  computed_at:       string;
+}
+
+export interface GridOverviewResponse {
+  zones:   GridZoneEntry[];
+  summary: GridSummary;
+}
+
+export const getGridOverview = () =>
+  apiFetch<GridOverviewResponse>(`/api/grid/overview`);
+
+// -- Phase 8: Historical Analytics
+
+export interface HistoricalRiskDistribution {
+  count: number;
+  pct:   number;
+}
+
+export interface HistoricalSummary {
+  location:          string;
+  days:              number;
+  data_available:    boolean;
+  snapshot_count:    number;
+  risk_distribution: {
+    low:    HistoricalRiskDistribution;
+    medium: HistoricalRiskDistribution;
+    high:   HistoricalRiskDistribution;
+  };
+  avg_risk_numeric:   number | null;
+  avg_confidence:     number | null;
+  peak_price_mwh:     number | null;
+  avg_price_mwh:      number | null;
+  top_primary_driver: string | null;
+  driver_counts:      Record<string, number>;
+  first_snapshot:     string | null;
+  last_snapshot:      string | null;
+}
+
+export interface AnomalyScore {
+  location:      string;
+  anomaly_score: number | null;
+  is_anomalous:  boolean;
+  baseline_avg:  number | null;
+  baseline_std:  number | null;
+  direction:     string;
+  sample_size?:  number;
+  note:          string;
+}
+
+export interface SpikePrecursorPattern {
+  avg_pre_spike_risk_numeric: number | null;
+  avg_pre_spike_price_mwh:    number | null;
+  most_common_demand_level:   string | null;
+  top_preceding_driver:       string | null;
+  top_risk_direction:         string | null;
+  driver_frequency:           Record<string, number>;
+}
+
+export interface SpikePrecursors {
+  location:           string;
+  spike_count:        number;
+  data_available:     boolean;
+  spike_timestamps:   string[];
+  precursor_pattern:  SpikePrecursorPattern | null;
+  note?:              string;
+}
+
+export interface HistoricalAnalytics {
+  location:    string;
+  summary:     HistoricalSummary;
+  anomaly:     AnomalyScore;
+  precursors:  SpikePrecursors;
+  computed_at: string;
+}
+
+export const getHistoricalAnalytics = (location = "Houston", riskNumeric = 2.0) =>
+  apiFetch<HistoricalAnalytics>(
+    `/api/history/analytics?location=${encodeURIComponent(location)}&risk_numeric=${riskNumeric}`
+  );

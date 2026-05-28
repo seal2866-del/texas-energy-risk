@@ -29,6 +29,8 @@ export default function Navbar() {
   const navLinks = user
     ? [
         { href: "/dashboard", label: "Dashboard" },
+        { href: "/map",       label: "Grid Map" },
+        { href: "/analytics", label: "Analytics" },
         { href: "/alerts",    label: "Alerts" },
         { href: "/pricing",   label: "Upgrade" },
       ]
