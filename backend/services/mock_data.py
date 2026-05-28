@@ -64,10 +64,28 @@ def mock_current_ercot_price(settlement_point: str = "HB_HOUSTON") -> Dict[str, 
 # ──────────────────────────────────────────────────────────────
 
 TX_STATIONS = {
-    "Houston":  {"station": "KHOU", "lat": 29.76, "lon": -95.37},
-    "Dallas":   {"station": "KDFW", "lat": 32.89, "lon": -97.04},
-    "Austin":   {"station": "KAUS", "lat": 30.19, "lon": -97.67},
-    "San Antonio": {"station": "KSAT", "lat": 29.53, "lon": -98.47},
+    "Houston":        {"station": "KHOU", "lat": 29.76,  "lon": -95.37},
+    "Dallas":         {"station": "KDFW", "lat": 32.89,  "lon": -97.04},
+    "Austin":         {"station": "KAUS", "lat": 30.19,  "lon": -97.67},
+    "San Antonio":    {"station": "KSAT", "lat": 29.53,  "lon": -98.47},
+    "Midland":        {"station": "KMAF", "lat": 31.94,  "lon": -102.20},
+    "Odessa":         {"station": "KODO", "lat": 31.92,  "lon": -102.39},
+    "Corpus Christi": {"station": "KCRP", "lat": 27.77,  "lon": -97.50},
+    "Lubbock":        {"station": "KLBB", "lat": 33.66,  "lon": -101.82},
+}
+
+
+
+# Per-city temperature offsets (degrees F relative to base) for realistic regional variation
+_CITY_TEMP_OFFSETS = {
+    "Houston":        0,
+    "Dallas":         2,
+    "Austin":         1,
+    "San Antonio":    2,
+    "Midland":        5,   # hotter, drier desert climate
+    "Odessa":         5,
+    "Corpus Christi": -3,  # coastal, slightly cooler
+    "Lubbock":        3,   # high plains, hot summers
 }
 
 
@@ -75,14 +93,16 @@ def mock_weather_forecast(days: int = 7, location: str = "Houston") -> List[Dict
     now = _utcnow()
     forecasts = []
 
+    city_offset = _CITY_TEMP_OFFSETS.get(location, 0)
+
     # May through September — simulate Texas summer heat
     month = now.month
     if month in range(5, 10):
-        base_high = random.uniform(95, 108)
+        base_high = random.uniform(95, 108) + city_offset
     elif month in range(11, 13) or month in range(1, 3):
-        base_high = random.uniform(35, 65)
+        base_high = random.uniform(35, 65) + city_offset
     else:
-        base_high = random.uniform(70, 90)
+        base_high = random.uniform(70, 90) + city_offset
 
     for day_offset in range(1, days + 1):
         forecast_dt = now + timedelta(days=day_offset)
@@ -132,32 +152,4 @@ def mock_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
         report_date = (now - timedelta(weeks=week)).date()
         # Gradual drawdown trend with noise
         storage += random.gauss(-30, 20)
-        storage = max(1500, min(3800, storage))
-
-        avg = 2310.0 + random.gauss(0, 30)
-        pct_vs_avg = round(((storage - avg) / avg) * 100, 2)
-
-        if pct_vs_avg < -10:
-            supply_pressure = "low"
-        elif pct_vs_avg > 5:
-            supply_pressure = "high"
-        else:
-            supply_pressure = "normal"
-
-        henry_hub = round(max(1.5, 2.50 + random.gauss(0, 0.3)), 4)
-
-        records.append({
-            "report_date": str(report_date),
-            "storage_bcf": round(storage, 1),
-            "storage_5yr_avg_bcf": round(avg, 1),
-            "storage_pct_vs_avg": pct_vs_avg,
-            "henry_hub_price": henry_hub,
-            "supply_pressure": supply_pressure,
-            "source": "mock",
-        })
-
-    return records
-
-
-def mock_latest_gas() -> Dict[str, Any]:
-    return mock_gas_data(weeks=1)[-1]
+        storage = max(1
