@@ -190,6 +190,7 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
         "model":                         "rule-based-fallback",
         "disclaimer":                    DISCLAIMER,
         "ai_powered":                    False,
+        "fallback_reason":               _fallback_reason,
     }
 
 
@@ -264,7 +265,9 @@ async def generate_ai_reasoning(inputs: Dict[str, Any]) -> Dict[str, Any]:
         return {**cached, "from_cache": True}
 
     # -- Try Claude API
+    _fallback_reason: str = "no_api_key"  # overwritten on success or specific error
     if ANTHROPIC_API_KEY:
+        _fallback_reason = "api_error"    # default if something goes wrong inside
         try:
             import anthropic
             client  = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
@@ -286,7 +289,8 @@ async def generate_ai_reasoning(inputs: Dict[str, Any]) -> Dict[str, Any]:
             result["model"]        = AI_MODEL
             result["disclaimer"]   = DISCLAIMER
             result["ai_powered"]   = True
-            result["from_cache"]   = False
+            result["from_cache"]     = False
+            result["fallback_reason"] = None
             if "historical_context" not in result:
                 result["historical_context"] = ""
             _set_cache(key, result)
@@ -295,13 +299,28 @@ async def generate_ai_reasoning(inputs: Dict[str, Any]) -> Dict[str, Any]:
 
         except json.JSONDecodeError as exc:
             logger.warning("[AI_REASONING] JSON parse error from Claude: %s", exc)
+            _fallback_reason = "parse_error"
         except Exception as exc:
             logger.warning("[AI_REASONING] Claude API error, using fallback: %s", exc)
+            _fallback_reason = "api_error"
     else:
         logger.info("[AI_REASONING] No ANTHROPIC_API_KEY — using rule-based fallback")
+        _fallback_reason = "no_api_key"
 
     # -- Rule-based fallback
     result = _rule_based_fallback(inputs)
     result["from_cache"] = False
     _set_cache(key, result)
     return result
+
+def get_ai_status() -> dict:
+    """Return diagnostic info about the AI reasoning layer (no secrets exposed)."""
+    cache_count = len(_cache)
+    ai_entries  = sum(1 for v in _cache.values() if v["data"].get("ai_powered"))
+    return {
+        "api_key_configured": bool(ANTHROPIC_API_KEY),
+        "model":              AI_MODEL,
+        "cache_ttl_minutes":  CACHE_TTL_MINUTES,
+        "cached_entries":     cache_count,
+        "ai_powered_entries": ai_entries,
+    }

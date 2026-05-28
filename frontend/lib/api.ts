@@ -371,6 +371,7 @@ export interface AIReasoningResponse {
   disclaimer:                    string;
   ai_powered:                    boolean;
   from_cache:                    boolean;
+  fallback_reason?:              "no_api_key" | "api_error" | "parse_error" | null;
 }
 
 export const getAIReasoning = (location = "Houston") =>

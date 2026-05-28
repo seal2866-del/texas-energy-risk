@@ -65,8 +65,9 @@ export default function AIMarketReasoning({ reasoning, loading, error, computedA
   const timeStr  = ts ? new Date(ts).toLocaleTimeString("en-US", {
     timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", timeZoneName: "short"
   }) : null;
-  const isStale   = reasoning?.from_cache && !loading;
-  const isPowered = reasoning?.ai_powered;
+  const isStale      = reasoning?.from_cache && !loading;
+  const isPowered    = reasoning?.ai_powered;
+  const fallbackReason = reasoning?.fallback_reason;
 
   return (
     <div className="card-glass panel-scan lg:col-span-2 border border-teal-500/12 p-5 sm:p-6 relative overflow-hidden">
@@ -104,8 +105,18 @@ export default function AIMarketReasoning({ reasoning, loading, error, computedA
                 Claude AI
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold border bg-white/5 border-white/10 text-gray-500">
-                <Zap className="w-3 h-3" />Rule-based
+              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold border ${
+                fallbackReason === "no_api_key"
+                  ? "bg-amber-500/8 border-amber-500/20 text-amber-500/80"
+                  : fallbackReason === "api_error" || fallbackReason === "parse_error"
+                  ? "bg-red-500/8 border-red-500/20 text-red-400/80"
+                  : "bg-white/5 border-white/10 text-gray-500"
+              }`}>
+                <Zap className="w-3 h-3" />
+                {fallbackReason === "no_api_key" ? "API Key Missing"
+                 : fallbackReason === "api_error" ? "AI Unavailable"
+                 : fallbackReason === "parse_error" ? "AI Parse Error"
+                 : "Rule-based"}
               </span>
             )
           )}
@@ -122,6 +133,11 @@ export default function AIMarketReasoning({ reasoning, loading, error, computedA
         <StatusPill label="AI Synced"      active={!!reasoning && !error} />
         <StatusPill label="Analysis Ready" active={!!reasoning} />
         <StatusPill label="Live Feed"      active={!!reasoning?.ai_powered} />
+        {fallbackReason === "no_api_key" && (
+          <span className="text-[10px] text-amber-500/70 font-semibold uppercase tracking-wide">
+            · Set ANTHROPIC_API_KEY in Railway
+          </span>
+        )}
         {timeStr && (
           <span className="ml-auto text-[10px] text-gray-700 font-mono flex-shrink-0">{timeStr}</span>
         )}

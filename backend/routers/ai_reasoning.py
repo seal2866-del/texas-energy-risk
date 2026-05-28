@@ -120,3 +120,13 @@ async def get_ai_reasoning(location: str = Query(default="Houston")):
 
     result = await generate_ai_reasoning(inputs)
     return result
+
+
+@router.get("/ai-reasoning/status")
+async def ai_reasoning_status():
+    """
+    Diagnostic endpoint — returns AI layer config without exposing the API key.
+    Use to verify ANTHROPIC_API_KEY is set in the deployment environment.
+    """
+    from services.ai_reasoning import get_ai_status
+    return get_ai_status()
