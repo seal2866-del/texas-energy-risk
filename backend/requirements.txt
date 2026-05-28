@@ -11,3 +11,4 @@ apscheduler==3.10.4
 pandas==2.2.2
 numpy==1.26.4
 anthropic>=0.40.0
+reportlab>=4.0.0

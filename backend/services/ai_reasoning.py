@@ -27,6 +27,7 @@ DISCLAIMER = (
 
 # In-memory cache: key -> {"data": dict, "expires_at": datetime}
 _cache: Dict[str, Dict[str, Any]] = {}
+_last_error: Optional[str] = None  # last Claude API error (for diagnostics)
 
 
 def _cache_key(location: str, risk_score: str, primary_driver: str, data_valid: bool) -> str:
@@ -276,6 +277,7 @@ async def generate_ai_reasoning(inputs: Dict[str, Any]) -> Dict[str, Any]:
                 model=AI_MODEL,
                 max_tokens=1024,
                 messages=[{"role": "user", "content": prompt}],
+                timeout=30.0,
             )
             raw = message.content[0].text.strip()
             # Strip markdown code fences if the model wraps them
@@ -300,9 +302,12 @@ async def generate_ai_reasoning(inputs: Dict[str, Any]) -> Dict[str, Any]:
         except json.JSONDecodeError as exc:
             logger.warning("[AI_REASONING] JSON parse error from Claude: %s", exc)
             _fallback_reason = "parse_error"
+            global _last_error
+            _last_error = f"JSON parse error: {exc}"
         except Exception as exc:
             logger.warning("[AI_REASONING] Claude API error, using fallback: %s", exc)
             _fallback_reason = "api_error"
+            _last_error = f"{type(exc).__name__}: {exc}"
     else:
         logger.info("[AI_REASONING] No ANTHROPIC_API_KEY — using rule-based fallback")
         _fallback_reason = "no_api_key"
@@ -319,8 +324,10 @@ def get_ai_status() -> dict:
     ai_entries  = sum(1 for v in _cache.values() if v["data"].get("ai_powered"))
     return {
         "api_key_configured": bool(ANTHROPIC_API_KEY),
+        "api_key_prefix":     (ANTHROPIC_API_KEY[:8] + "...") if ANTHROPIC_API_KEY else None,
         "model":              AI_MODEL,
         "cache_ttl_minutes":  CACHE_TTL_MINUTES,
         "cached_entries":     cache_count,
         "ai_powered_entries": ai_entries,
+        "last_error":         _last_error,
     }
