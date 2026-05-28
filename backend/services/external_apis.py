@@ -476,11 +476,20 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
     """
     Fetch EIA weekly natural gas storage data.
     Falls back to mock if EIA_API_KEY is not set or all attempts fail.
+    Results are cached for 4 hours — EIA publishes weekly, so frequent re-fetching is wasteful.
     """
+    # ── TTL cache check (4-hour TTL) ────────────────────────────────────────
+    cached = _get_gas_cache(weeks)
+    if cached is not None:
+        logger.debug("[EIA] Returning cached gas data (%d records)", len(cached))
+        return cached
+
     api_key = os.getenv("EIA_API_KEY", "")
     if not api_key:
         logger.debug("[EIA] No API key -- returning mock gas data")
-        return mock_data.mock_gas_data(weeks)
+        result = mock_data.mock_gas_data(weeks)
+        _set_gas_cache(weeks, result)
+        return result
 
     async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
 
@@ -502,6 +511,7 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
                         logger.warning("[EIA] Gas OK (no-facets): %d records, latest=%s %.1f bcf",
                                        len(parsed), parsed[-1]["report_date"],
                                        parsed[-1]["storage_bcf"])
+                        _set_gas_cache(weeks, parsed)
                         return parsed
         except Exception as exc:
             logger.warning("[EIA] no-facets error: %s", exc)
@@ -518,6 +528,7 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
                     if rows:
                         parsed = _parse_eia_gas_rows(rows, weeks)
                         if parsed:
+                            _set_gas_cache(weeks, parsed)
                             return parsed
                 except Exception as exc:
                     logger.warning("[EIA] process=%s duoarea=%s error: %s", process, duoarea, exc)
@@ -542,12 +553,15 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
                         logger.warning("[EIA] Gas OK (v1): %d records, latest=%s %.1f bcf",
                                        len(parsed), parsed[-1]["report_date"],
                                        parsed[-1]["storage_bcf"])
+                        _set_gas_cache(weeks, parsed)
                         return parsed
             except Exception as exc:
                 logger.warning("[EIA] v1 series=%s error: %s", series_id, exc)
 
     logger.warning("[EIA] All EIA attempts failed — falling back to mock data")
-    return mock_data.mock_gas_data(weeks)
+    result = mock_data.mock_gas_data(weeks)
+    _set_gas_cache(weeks, result)
+    return result
 
 
 def _safe_float(val) -> float:
