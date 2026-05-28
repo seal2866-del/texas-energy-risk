@@ -369,9 +369,15 @@ def _compute_confidence(
             "signal precision is limited to available sources."
         )
     elif any_stale:
+        stale_names = [
+            {"ercot": "ERCOT price feed", "noaa": "NOAA weather forecast", "eia": "EIA gas storage"}[src]
+            for src, info in {"ercot": ercot_status, "noaa": noaa_status, "eia": eia_status}.items()
+            if info == "stale"
+        ]
+        stale_label = ", ".join(stale_names) if stale_names else "one data source"
         note = (
             f"Confidence is {conf_word} ({confidence}%). {driver_phrase}. "
-            "Slightly reduced because one or more data sources have not refreshed within the expected interval."
+            f"Reduced due to delayed {stale_label} — operating on last known values."
         )
     elif all_active and triggered_count >= 2:
         note = (
@@ -1701,6 +1707,83 @@ def _compute_what_changed(
 # Main orchestration entry point
 # ------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# Escalation Probability Engine
+# ------------------------------------------------------------------------------
+
+def _compute_escalation_probability(
+    risk_score:      str,
+    risk_direction:  str,
+    signal_alignment: Dict[str, Any],
+    active_signals:  int,
+    events:          List[Dict],
+    demand_pressure: Dict[str, Any],
+    supply_pressure: Dict[str, Any],
+    market_reaction: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Compute probability that conditions will escalate in the near term.
+    Returns {level, pct, rationale}.
+    """
+    score = 0
+
+    # Risk score contribution
+    if risk_score == "high":      score += 40
+    elif risk_score == "medium":  score += 20
+
+    # Direction contribution
+    if risk_direction == "increasing":    score += 20
+    elif risk_direction == "decreasing":  score -= 10
+
+    # Signal alignment contribution
+    alignment_score = signal_alignment.get("score", 0)
+    score += alignment_score * 8   # 0, 8, 16, 24
+
+    # Active events
+    high_events = [e for e in events if e.get("severity") == "high"]
+    score += len(high_events) * 10
+
+    # High-level drivers compound
+    high_drivers = sum(1 for d in [demand_pressure, supply_pressure, market_reaction]
+                       if d and d.get("level") == "high")
+    score += high_drivers * 5
+
+    # Clamp to 0–95
+    score = max(0, min(95, score))
+
+    # Determine level label
+    if score >= 65:
+        level   = "Elevated"
+        rationale = (
+            "Multiple reinforcing risk factors active. "
+            f"{'Increasing risk direction and ' if risk_direction == 'increasing' else ''}"
+            f"signal alignment is {signal_alignment.get('label', 'moderate')}."
+        )
+    elif score >= 40:
+        level   = "Moderate"
+        rationale = (
+            f"{'Rising conditions detected — ' if risk_direction == 'increasing' else ''}"
+            f"{'conditions are stable — ' if risk_direction == 'stable' else ''}"
+            f"{signal_alignment.get('description', 'Some drivers active.')}"
+        )
+    elif score >= 20:
+        level   = "Low-Moderate"
+        rationale = (
+            "Monitoring conditions. "
+            f"One or more drivers elevated but not reinforcing broadly. "
+            f"Escalation would require additional pressure."
+        )
+    else:
+        level   = "Low"
+        rationale = "No active escalation signals. All monitored channels within normal operating range."
+
+    return {
+        "level":     level,
+        "pct":       score,
+        "rationale": rationale.strip(),
+    }
+
+
 def run_all_signals(
     prices:      List[Dict],
     forecasts:   List[Dict],
@@ -1829,6 +1912,11 @@ def run_all_signals(
             risk_score, demand_pressure, supply_pressure, market_reaction, prices
         )
 
+        escalation_probability = _compute_escalation_probability(
+            risk_score, risk_direction, signal_alignment, active_count,
+            events, demand_pressure, supply_pressure, market_reaction,
+        )
+
         # ── Risk headline ─────────────────────────────────────────────────────
         risk_headline = risk_narrative["headline"]
 
@@ -1862,8 +1950,9 @@ def run_all_signals(
             "cost_impact":            cost_impact,
             "market_condition":       market_condition,
             "alert_severity":         alert_severity,
-            "signal_alignment":       signal_alignment,
-            "what_changed":           what_changed,
+            "signal_alignment":          signal_alignment,
+            "what_changed":              what_changed,
+            "escalation_probability":    escalation_probability,
             "signals": {
                 "price_volatility": price_sig,
                 "weather_demand":   weather_sig,

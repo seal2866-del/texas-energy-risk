@@ -38,7 +38,7 @@ function Section({ icon, label, text }: {
         <span className="text-teal-500/70 flex-shrink-0">{icon}</span>
         <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{label}</p>
       </div>
-      <p className="text-sm text-gray-300 leading-relaxed">{text}</p>
+      <p className="text-sm text-gray-300 leading-relaxed max-w-[60ch]">{text}</p>
     </div>
   );
 }
@@ -166,7 +166,7 @@ export default function AIMarketReasoning({ reasoning, loading, error, computedA
               <Activity className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
               <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest">Executive Summary</p>
             </div>
-            <p className="text-base font-semibold text-white leading-snug pl-2">{reasoning.executive_summary}</p>
+            <p className="text-base font-semibold text-white leading-snug pl-2 max-w-[70ch]">{reasoning.executive_summary}</p>
           </div>
 
           {/* ── 2×2 analysis grid ─────────────────────────────────────────── */}
@@ -197,14 +197,14 @@ export default function AIMarketReasoning({ reasoning, loading, error, computedA
           {reasoning.historical_context && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-white/3 border border-white/6">
               <History className="w-3.5 h-3.5 text-gray-600 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-gray-500 leading-relaxed">{reasoning.historical_context}</p>
+              <p className="text-xs text-gray-500 leading-relaxed max-w-[72ch]">{reasoning.historical_context}</p>
             </div>
           )}
 
           {/* ── Confidence note ────────────────────────────────────────────── */}
           <div className="flex items-start gap-2">
             <ShieldCheck className="w-3.5 h-3.5 text-gray-700 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-gray-600 leading-relaxed">{reasoning.confidence_note}</p>
+            <p className="text-xs text-gray-600 leading-relaxed max-w-[72ch]">{reasoning.confidence_note}</p>
           </div>
 
           {/* ── Footer ────────────────────────────────────────────────────── */}

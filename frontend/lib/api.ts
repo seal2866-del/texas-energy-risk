@@ -83,6 +83,12 @@ export interface WhatChangedItem {
   direction: "rising" | "easing" | "stable" | "escalated" | "improved";
 }
 
+export interface EscalationProbability {
+  level:     string;   // Low | Low-Moderate | Moderate | Elevated
+  pct:       number;   // 0–95
+  rationale: string;
+}
+
 export interface DriverLevel {
   level:       RiskScore;
   explanation: string;
@@ -164,8 +170,9 @@ export interface SignalsResponse {
     weather_demand:   Signal;
     gas_supply:       Signal;
   };
-  signal_alignment?: SignalAlignment;
-  what_changed?:     WhatChangedItem[];
+  signal_alignment?:       SignalAlignment;
+  what_changed?:           WhatChangedItem[];
+  escalation_probability?: EscalationProbability;
   summary:    string;
   disclaimer: string;
 }

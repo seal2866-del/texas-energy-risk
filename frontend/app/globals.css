@@ -303,3 +303,44 @@ body::after {
     padding: 1rem !important;
   }
 }
+
+/* ── Live telemetry micro-animations ──────────────────────────────────────── */
+@keyframes telemetry-sweep {
+  0%   { opacity: 0.0; transform: translateX(-100%); }
+  15%  { opacity: 0.8; }
+  85%  { opacity: 0.8; }
+  100% { opacity: 0.0; transform: translateX(100%); }
+}
+
+/* Subtle horizontal scan line on card hover */
+.card-glass:hover::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(249,115,22,0.15) 40%,
+    rgba(249,115,22,0.15) 60%,
+    transparent 100%);
+  animation: telemetry-sweep 3s ease-in-out;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes sync-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1;   }
+}
+
+/* Used on "● Monitoring Active" and similar dots */
+.telemetry-dot {
+  animation: sync-pulse 3s ease-in-out infinite;
+}
+
+@keyframes confidence-fill {
+  from { width: 0%; }
+}
+.confidence-bar-animate {
+  animation: confidence-fill 0.8s ease-out forwards;
+}
