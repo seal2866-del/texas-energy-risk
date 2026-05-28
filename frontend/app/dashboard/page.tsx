@@ -455,6 +455,7 @@ export default function DashboardPage() {
                 alertSeverity={signals.alert_severity}
                 signalAlignment={signals.signal_alignment}
                 panelGlow={riskGlow}
+                earlyWarnings={riskModel?.earlyWarningSignals}
               />
 
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
@@ -470,6 +471,7 @@ export default function DashboardPage() {
                 aiLoading={aiLoading}
                 computedAt={signals.computed_at}
                 location={location}
+                earlyWarnings={riskModel?.earlyWarningSignals}
               />
 
               <EarlyWarningEngine
@@ -538,6 +540,7 @@ export default function DashboardPage() {
                 scenarios={signals.scenarios}
                 operationalExposure={signals.operational_exposure}
                 marketTransition={signals.market_transition}
+                earlyWarnings={riskModel?.earlyWarningSignals}
               />
 
               <SystemHealthCenter

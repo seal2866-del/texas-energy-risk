@@ -2,14 +2,16 @@
 import { FileText, Clock, Zap, Thermometer, Flame, TrendingUp, TrendingDown,
          ShieldCheck, AlertTriangle, Radio, Minus, CheckCircle2 } from "lucide-react";
 import type { SignalsResponse, AIReasoningResponse } from "@/lib/api";
+import type { EarlyWarning } from "@/lib/energyRiskEngine";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  signals:    SignalsResponse;
-  reasoning:  AIReasoningResponse | null;
-  aiLoading:  boolean;
-  computedAt: string;
-  location?:  string;
+  signals:       SignalsResponse;
+  reasoning:     AIReasoningResponse | null;
+  aiLoading:     boolean;
+  computedAt:    string;
+  location?:     string;
+  earlyWarnings?: EarlyWarning[];
 }
 
 // ── Colour maps ───────────────────────────────────────────────────────────────
@@ -115,7 +117,7 @@ function BriefSkeleton() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function AIExecutiveBrief({
-  signals, reasoning, aiLoading, computedAt, location = "Texas",
+  signals, reasoning, aiLoading, computedAt, location = "Texas", earlyWarnings,
 }: Props) {
   const {
     risk_score, risk_direction, risk_headline,
@@ -357,7 +359,29 @@ export default function AIExecutiveBrief({
         </div>
       )}
 
-      {/* ── Footer ──────────────────────────────────────────────────────────── */}
+      {/* ── Phase 5: Early Warning Signals ──────────────────────────────────── */}
+      {earlyWarnings && earlyWarnings.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-white/5">
+          <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Pre-Escalation Signals</p>
+          <div className="space-y-1.5">
+            {earlyWarnings.map((w) => {
+              const sev = w.severity === "elevated"
+                ? "text-orange-300 bg-orange-500/8 border-orange-500/20"
+                : w.severity === "advisory"
+                ? "text-amber-300  bg-amber-500/8  border-amber-500/20"
+                : "text-gray-400   bg-white/4      border-white/8";
+              return (
+                <div key={w.id} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${sev}`}>
+                  <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{w.message}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
       <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
           <Radio className="w-3 h-3 text-teal-500/50" />

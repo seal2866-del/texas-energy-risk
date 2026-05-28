@@ -1,6 +1,7 @@
 "use client";
 import { Activity, WifiOff, TrendingUp, TrendingDown, Minus, Zap, Info, AlertTriangle } from "lucide-react";
 import type { RiskScore as RiskScoreType, TimeHorizons, SignalDriver, MarketCondition, AlertSeverityInfo, SignalAlignment } from "@/lib/api";
+import type { EarlyWarning } from "@/lib/energyRiskEngine";
 import { cn, riskColor, riskBg } from "@/lib/utils";
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
   alertSeverity?:          AlertSeverityInfo;
   signalAlignment?:        SignalAlignment;
   panelGlow?:            string;
+  earlyWarnings?:          EarlyWarning[];
 }
 
 const ALIGN_CLS: Record<string, string> = {
@@ -89,7 +91,7 @@ export default function RiskScore({
   confidence, confidenceNote, explanation, impact,
   primaryDriver, riskDirection, riskDirectionContext, signalDrivers,
   secondaryFactors, dataValid, dataStatus, riskHeadline, timeHorizons,
-  marketCondition, alertSeverity, signalAlignment, panelGlow,
+  marketCondition, alertSeverity, signalAlignment, panelGlow, earlyWarnings,
 }: Props) {
   const cfg = SCORE_CONFIG[score];
 
@@ -296,6 +298,24 @@ export default function RiskScore({
         <div className="mt-3 flex items-start gap-1.5">
           <Info className="w-3 h-3 text-gray-600 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-gray-600 leading-relaxed">{confidenceNote}</p>
+        </div>
+      )}
+
+      {/* ── Phase 5: Early Warning Signals ──────────────────────────────── */}
+      {earlyWarnings && earlyWarnings.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5">
+          <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Early Warning Signals</p>
+          {earlyWarnings.map((w) => {
+            const sev = w.severity === "elevated" ? "text-orange-400 bg-orange-500/8 border-orange-500/20"
+                      : w.severity === "advisory"  ? "text-amber-400  bg-amber-500/8  border-amber-500/20"
+                      :                              "text-gray-400   bg-white/5      border-white/10";
+            return (
+              <div key={w.id} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${sev}`}>
+                <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{w.message}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 

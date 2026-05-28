@@ -1,12 +1,14 @@
 "use client";
 import { GitBranch, TrendingUp, AlertTriangle, ShieldCheck, ChevronRight, Radio } from "lucide-react";
 import type { Scenario, OperationalExposure, MarketTransition } from "@/lib/api";
+import type { EarlyWarning } from "@/lib/energyRiskEngine";
 import { cn } from "@/lib/utils";
 
 interface Props {
   scenarios?:           Scenario[];
   operationalExposure?: OperationalExposure;
   marketTransition?:    MarketTransition;
+  earlyWarnings?:       EarlyWarning[];
 }
 
 const PROB_CFG = {
@@ -29,7 +31,7 @@ const TRANSITION_URGENCY_CFG = {
   low:    { cls: "text-gray-500",  bg: "bg-white/4      border-white/8"      },
 } as const;
 
-export default function ScenarioEngine({ scenarios, operationalExposure, marketTransition }: Props) {
+export default function ScenarioEngine({ scenarios, operationalExposure, marketTransition, earlyWarnings }: Props) {
   if (!scenarios?.length && !operationalExposure && !marketTransition) return null;
 
   const hasScenarios = (scenarios?.length ?? 0) > 0;
@@ -131,6 +133,28 @@ export default function ScenarioEngine({ scenarios, operationalExposure, marketT
           </div>
         )}
       </div>
+
+      {/* ── Phase 5: Early Warning Signals ──────────────────────────────────── */}
+      {earlyWarnings && earlyWarnings.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Pre-Escalation Signals</p>
+          <div className="space-y-1.5">
+            {earlyWarnings.map((w) => {
+              const sev = w.severity === "elevated"
+                ? "text-orange-400 bg-orange-500/8 border-orange-500/20"
+                : w.severity === "advisory"
+                ? "text-amber-400  bg-amber-500/8  border-amber-500/20"
+                : "text-gray-500   bg-white/4      border-white/8";
+              return (
+                <div key={w.id} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${sev}`}>
+                  <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{w.message}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Conditional Scenarios */}
       {hasScenarios && (
