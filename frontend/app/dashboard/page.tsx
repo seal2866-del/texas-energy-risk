@@ -22,6 +22,7 @@ import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligenc
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
 import ScenarioEngine from "@/components/widgets/ScenarioEngine";
 import RiskHistoryChart from "@/components/widgets/RiskHistoryChart";
+import PredictiveOutlook from "@/components/widgets/PredictiveOutlook";
 import OperationalExposure from "@/components/widgets/OperationalExposure";
 import MarketStatePanel from "@/components/widgets/MarketStatePanel";
 import RiskModelDebug from "@/components/widgets/RiskModelDebug";
@@ -30,8 +31,8 @@ import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energ
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
 import { supabase } from "@/lib/supabase";
 import {
-  getSignals, getERCOTPrices, getWeatherForecast, getGasData, getAIReasoning,
-  type SignalsResponse, type ERCOTPrice, type WeatherForecast, type GasRecord, type AIReasoningResponse, type EscalationProbability, type MarketSensitivity,
+  getSignals, getERCOTPrices, getWeatherForecast, getGasData, getAIReasoning, getSignalHistory,
+  type SignalsResponse, type ERCOTPrice, type WeatherForecast, type GasRecord, type AIReasoningResponse, type EscalationProbability, type MarketSensitivity, type SignalSnapshot,
 } from "@/lib/api";
 
 const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
@@ -192,6 +193,7 @@ export default function DashboardPage() {
   const [forecasts,    setForecasts]    = useState<WeatherForecast[]>([]);
   const [gasRecs,      setGasRecs]      = useState<GasRecord[]>([]);
   const [gasLatest,    setGasLatest]    = useState<GasRecord | null>(null);
+  const [snapshots,    setSnapshots]    = useState<SignalSnapshot[]>([]);
   const [aiReasoning,  setAiReasoning]  = useState<AIReasoningResponse | null>(null);
   const [aiLoading,    setAiLoading]    = useState(false);
   const [aiError,      setAiError]      = useState(false);
@@ -256,6 +258,11 @@ export default function DashboardPage() {
         setGasRecs(gasData.value.records);
         setGasLatest(gasData.value.latest);
       }
+      // Signal history for predictive outlook — fire independently
+      getSignalHistory(location, 168)
+        .then(r => setSnapshots(r.snapshots ?? []))
+        .catch(() => { /* silent — predictive widget shows empty state */ });
+
       // AI reasoning — fire independently so it never blocks the dashboard
       setAiLoading(true);
       setAiError(false);
@@ -477,6 +484,10 @@ export default function DashboardPage() {
 
               {signalsReady && (
                 <RiskHistoryChart location={location} />
+              )}
+
+              {signalsReady && snapshots.length >= 6 && (
+                <PredictiveOutlook snapshots={snapshots} />
               )}
 
               {/* ── AI Executive Brief — full width below top row ─────── */}
