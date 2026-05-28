@@ -1,5 +1,5 @@
 "use client";
-import { Clock, TrendingUp, Activity, Eye, ChevronRight } from "lucide-react";
+import { Clock, TrendingUp, Activity, Eye, ChevronRight, Radio } from "lucide-react";
 import type { IntervalIntelligence } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +79,7 @@ export default function IntervalIntelligenceWidget({ intelligence }: Props) {
   const { short_term, near_term, outlook } = intelligence;
 
   return (
-    <div className="card-glass border border-white/8 rounded-2xl p-5 lg:col-span-2">
+    <div className="card-glass border border-white/5 rounded-2xl p-5 lg:col-span-2">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5 mb-4">
@@ -122,9 +122,12 @@ export default function IntervalIntelligenceWidget({ intelligence }: Props) {
       </div>
 
       {/* ── Footer disclaimer ────────────────────────────────────────────────── */}
-      <p className="mt-3 text-[10px] text-gray-700">
-        Interval confidence decreases with forecast distance. All outlooks are probabilistic and operational in nature.
-      </p>
+      <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-1.5 text-[10px] text-gray-700">
+        <Radio className="w-3 h-3 text-teal-500/40 signal-sweep" />
+        <span className="uppercase tracking-wide font-semibold">
+          Interval confidence decreases with forecast distance · Probabilistic and operational only
+        </span>
+      </div>
     </div>
   );
 }

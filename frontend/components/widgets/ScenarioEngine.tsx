@@ -1,6 +1,5 @@
 "use client";
-import { GitBranch, TrendingUp, AlertTriangle, ShieldCheck, ChevronRight,
-         Minus, Radio } from "lucide-react";
+import { GitBranch, TrendingUp, AlertTriangle, ShieldCheck, ChevronRight, Radio } from "lucide-react";
 import type { Scenario, OperationalExposure, MarketTransition } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +63,7 @@ export default function ScenarioEngine({ scenarios, operationalExposure, marketT
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className={cn("grid grid-cols-1 gap-4", operationalExposure && marketTransition && "lg:grid-cols-2")}>
 
         {/* Left: Operational Exposure */}
         {operationalExposure && (

@@ -106,7 +106,7 @@ export default function SystemHealthCenter({ signals, aiLoading, aiSynced }: Pro
   const overallCfg = STATUS_CFG[overallStatus];
 
   return (
-    <div className="card-glass border border-white/8 rounded-2xl p-5">
+    <div className="card-glass border border-white/5 rounded-2xl p-5">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5">
@@ -124,7 +124,7 @@ export default function SystemHealthCenter({ signals, aiLoading, aiSynced }: Pro
           </div>
         </div>
         <span className={cn(
-          "flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border",
+          "flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border whitespace-nowrap",
           allNominal ? "bg-green-500/8 border-green-500/20 text-green-400" : overallCfg.bg + " " + overallCfg.cls,
         )}>
           <span className={cn("w-1.5 h-1.5 rounded-full", overallCfg.dot, allNominal ? "opacity-60" : "animate-pulse")} />

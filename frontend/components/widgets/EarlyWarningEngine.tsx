@@ -69,7 +69,7 @@ export default function EarlyWarningEngine({ earlyWarnings, riskTrend, weatherPe
   if (count === 0 && traj === "stable" && persist === "low") return null;
 
   return (
-    <div className="card-glass border border-white/8 rounded-2xl p-5 lg:col-span-2">
+    <div className="card-glass border border-white/5 rounded-2xl p-5 lg:col-span-2">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -121,8 +121,8 @@ export default function EarlyWarningEngine({ earlyWarnings, riskTrend, weatherPe
             <TrajIcon className={cn("w-3.5 h-3.5", trajCfg.cls)} />
             <span className={cn("text-sm font-bold", trajCfg.cls)}>{riskTrend?.label ?? "Stable"}</span>
           </div>
-          <p className="text-[10px] text-gray-600 mt-1 leading-snug max-w-[28ch]">
-            {riskTrend?.description?.slice(0, 80).concat("…") ?? "Holding at current levels."}
+          <p className="text-[10px] text-gray-600 mt-1 leading-snug line-clamp-2">
+            {riskTrend?.description ?? "Holding at current levels."}
           </p>
         </div>
 

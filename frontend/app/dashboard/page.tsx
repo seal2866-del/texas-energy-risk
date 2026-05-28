@@ -441,6 +441,12 @@ export default function DashboardPage() {
                 location={location}
               />
 
+              <EarlyWarningEngine
+                earlyWarnings={signals.early_warnings}
+                riskTrend={signals.risk_trend}
+                weatherPersistence={signals.weather_persistence}
+              />
+
               <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
 
               <WeatherRisk
@@ -457,14 +463,11 @@ export default function DashboardPage() {
                 panelGlow={gasGlow}
               />
 
-              <EnergyRiskDrivers signals={signals} />
-
-              <DataSources
-                sources={signals.data_sources}
-                computedAt={signals.computed_at}
+              <IntervalIntelligenceWidget
+                intelligence={signals.interval_intelligence}
               />
 
-              <RecentAlerts />
+              <EnergyRiskDrivers signals={signals} />
 
               <MarketInterpretation signals={signals} prices={prices} />
 
@@ -486,15 +489,12 @@ export default function DashboardPage() {
                 computedAt={signals.computed_at}
               />
 
-              <EarlyWarningEngine
-                earlyWarnings={signals.early_warnings}
-                riskTrend={signals.risk_trend}
-                weatherPersistence={signals.weather_persistence}
+              <DataSources
+                sources={signals.data_sources}
+                computedAt={signals.computed_at}
               />
 
-              <IntervalIntelligenceWidget
-                intelligence={signals.interval_intelligence}
-              />
+              <RecentAlerts />
 
               <ScenarioEngine
                 scenarios={signals.scenarios}
