@@ -32,7 +32,7 @@ TEMP_LOW_THRESHOLD_F      = 28.0
 GAS_STORAGE_PCT_THRESHOLD = -10.0
 
 # -- Data validation constants -------------------------------------------------
-DATA_FRESHNESS_MINUTES = 15
+DATA_FRESHNESS_MINUTES = 1440  # 24h — tolerate CDR cache lag on Railway
 DATA_MIN_REAL_POINTS   = 1
 MOCK_SOURCES           = {"mock", "mock_data", "generated", "demo", None, ""}
 
