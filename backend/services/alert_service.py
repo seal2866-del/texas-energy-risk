@@ -215,16 +215,16 @@ def log_alert(
 
 def _subject(alert_type: str, risk_level: str = "low") -> str:
     if alert_type == "daily_summary":
-        return "TX Energy Risk Daily Summary"
+        return "TX Energy Intelligence — Daily Operational Summary"
     if alert_type == "weekly_summary":
-        return "TX Energy Risk Weekly Summary"
+        return "TX Energy Intelligence — Weekly Operational Summary"
     if alert_type == "data_source":
-        return "TX Energy Risk Notice: Data Source Degraded"
+        return "TX Energy Intelligence — Data Source Degraded · Feed Health Notice"
     if risk_level == "high":
-        return "TX Energy Risk Alert: High Risk Detected"
+        return "TX Energy Intelligence — Elevated Operational Risk · Immediate Monitoring Warranted"
     if risk_level == "medium":
-        return "TX Energy Risk Alert: Medium Risk Detected"
-    return "TX Energy Risk Alert: Risk Level Update"
+        return "TX Energy Intelligence — Increased Operational Risk · Monitoring Recommended"
+    return "TX Energy Intelligence — Operational Risk Level Update"
 
 
 def _row(label: str, value: str) -> str:

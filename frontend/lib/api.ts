@@ -89,6 +89,12 @@ export interface EscalationProbability {
   rationale: string;
 }
 
+export interface MarketSensitivity {
+  level:       string;   // Low Sensitivity | Moderate Sensitivity | Elevated Sensitivity
+  score:       number;   // 0–95
+  description: string;
+}
+
 export interface DriverLevel {
   level:       RiskScore;
   explanation: string;
@@ -172,7 +178,9 @@ export interface SignalsResponse {
   };
   signal_alignment?:       SignalAlignment;
   what_changed?:           WhatChangedItem[];
-  escalation_probability?: EscalationProbability;
+  escalation_probability?:       EscalationProbability;
+  market_sensitivity?:           MarketSensitivity;
+  potential_escalation_drivers?: string[];
   summary:    string;
   disclaimer: string;
 }

@@ -1708,6 +1708,111 @@ def _compute_what_changed(
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
+# Market Sensitivity Engine
+# ------------------------------------------------------------------------------
+
+def _compute_market_sensitivity(
+    risk_score:       str,
+    signal_alignment: Dict[str, Any],
+    active_signals:   int,
+    risk_direction:   str,
+    demand_pressure:  Dict[str, Any],
+    supply_pressure:  Dict[str, Any],
+    market_reaction:  Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    How reactive/sensitive current conditions are — distinct from raw risk level.
+    A low-risk market can still be highly sensitive (one trigger away from escalation).
+    Returns {level, description}.
+    """
+    score = 0
+
+    alignment_score = signal_alignment.get("score", 0)
+    score += alignment_score * 12   # 0, 12, 24, 36
+
+    if risk_direction == "increasing":  score += 18
+    elif risk_direction == "stable":    score += 0
+    else:                               score -= 8
+
+    if risk_score == "high":    score += 20
+    elif risk_score == "medium": score += 10
+
+    # High-level drivers add sensitivity
+    for d in [demand_pressure, supply_pressure, market_reaction]:
+        if d and d.get("level") == "high":    score += 8
+        elif d and d.get("level") == "medium": score += 4
+
+    score = max(0, min(95, score))
+
+    if score >= 60:
+        level = "Elevated Sensitivity"
+        desc  = (
+            "Current conditions are highly reactive. "
+            "Additional demand, supply, or pricing pressure could trigger rapid escalation."
+        )
+    elif score >= 35:
+        level = "Moderate Sensitivity"
+        desc  = (
+            "Market conditions show elevated responsiveness to new pressure inputs. "
+            "Monitoring is advised."
+        )
+    else:
+        level = "Low Sensitivity"
+        desc  = (
+            "Market conditions are within normal operating bounds. "
+            "Sensitivity to new pressure inputs is limited at this time."
+        )
+
+    return {"level": level, "score": score, "description": desc}
+
+
+# ------------------------------------------------------------------------------
+# Potential Escalation Drivers
+# ------------------------------------------------------------------------------
+
+def _compute_potential_escalation_drivers(
+    demand_pressure:  Dict[str, Any],
+    supply_pressure:  Dict[str, Any],
+    market_reaction:  Dict[str, Any],
+    risk_direction:   str,
+    signal_alignment: Dict[str, Any],
+    events:           List[Dict],
+) -> List[str]:
+    """
+    Generate a list of potential escalation drivers based on current conditions.
+    Only returns drivers that are plausibly relevant given current state.
+    """
+    drivers = []
+
+    demand_level = demand_pressure.get("level", "low")  if demand_pressure  else "low"
+    supply_level = supply_pressure.get("level", "low")  if supply_pressure  else "low"
+    market_level = market_reaction.get("level", "low")  if market_reaction  else "low"
+    alignment    = signal_alignment.get("label", "None")
+
+    if demand_level in ("medium", "high"):
+        drivers.append("Sustained heat persistence driving continued grid load elevation")
+    if supply_level in ("medium", "high"):
+        drivers.append("Gas supply deterioration compounding generation cost sensitivity")
+    if market_level == "high":
+        drivers.append("Accelerating ERCOT price volatility reducing market predictability")
+    if risk_direction == "increasing":
+        drivers.append("Rising risk trajectory — conditions trending toward further escalation")
+    if alignment in ("Moderate", "Strong"):
+        drivers.append("Converging signal alignment increasing compounding risk potential")
+    if any(e.get("severity") == "high" for e in events):
+        drivers.append("Active high-severity events reinforcing operational risk exposure")
+
+    # Structural risks always relevant
+    if demand_level != "low" or supply_level != "low":
+        drivers.append("Reserve margin sensitivity during simultaneous demand and supply pressure")
+
+    if not drivers:
+        drivers.append("No material escalation catalysts identified at current monitoring interval")
+
+    return drivers[:5]   # cap at 5 for readability
+
+
+# ------------------------------------------------------------------------------
 # Escalation Probability Engine
 # ------------------------------------------------------------------------------
 
@@ -1917,6 +2022,16 @@ def run_all_signals(
             events, demand_pressure, supply_pressure, market_reaction,
         )
 
+        market_sensitivity = _compute_market_sensitivity(
+            risk_score, signal_alignment, active_count, risk_direction,
+            demand_pressure, supply_pressure, market_reaction,
+        )
+
+        potential_escalation_drivers = _compute_potential_escalation_drivers(
+            demand_pressure, supply_pressure, market_reaction,
+            risk_direction, signal_alignment, events,
+        )
+
         # ── Risk headline ─────────────────────────────────────────────────────
         risk_headline = risk_narrative["headline"]
 
@@ -1952,7 +2067,9 @@ def run_all_signals(
             "alert_severity":         alert_severity,
             "signal_alignment":          signal_alignment,
             "what_changed":              what_changed,
-            "escalation_probability":    escalation_probability,
+            "escalation_probability":         escalation_probability,
+            "market_sensitivity":             market_sensitivity,
+            "potential_escalation_drivers":   potential_escalation_drivers,
             "signals": {
                 "price_volatility": price_sig,
                 "weather_demand":   weather_sig,

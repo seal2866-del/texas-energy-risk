@@ -20,7 +20,7 @@ import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
   getSignals, getERCOTPrices, getWeatherForecast, getGasData, getAIReasoning,
-  type SignalsResponse, type ERCOTPrice, type WeatherForecast, type GasRecord, type AIReasoningResponse, type EscalationProbability,
+  type SignalsResponse, type ERCOTPrice, type WeatherForecast, type GasRecord, type AIReasoningResponse, type EscalationProbability, type MarketSensitivity,
 } from "@/lib/api";
 
 const LOCATIONS = ["Houston", "Dallas", "Austin", "San Antonio"] as const;
@@ -73,7 +73,9 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
   },
   signal_alignment: { label: "None", score: 0, description: "" },
   what_changed:          [],
-  escalation_probability: { level: "Low", pct: 0, rationale: "" },
+  escalation_probability:       { level: "Low", pct: 0, rationale: "" },
+  market_sensitivity:           { level: "Low Sensitivity", score: 0, description: "" },
+  potential_escalation_drivers: [],
   summary:    "",
   disclaimer: "",
 };
