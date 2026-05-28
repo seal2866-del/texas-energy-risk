@@ -31,7 +31,64 @@ ENVIRONMENT  = os.getenv("ENVIRONMENT", "development")
 # ── Background price poller ───────────────────────────────────
 # Keeps the in-memory ERCOT price cache warm regardless of user traffic.
 # Polls immediately on startup then every POLL_INTERVAL_SECONDS.
-POLL_INTERVAL_SECONDS = int(os.getenv("ERCOT_POLL_INTERVAL", "300"))   # default 5 min
+POLL_INTERVAL_SECONDS    = int(os.getenv("ERCOT_POLL_INTERVAL", "300"))    # default 5 min
+GRID_POLL_INTERVAL_SECS  = int(os.getenv("GRID_POLL_INTERVAL",  "1800"))   # default 30 min
+
+# All cities that need background signal snapshots
+GRID_LOCATIONS = [
+    "Houston", "Dallas", "Austin", "San Antonio",
+    "Midland", "Odessa", "Corpus Christi", "Lubbock",
+]
+
+
+async def _grid_signal_loop():
+    """
+    Background task: run the signal engine for every monitored city every
+    GRID_POLL_INTERVAL_SECS.  Snapshots are written as a side-effect of
+    run_all_signals → save_snapshot, so the grid map and analytics pages
+    have fresh data for all 8 locations.
+    """
+    from services.external_apis  import fetch_ercot_prices, fetch_weather_forecast, fetch_gas_data
+    from services.signal_engine  import run_all_signals
+    from services.snapshot_service import save_snapshot
+
+    # Wait for the ERCOT price cache to warm up before first pass
+    await asyncio.sleep(60)
+
+    log.info("[GRID-POLLER] Multi-location signal poller starting (interval=%ds, %d cities)",
+             GRID_POLL_INTERVAL_SECS, len(GRID_LOCATIONS))
+
+    while True:
+        for loc in GRID_LOCATIONS:
+            try:
+                prices_r, wx_r, gas_r = await asyncio.gather(
+                    fetch_ercot_prices(hours=6, settlement_point="HB_HOUSTON"),
+                    fetch_weather_forecast(location=loc, days=3),
+                    fetch_gas_data(weeks=4),
+                    return_exceptions=True,
+                )
+                prices     = prices_r if not isinstance(prices_r, Exception) else []
+                forecasts  = wx_r     if not isinstance(wx_r,     Exception) else []
+                gas_data   = gas_r    if not isinstance(gas_r,    Exception) else {}
+
+                gas_records = gas_data.get("records", []) if isinstance(gas_data, dict) else []
+                gas_latest  = gas_data.get("latest",  None) if isinstance(gas_data, dict) else None
+
+                result = run_all_signals(prices, forecasts, gas_records)
+
+                ercot_latest = prices[-1].price_mwh if prices and hasattr(prices[-1], "price_mwh") else None
+                henry_hub    = gas_latest.henry_hub_price if gas_latest and hasattr(gas_latest, "henry_hub_price") else None
+                await save_snapshot(result, loc, ercot_latest, henry_hub)
+                log.info("[GRID-POLLER] %s → %s", loc, result.get("risk_score", "?"))
+
+            except Exception as exc:
+                log.warning("[GRID-POLLER] Failed for %s: %s", loc, exc)
+
+            # Brief pause between cities to avoid thundering-herd on external APIs
+            await asyncio.sleep(10)
+
+        log.info("[GRID-POLLER] Full grid pass complete. Next in %ds.", GRID_POLL_INTERVAL_SECS)
+        await asyncio.sleep(GRID_POLL_INTERVAL_SECS)
 
 
 async def _ercot_price_loop():
@@ -65,6 +122,11 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(_ercot_price_loop())
     log.info("[STARTUP] Background ERCOT price poller scheduled")
 
+    # ── Multi-location grid signal poller ─────────────────────────
+    grid_task = asyncio.create_task(_grid_signal_loop())
+    log.info("[STARTUP] Multi-location grid poller scheduled (%d cities, every %ds)",
+             len(GRID_LOCATIONS), GRID_POLL_INTERVAL_SECS)
+
     # ── Morning digest scheduler (7am CT = 12:00 UTC) ────────────
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
@@ -79,12 +141,13 @@ async def lifespan(app: FastAPI):
     yield
 
     scheduler.shutdown(wait=False)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
-    log.info("[SHUTDOWN] Price poller + digest scheduler stopped")
+    for t in (task, grid_task):
+        t.cancel()
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
+    log.info("[SHUTDOWN] Price poller + grid poller + digest scheduler stopped")
 
 
 async def _run_morning_digest():
