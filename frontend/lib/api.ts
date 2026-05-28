@@ -376,3 +376,30 @@ export interface AIReasoningResponse {
 
 export const getAIReasoning = (location = "Houston") =>
   apiFetch<AIReasoningResponse>(`/api/ai-reasoning?location=${location}`);
+
+// ── Historical signal snapshots ───────────────────────────────────────────────
+
+export interface SignalSnapshot {
+  computed_at:          string;
+  risk_score:           string;
+  risk_score_numeric:   number;
+  risk_direction?:      string;
+  confidence?:          number;
+  escalation_pct?:      number;
+  demand_level?:        string;
+  supply_level?:        string;
+  market_level?:        string;
+  ercot_price?:         number;
+  primary_driver?:      string;
+  active_signals?:      number;
+}
+
+export interface SignalHistory {
+  location:   string;
+  hours:      number;
+  count:      number;
+  snapshots:  SignalSnapshot[];
+}
+
+export const getSignalHistory = (location = "Houston", hours = 168) =>
+  apiFetch<SignalHistory>(`/api/signals/history?location=${encodeURIComponent(location)}&hours=${hours}`);

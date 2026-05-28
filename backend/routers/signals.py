@@ -83,6 +83,15 @@ async def get_signals(
                        result.get("risk_score"), result.get("data_valid"))
 
         await _maybe_trigger_alert(result, location, authorization)
+
+        # Fire-and-forget snapshot — never blocks the response
+        import asyncio as _asyncio
+        ercot_vals = [p.get("price_mwh", 0) for p in prices if (p.get("price_mwh") or 0) > 0]
+        ercot_latest = ercot_vals[-1] if ercot_vals else None
+        gas_latest = gas_data[-1] if gas_data else {}
+        henry_hub = gas_latest.get("henry_hub_price") if gas_latest else None
+        _asyncio.create_task(_save_snapshot(result, location, ercot_latest, henry_hub))
+
         return result
 
     except Exception as exc:
@@ -104,4 +113,31 @@ async def get_risk_score(location: str = Query(default="Houston")):
         "active_signals": result["active_signals"],
         "computed_at":    result["computed_at"],
         "disclaimer":     result["disclaimer"],
+    }
+
+async def _save_snapshot(result, location, ercot_price, henry_hub):
+    """Fire-and-forget wrapper — errors are logged, never raised."""
+    try:
+        from services.snapshot_service import save_snapshot
+        await save_snapshot(result, location, ercot_price, henry_hub)
+    except Exception as exc:
+        logger.warning("[SIGNALS] Snapshot save error: %s", exc)
+
+
+@router.get("/history")
+async def get_signal_history(
+    location: str = Query(default="Houston"),
+    hours:    int  = Query(default=168, ge=1, le=720),
+):
+    """
+    Returns historical signal snapshots for a location.
+    Default: last 7 days (168 hours). Max: 30 days (720 hours).
+    """
+    from services.snapshot_service import get_history
+    data = await get_history(location=location, hours=hours)
+    return {
+        "location": location,
+        "hours":    hours,
+        "count":    len(data),
+        "snapshots": data,
     }

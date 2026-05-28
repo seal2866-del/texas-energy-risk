@@ -21,6 +21,7 @@ import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
 import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
 import ScenarioEngine from "@/components/widgets/ScenarioEngine";
+import RiskHistoryChart from "@/components/widgets/RiskHistoryChart";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
@@ -431,6 +432,10 @@ export default function DashboardPage() {
               />
 
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} />
+
+              {signalsReady && (
+                <RiskHistoryChart location={location} />
+              )}
 
               {/* ── AI Executive Brief — full width below top row ─────── */}
               <AIExecutiveBrief
