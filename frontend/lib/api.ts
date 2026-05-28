@@ -181,6 +181,12 @@ export interface SignalsResponse {
   escalation_probability?:       EscalationProbability;
   market_sensitivity?:           MarketSensitivity;
   potential_escalation_drivers?: string[];
+  // Phase 10 — Predictive Intelligence
+  weather_persistence?:   WeatherPersistence;
+  early_warnings?:        EarlyWarnings;
+  risk_trend?:            RiskTrend;
+  gas_power_correlation?: GasPowerCorrelation;
+  interval_intelligence?: IntervalIntelligence;
   summary:    string;
   disclaimer: string;
 }
@@ -272,6 +278,50 @@ export interface AlertPrefs {
 
 export const updateAlertPrefs = (prefs: AlertPrefs, token: string) =>
   apiFetch<{ success: boolean }>(`/api/alerts/prefs/`, token);
+
+// ── Phase 10 — Predictive Intelligence Types ──────────────────────────────────
+
+export interface WeatherPersistence {
+  consecutive_high_days:  number;
+  overnight_cooling_weak: boolean;
+  persistence_risk:       "low" | "moderate" | "elevated" | "high";
+  description:            string;
+}
+
+export interface EarlyWarnings {
+  warnings:         string[];
+  warning_count:    number;
+  highest_severity: "none" | "watch" | "caution" | "alert";
+}
+
+export interface RiskTrend {
+  trajectory:  "improving" | "stable" | "tightening" | "deteriorating" | "accelerating";
+  label:       string;
+  description: string;
+  momentum:    "positive" | "neutral" | "negative";
+}
+
+export interface GasPowerCorrelation {
+  correlation_level:   "low" | "moderate" | "elevated" | "high";
+  sensitivity:         string;
+  description:         string;
+  henry_hub_price:     number;
+  storage_pct_vs_avg:  number;
+}
+
+export interface IntervalOutlook {
+  label:            string;
+  outlook:          string;
+  confidence:       number;
+  escalation_pct:   number;
+  monitoring_focus: string;
+}
+
+export interface IntervalIntelligence {
+  short_term: IntervalOutlook;
+  near_term:  IntervalOutlook;
+  outlook:    IntervalOutlook;
+}
 
 // ── AI Reasoning Layer ────────────────────────────────────────────────────────
 

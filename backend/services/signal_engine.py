@@ -1889,6 +1889,362 @@ def _compute_escalation_probability(
     }
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 10 — PREDICTIVE ENERGY INTELLIGENCE
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _compute_weather_persistence(forecasts: List[Dict]) -> Dict[str, Any]:
+    """Analyze sustained heat duration and overnight cooling recovery."""
+    if not forecasts:
+        return {
+            "consecutive_high_days":  0,
+            "overnight_cooling_weak": False,
+            "persistence_risk":       "low",
+            "description": "Insufficient forecast data for persistence analysis.",
+        }
+    high_days   = [f for f in forecasts[:7] if (f.get("temp_high_f") or 0) >= 95]
+    hot_nights  = [f for f in forecasts[:4] if (f.get("temp_low_f")  or 60) >= 75]
+    consec_high = len(high_days)
+    cooling_weak = len(hot_nights) >= 2
+
+    if consec_high >= 4 or (consec_high >= 3 and cooling_weak):
+        risk = "high"
+        desc = (
+            f"Extended heat persistence detected — {consec_high} forecast intervals at or above 95°F. "
+            + ("Overnight temperatures remain elevated, limiting cooling recovery between demand intervals."
+               if cooling_weak else
+               "Sustained demand pressure expected through the forecast window.")
+        )
+    elif consec_high >= 2 and cooling_weak:
+        risk = "elevated"
+        desc = (
+            f"Multiple consecutive high-temperature intervals with limited overnight cooling. "
+            "Sustained demand pressure likely through the near-term window."
+        )
+    elif consec_high >= 2:
+        risk = "moderate"
+        desc = (
+            f"{consec_high} consecutive high-temperature intervals detected. "
+            "Weather-driven demand pressure may persist through the near-term outlook."
+        )
+    elif consec_high == 1 and cooling_weak:
+        risk = "moderate"
+        desc = "Elevated temperature interval with weak overnight cooling. Demand pressure may continue."
+    else:
+        risk = "low"
+        desc = "No sustained heat persistence pattern detected. Weather conditions within normal seasonal range."
+
+    return {
+        "consecutive_high_days":  consec_high,
+        "overnight_cooling_weak": cooling_weak,
+        "persistence_risk":       risk,
+        "description":            desc,
+    }
+
+
+def _compute_early_warnings(
+    demand: Dict, supply: Dict, market: Dict,
+    forecasts: List[Dict], gas_records: List[Dict],
+    escalation_prob: Dict, risk_direction: str,
+    signal_alignment: Dict,
+) -> Dict[str, Any]:
+    """
+    Detect pre-escalation patterns BEFORE they trigger formal risk levels.
+    Returns probabilistic operational warning strings — not predictions.
+    Language is informational, probabilistic, and non-financial.
+    """
+    warnings: List[str] = []
+    severity = "none"
+
+    demand_lvl  = demand.get("level",  "low")
+    supply_lvl  = supply.get("level",  "low")
+    market_lvl  = market.get("level",  "low")
+    align_score = signal_alignment.get("score", 0)
+    esc_pct     = escalation_prob.get("pct", 0)
+
+    high_temp_days = sum(1 for f in forecasts[:5] if (f.get("temp_high_f") or 0) >= 95)
+    hot_nights     = sum(1 for f in forecasts[:3] if (f.get("temp_low_f") or 60) >= 75)
+
+    # ── Heat persistence ────────────────────────────────────────────────────
+    if high_temp_days >= 3:
+        warnings.append(
+            "Sustained heat persistence detected across multiple forecast intervals — "
+            "elevated cooling demand pressure may persist through the near-term window."
+        )
+        severity = "caution"
+    elif high_temp_days >= 2 and demand_lvl in ("medium", "high"):
+        warnings.append(
+            "Consecutive high-temperature intervals suggest demand pressure may sustain "
+            "above baseline through the near-term outlook."
+        )
+        severity = "watch"
+
+    # ── Overnight cooling weakness ──────────────────────────────────────────
+    if hot_nights >= 2 and demand_lvl in ("medium", "high"):
+        warnings.append(
+            "Overnight temperature recovery appears limited — reduced cooling relief may "
+            "sustain demand pressure through consecutive load intervals."
+        )
+        if severity == "none":
+            severity = "watch"
+
+    # ── Gas supply tightening trajectory ────────────────────────────────────
+    if len(gas_records) >= 2:
+        latest_pct = gas_records[-1].get("storage_pct_vs_avg", 0) or 0
+        prior_pct  = gas_records[-2].get("storage_pct_vs_avg", 0) or 0
+        if latest_pct < prior_pct and supply_lvl in ("medium", "high"):
+            warnings.append(
+                "Natural gas storage trending below prior-week levels — "
+                "supply-side sensitivity may be increasing despite current market stability."
+            )
+            if severity == "none":
+                severity = "watch"
+
+    # ── Supply + demand convergence ──────────────────────────────────────────
+    if demand_lvl in ("medium", "high") and supply_lvl in ("medium", "high"):
+        warnings.append(
+            "Weather-driven demand pressure and gas supply sensitivity are simultaneously "
+            "elevated — convergence conditions increase escalation responsiveness."
+        )
+        severity = "caution"
+
+    # ── Volatility acceleration ──────────────────────────────────────────────
+    if market_lvl in ("medium", "high") and risk_direction == "increasing":
+        warnings.append(
+            "Market reaction indicators are elevated and conditions are trending in an "
+            "increasing direction — price volatility acceleration is possible near-term."
+        )
+        severity = "caution"
+
+    # ── Multi-driver alignment building ──────────────────────────────────────
+    if align_score >= 2 and esc_pct >= 25:
+        warnings.append(
+            "Multiple risk drivers are simultaneously active — signal alignment suggests "
+            "conditions are sensitive to additional pressure from any single driver."
+        )
+        if severity not in ("alert", "caution"):
+            severity = "caution"
+
+    # ── Reserve margin tightening watch ──────────────────────────────────────
+    if demand_lvl == "high" and market_lvl in ("medium", "high"):
+        warnings.append(
+            "High demand conditions combined with active market reaction — "
+            "generation reserve margins may be approaching tighter operating bands."
+        )
+        severity = "alert"
+
+    warnings = warnings[:5]
+    return {
+        "warnings":         warnings,
+        "warning_count":    len(warnings),
+        "highest_severity": severity,
+    }
+
+
+def _compute_risk_trend(
+    risk_score: str, risk_direction: str, signal_alignment: Dict,
+    demand: Dict, supply: Dict, market: Dict,
+    what_changed: List[Dict],
+) -> Dict[str, Any]:
+    """Determine the trajectory of conditions — direction of travel, not current state."""
+    rising_count = sum(1 for w in what_changed if w.get("direction") in ("rising", "escalated"))
+    easing_count = sum(1 for w in what_changed if w.get("direction") in ("easing", "improved"))
+    align_score  = signal_alignment.get("score", 0)
+
+    if risk_score == "high" and risk_direction == "increasing":
+        traj     = "accelerating"
+        label    = "Conditions Accelerating"
+        desc     = ("Multiple risk indicators are simultaneously elevated and trending higher. "
+                    "Conditions may escalate further without stabilizing pressure changes.")
+        momentum = "negative"
+    elif risk_score == "high" and risk_direction == "stable":
+        traj     = "deteriorating"
+        label    = "Conditions Deteriorated"
+        desc     = ("Risk conditions have reached an elevated state and are holding at current levels. "
+                    "No immediate improvement signals detected.")
+        momentum = "negative"
+    elif risk_score == "medium" and risk_direction == "increasing":
+        traj     = "tightening"
+        label    = "Conditions Tightening"
+        desc     = ("Moderate risk indicators are trending toward elevated territory. "
+                    "Conditions warrant increased monitoring frequency.")
+        momentum = "negative"
+    elif risk_direction == "decreasing":
+        traj     = "improving"
+        label    = "Conditions Improving"
+        desc     = ("Risk indicators are trending lower. Conditions appear to be easing toward a "
+                    "more stable operational environment.")
+        momentum = "positive"
+    elif rising_count > easing_count and align_score >= 2:
+        traj     = "tightening"
+        label    = "Conditions Tightening"
+        desc     = ("Multiple drivers showing increasing pressure. Conditions may tighten further "
+                    "if current trajectory continues.")
+        momentum = "negative"
+    elif easing_count > rising_count:
+        traj     = "improving"
+        label    = "Conditions Easing"
+        desc     = ("Several risk indicators have moved to lower levels. Operational pressure "
+                    "appears to be reducing from recent intervals.")
+        momentum = "positive"
+    else:
+        traj     = "stable"
+        label    = "Conditions Stable"
+        desc     = ("Risk indicators are holding at current levels without material directional "
+                    "movement in either direction.")
+        momentum = "neutral"
+
+    return {
+        "trajectory":  traj,
+        "label":       label,
+        "description": desc,
+        "momentum":    momentum,
+    }
+
+
+def _compute_gas_power_correlation(
+    gas_records: List[Dict],
+    demand: Dict, supply: Dict, market: Dict,
+) -> Dict[str, Any]:
+    """Analyze relationship between gas supply, weather demand, and ERCOT pricing."""
+    demand_lvl = demand.get("level", "low")
+    supply_lvl = supply.get("level", "low")
+    market_lvl = market.get("level", "low")
+
+    latest_gas  = gas_records[-1] if gas_records else {}
+    henry_hub   = float(latest_gas.get("henry_hub_price", 3.0) or 3.0)
+    storage_pct = float(latest_gas.get("storage_pct_vs_avg", 0) or 0)
+
+    high_factors = sum([
+        demand_lvl in ("medium", "high"),
+        supply_lvl in ("medium", "high"),
+        market_lvl in ("medium", "high"),
+        henry_hub > 3.5,
+        storage_pct < -5,
+    ])
+
+    direction_str = f"{'below' if storage_pct < 0 else 'above'}"
+    storage_abs   = abs(storage_pct)
+
+    if high_factors >= 4:
+        corr = "high"
+        sens = "Strong coupling between gas supply conditions and ERCOT pricing behavior detected."
+        desc = (
+            f"Gas-to-power correlation is elevated. Demand pressure, supply sensitivity, and market "
+            f"reaction are simultaneously active — fuel-side costs are likely influencing generation "
+            f"dispatch decisions. Henry Hub at ${henry_hub:.2f}/MMBtu with storage "
+            f"{storage_abs:.0f}% {direction_str} 5-year average."
+        )
+    elif high_factors >= 2:
+        corr = "elevated"
+        sens = "Moderate coupling between gas market conditions and power pricing observed."
+        demand_note = "Weather-driven demand is increasing gas-fired generation requirements. " if demand_lvl in ("medium","high") else ""
+        supply_note = "Gas storage conditions are contributing to supply-side sensitivity. " if supply_lvl in ("medium","high") else ""
+        desc = (
+            f"Gas-to-power sensitivity is moderately elevated. {demand_note}{supply_note}"
+            f"Henry Hub at ${henry_hub:.2f}/MMBtu."
+        ).strip()
+    elif high_factors == 1:
+        corr = "moderate"
+        sens = "Limited gas-to-power coupling at current conditions."
+        avg_note = "average" if storage_abs < 5 else f"{storage_abs:.0f}% {direction_str} average"
+        desc = (
+            f"Gas supply conditions are within adequate range. "
+            f"Henry Hub at ${henry_hub:.2f}/MMBtu with storage near {avg_note}. "
+            "Fuel-side escalation risk remains limited at current conditions."
+        )
+    else:
+        corr = "low"
+        sens = "Gas supply adequate — minimal fuel-side escalation risk."
+        demand_note = "elevated" if demand_lvl == "high" else "current"
+        desc = (
+            f"Natural gas storage remains adequate, limiting immediate fuel-side escalation risk "
+            f"despite {demand_note} weather demand. Henry Hub at ${henry_hub:.2f}/MMBtu."
+        )
+
+    return {
+        "correlation_level":   corr,
+        "sensitivity":         sens,
+        "description":         desc,
+        "henry_hub_price":     henry_hub,
+        "storage_pct_vs_avg":  storage_pct,
+    }
+
+
+def _compute_interval_intelligence(
+    risk_score: str, risk_direction: str,
+    demand: Dict, supply: Dict, market: Dict,
+    escalation_prob: Dict, confidence: Optional[int],
+    weather_persistence: Dict,
+    time_horizons: Dict,
+) -> Dict[str, Any]:
+    """Per-interval (0-6h, 6-24h, 24-48h) operational intelligence with confidence + escalation."""
+    base_esc      = escalation_prob.get("pct", 0) or 0
+    base_conf     = confidence or 70
+    demand_lvl    = demand.get("level", "low")
+    supply_lvl    = supply.get("level", "low")
+    market_lvl    = market.get("level", "low")
+    persist_risk  = weather_persistence.get("persistence_risk", "low")
+
+    # Short-term 0-6h — highest certainty
+    st_esc  = min(base_esc + 5, 95) if risk_direction == "increasing" else max(base_esc - 5, 0)
+    st_conf = min(base_conf + 5, 95)
+    st_out  = time_horizons.get("short_term", "Monitoring active for the next 6-hour interval.")
+    if market_lvl == "high":
+        st_focus = "Monitor ERCOT real-time pricing for volatility spikes and settlement point deviations."
+    elif demand_lvl == "high":
+        st_focus = "Track weather-driven load conditions and generation reserve margin reports."
+    else:
+        st_focus = "Routine monitoring — verify ERCOT pricing remains within normal operating band."
+
+    # Near-term 6-24h — moderate uncertainty
+    nt_esc  = min(base_esc + 10, 95) if persist_risk in ("elevated", "high") else base_esc
+    nt_conf = max(base_conf - 8, 45)
+    nt_out  = time_horizons.get("near_term", "Near-term conditions subject to weather persistence patterns.")
+    if persist_risk in ("elevated", "high"):
+        nt_focus = "Evaluate weather persistence through daytime peak intervals — cooling demand may remain elevated."
+    elif supply_lvl in ("medium", "high"):
+        nt_focus = "Monitor EIA storage updates and Henry Hub for supply-side sensitivity changes."
+    else:
+        nt_focus = "Standard monitoring — no material escalation signals projected for the 6-24h window."
+
+    # Outlook 24-48h — lowest confidence
+    out_esc  = min(base_esc + 5, 85) if risk_direction == "increasing" else max(base_esc - 10, 0)
+    out_conf = max(base_conf - 18, 35)
+    out_out  = time_horizons.get("outlook", "48-hour operational outlook based on current signal trajectory.")
+    if persist_risk == "high":
+        out_focus = "Review extended forecast models for heat wave duration and overnight recovery patterns."
+    elif risk_direction == "decreasing":
+        out_focus = "Conditions trending toward improvement — verify stabilization across all data sources."
+    else:
+        out_focus = "Continue monitoring all signal channels — conditions subject to weather and supply updates."
+
+    return {
+        "short_term": {
+            "label":            "0–6 Hour Outlook",
+            "outlook":          st_out,
+            "confidence":       st_conf,
+            "escalation_pct":   st_esc,
+            "monitoring_focus": st_focus,
+        },
+        "near_term": {
+            "label":            "6–24 Hour Outlook",
+            "outlook":          nt_out,
+            "confidence":       nt_conf,
+            "escalation_pct":   nt_esc,
+            "monitoring_focus": nt_focus,
+        },
+        "outlook": {
+            "label":            "24–48 Hour Outlook",
+            "outlook":          out_out,
+            "confidence":       out_conf,
+            "escalation_pct":   out_esc,
+            "monitoring_focus": out_focus,
+        },
+    }
+
+
 def run_all_signals(
     prices:      List[Dict],
     forecasts:   List[Dict],
@@ -2032,6 +2388,28 @@ def run_all_signals(
             risk_direction, signal_alignment, events,
         )
 
+        # ── Phase 10: Predictive Intelligence ────────────────────────────────
+        weather_persistence   = _compute_weather_persistence(forecasts)
+        early_warnings        = _compute_early_warnings(
+            demand_pressure, supply_pressure, market_reaction,
+            forecasts, gas_records, escalation_probability,
+            risk_direction, signal_alignment,
+        )
+        risk_trend            = _compute_risk_trend(
+            risk_score, risk_direction, signal_alignment,
+            demand_pressure, supply_pressure, market_reaction,
+            what_changed,
+        )
+        gas_power_correlation = _compute_gas_power_correlation(
+            gas_records, demand_pressure, supply_pressure, market_reaction,
+        )
+        interval_intelligence = _compute_interval_intelligence(
+            risk_score, risk_direction,
+            demand_pressure, supply_pressure, market_reaction,
+            escalation_probability, confidence,
+            weather_persistence, time_horizons,
+        )
+
         # ── Risk headline ─────────────────────────────────────────────────────
         risk_headline = risk_narrative["headline"]
 
@@ -2070,6 +2448,12 @@ def run_all_signals(
             "escalation_probability":         escalation_probability,
             "market_sensitivity":             market_sensitivity,
             "potential_escalation_drivers":   potential_escalation_drivers,
+            # Phase 10 — Predictive Intelligence
+            "weather_persistence":            weather_persistence,
+            "early_warnings":                 early_warnings,
+            "risk_trend":                     risk_trend,
+            "gas_power_correlation":          gas_power_correlation,
+            "interval_intelligence":          interval_intelligence,
             "signals": {
                 "price_volatility": price_sig,
                 "weather_demand":   weather_sig,

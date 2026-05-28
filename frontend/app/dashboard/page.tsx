@@ -17,6 +17,8 @@ import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
 import MarketInterpretation from "@/components/widgets/MarketInterpretation";
 import WhatChanged from "@/components/widgets/WhatChanged";
 import AIExecutiveBrief from "@/components/widgets/AIExecutiveBrief";
+import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
+import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
@@ -77,6 +79,11 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
   escalation_probability:       { level: "Low", pct: 0, rationale: "" },
   market_sensitivity:           { level: "Low Sensitivity", score: 0, description: "" },
   potential_escalation_drivers: [],
+  weather_persistence:   { consecutive_high_days: 0, overnight_cooling_weak: false, persistence_risk: "low", description: "" },
+  early_warnings:        { warnings: [], warning_count: 0, highest_severity: "none" },
+  risk_trend:            { trajectory: "stable", label: "Stable", description: "", momentum: "neutral" },
+  gas_power_correlation: { correlation_level: "low", sensitivity: "", description: "", henry_hub_price: 0, storage_pct_vs_avg: 0 },
+  interval_intelligence: undefined,
   summary:    "",
   disclaimer: "",
 };
@@ -407,6 +414,16 @@ export default function DashboardPage() {
               <AISummary
                 signals={signals}
                 computedAt={signals.computed_at}
+              />
+
+              <EarlyWarningEngine
+                earlyWarnings={signals.early_warnings}
+                riskTrend={signals.risk_trend}
+                weatherPersistence={signals.weather_persistence}
+              />
+
+              <IntervalIntelligenceWidget
+                intelligence={signals.interval_intelligence}
               />
 
             </div>
