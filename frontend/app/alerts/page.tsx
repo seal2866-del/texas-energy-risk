@@ -34,6 +34,8 @@ const DEFAULT_PREFS = {
   temp_high_threshold_f:     105,
   temp_low_threshold_f:      25,
   gas_storage_pct_threshold: -10,
+  digest_enabled:            false,
+  digest_email:              "",
 };
 
 const LOCATIONS   = ["Houston", "Dallas", "Austin", "San Antonio"];
@@ -633,6 +635,35 @@ export default function AlertsPage() {
                 <p className="mt-3 text-xs text-gray-600 leading-relaxed border-t border-white/5 pt-3">
                   Duplicate alerts are suppressed: the same risk level and driver will not re-alert within 60 minutes (30 minutes for High Risk).
                 </p>
+              </div>
+
+              {/* Morning Digest */}
+              <div className="card-glass border border-white/5 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-orange-400" />
+                    Morning Digest
+                  </h2>
+                  <Toggle on={!!prefs.digest_enabled} onToggle={() => set("digest_enabled", !prefs.digest_enabled)} />
+                </div>
+                <p className="text-xs text-gray-500 mb-4">
+                  Receive a daily risk summary at 7 AM CT every morning — separate from your real-time alerts.
+                </p>
+                {prefs.digest_enabled && (
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400 font-medium">Delivery email</label>
+                    <input
+                      type="email"
+                      value={(prefs as any).digest_email || ""}
+                      onChange={e => set("digest_email", e.target.value)}
+                      placeholder="Enter email (leave blank to use account email)"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
+                    />
+                    <p className="text-xs text-gray-600">
+                      If left blank, the digest is sent to your account email.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Compliance */}

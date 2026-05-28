@@ -36,6 +36,8 @@ class AlertPrefs(BaseModel):
     temp_high_threshold_f:     Optional[float] = 105.0
     temp_low_threshold_f:      Optional[float] = 25.0
     gas_storage_pct_threshold: Optional[float] = -10.0
+    digest_enabled:            Optional[bool]  = False
+    digest_email:              Optional[str]   = None
 
 
 # ── Auth helper ───────────────────────────────────────────────

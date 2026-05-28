@@ -15,8 +15,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron      import CronTrigger
 
 from routers import ercot, weather, gas, signals, alerts, stripe_webhooks, stripe_checkout, ai_reasoning, export
+from routers import digest
 
 load_dotenv()
 
@@ -58,16 +61,36 @@ async def _ercot_price_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Kick off the background poller as a fire-and-forget task
+    # ── Background ERCOT price poller ────────────────────────────
     task = asyncio.create_task(_ercot_price_loop())
     log.info("[STARTUP] Background ERCOT price poller scheduled")
+
+    # ── Morning digest scheduler (7am CT = 12:00 UTC) ────────────
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        _run_morning_digest,
+        CronTrigger(hour=12, minute=0, timezone="UTC"),   # 7am CDT / 8am CST
+        id="morning_digest",
+        replace_existing=True,
+    )
+    scheduler.start()
+    log.info("[STARTUP] Morning digest scheduler started (07:00 CT daily)")
+
     yield
+
+    scheduler.shutdown(wait=False)
     task.cancel()
     try:
         await task
     except asyncio.CancelledError:
         pass
-    log.info("[SHUTDOWN] Price poller stopped")
+    log.info("[SHUTDOWN] Price poller + digest scheduler stopped")
+
+
+async def _run_morning_digest():
+    """Wrapper so APScheduler can call the async digest function."""
+    from services.digest_service import send_morning_digest
+    await send_morning_digest()
 
 
 app = FastAPI(
@@ -105,6 +128,7 @@ app.include_router(stripe_webhooks.router)
 app.include_router(stripe_checkout.router)
 app.include_router(ai_reasoning.router)
 app.include_router(export.router)
+app.include_router(digest.router)
 
 
 # ── Health check ──────────────────────────────────────────────
