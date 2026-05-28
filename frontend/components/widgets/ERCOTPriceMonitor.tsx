@@ -3,11 +3,20 @@ import { useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { TrendingUp, TrendingDown, Clock, WifiOff, AlertTriangle } from "lucide-react";
 import type { ERCOTPrice } from "@/lib/api";
+import type { PriceBehavior } from "@/lib/energyRiskEngine";
 import { formatPrice } from "@/lib/utils";
 
+const PB_CONFIG: Record<PriceBehavior, { label: string; color: string; icon: string }> = {
+  falling:  { label: "Falling",  color: "text-green-400",  icon: "↘" },
+  stable:   { label: "Stable",   color: "text-gray-400",   icon: "→" },
+  rising:   { label: "Rising",   color: "text-amber-400",  icon: "↗" },
+  volatile: { label: "Volatile", color: "text-orange-400", icon: "↕" },
+};
+
 interface Props {
-  prices:   ERCOTPrice[];
-  loading?: boolean;
+  prices:         ERCOTPrice[];
+  loading?:       boolean;
+  priceBehavior?: PriceBehavior | null;
 }
 
 const PRICE_LOW_FLOOR    = 10;
@@ -52,7 +61,7 @@ const F = {
   stale:    { label: "Stale",     bg: "bg-red-500/10",    border: "border-red-500/25",    text: "text-red-400",   dot: "bg-red-400" },
 };
 
-export default function ERCOTPriceMonitor({ prices, loading }: Props) {
+export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Props) {
   const [hours, setHours] = useState<12 | 24>(12);
 
   const latest  = prices[prices.length - 1];
@@ -116,7 +125,17 @@ export default function ERCOTPriceMonitor({ prices, loading }: Props) {
       {/* Header row */}
       <div className="flex items-start justify-between mb-1">
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">ERCOT Price Monitor</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">ERCOT Price Monitor</p>
+            {priceBehavior && (() => {
+              const pb = PB_CONFIG[priceBehavior];
+              return (
+                <span className={`text-xs font-mono font-medium ${pb.color}`}>
+                  {pb.icon} {pb.label}
+                </span>
+              );
+            })()}
+          </div>
           <p className="text-xs text-gray-500 mt-0.5">ERCOT Real-Time Market (HB_HOUSTON)</p>
         </div>
 

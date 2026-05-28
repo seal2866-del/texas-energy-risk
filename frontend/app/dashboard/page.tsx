@@ -23,6 +23,7 @@ import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
 import ScenarioEngine from "@/components/widgets/ScenarioEngine";
 import RiskHistoryChart from "@/components/widgets/RiskHistoryChart";
 import OperationalExposure from "@/components/widgets/OperationalExposure";
+import MarketStatePanel from "@/components/widgets/MarketStatePanel";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
@@ -456,7 +457,7 @@ export default function DashboardPage() {
                 panelGlow={riskGlow}
               />
 
-              <ERCOTPriceMonitor prices={prices} loading={!signalsReady} />
+              <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
               {signalsReady && (
                 <RiskHistoryChart location={location} />
@@ -504,6 +505,10 @@ export default function DashboardPage() {
               <EnergyRiskDrivers signals={signals} />
 
               <MarketInterpretation signals={signals} prices={prices} />
+
+              {riskModel && (
+                <MarketStatePanel riskModel={riskModel} />
+              )}
 
               {signals.what_changed && signals.what_changed.length > 0 && (
                 <WhatChanged items={signals.what_changed} />
