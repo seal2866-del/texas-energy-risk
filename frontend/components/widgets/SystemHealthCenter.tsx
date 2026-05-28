@@ -1,10 +1,16 @@
 "use client";
 import { Activity, Wifi, WifiOff, Clock, CheckCircle2, AlertTriangle,
-         XCircle, Radio, Brain, Database, Zap } from "lucide-react";
+         XCircle, Radio, Brain, Database, Zap, Info } from "lucide-react";
 import type { SignalsResponse } from "@/lib/api";
+import type { RiskModel } from "@/lib/energyRiskEngine";
 import { cn } from "@/lib/utils";
 
-interface Props { signals: SignalsResponse; aiLoading: boolean; aiSynced: boolean; }
+interface Props {
+  signals:    SignalsResponse;
+  aiLoading:  boolean;
+  aiSynced:   boolean;
+  riskModel?: RiskModel;
+}
 
 type HealthStatus = "nominal" | "degraded" | "offline";
 
@@ -46,8 +52,11 @@ function HealthItem({ row }: { row: HealthRow }) {
   );
 }
 
-export default function SystemHealthCenter({ signals, aiLoading, aiSynced }: Props) {
-  const { data_sources, confidence, computed_at } = signals;
+export default function SystemHealthCenter({ signals, aiLoading, aiSynced, riskModel }: Props) {
+  const { data_sources, computed_at } = signals;
+  // Use engine-computed confidence (includes data validation penalty) when available
+  const confidence = riskModel?.confidence ?? signals.confidence;
+  const confidenceNote = riskModel?.confidenceNote ?? signals.confidence_note;
 
   const ercotStatus = data_sources?.ercot?.status;
   const noaaStatus  = data_sources?.noaa?.status;
@@ -134,20 +143,29 @@ export default function SystemHealthCenter({ signals, aiLoading, aiSynced }: Pro
 
       {/* Confidence */}
       {confidence != null && (
-        <div className="mb-3 px-3 py-2 rounded-lg bg-white/3 border border-white/6 flex items-center justify-between gap-3">
-          <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Analysis Confidence</p>
-          <div className="flex items-center gap-2">
-            <div className="w-20 h-1 bg-white/8 rounded-full overflow-hidden">
-              <div
-                className={cn("h-full rounded-full", confidence >= 75 ? "bg-green-500" : confidence >= 60 ? "bg-amber-500" : "bg-red-500")}
-                style={{ width: `${confidence}%` }}
-              />
+        <div className="mb-3 rounded-lg bg-white/3 border border-white/6 overflow-hidden">
+          <div className="px-3 py-2 flex items-center justify-between gap-3">
+            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Analysis Confidence</p>
+            <div className="flex items-center gap-2">
+              <div className="w-20 h-1 bg-white/8 rounded-full overflow-hidden">
+                <div
+                  className={cn("h-full rounded-full transition-all", confidence >= 75 ? "bg-green-500" : confidence >= 60 ? "bg-amber-500" : "bg-red-500")}
+                  style={{ width: `${confidence}%` }}
+                />
+              </div>
+              <span className={cn(
+                "text-xs font-bold tabular-nums",
+                confidence >= 75 ? "text-green-400" : confidence >= 60 ? "text-amber-400" : "text-red-400",
+              )}>{confidence}%</span>
             </div>
-            <span className={cn(
-              "text-xs font-bold tabular-nums",
-              confidence >= 75 ? "text-green-400" : confidence >= 60 ? "text-amber-400" : "text-red-400",
-            )}>{confidence}%</span>
           </div>
+          {/* Confidence note — shown when reduced by data quality */}
+          {confidence < 75 && confidenceNote && (
+            <div className="px-3 pb-2 flex items-start gap-1.5 border-t border-white/5 pt-2">
+              <Info className="w-3 h-3 text-gray-600 flex-shrink-0 mt-0.5" />
+              <p className="text-[10px] text-gray-500 leading-relaxed">{confidenceNote}</p>
+            </div>
+          )}
         </div>
       )}
 

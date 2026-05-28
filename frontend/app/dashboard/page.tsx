@@ -24,6 +24,7 @@ import ScenarioEngine from "@/components/widgets/ScenarioEngine";
 import RiskHistoryChart from "@/components/widgets/RiskHistoryChart";
 import OperationalExposure from "@/components/widgets/OperationalExposure";
 import MarketStatePanel from "@/components/widgets/MarketStatePanel";
+import RiskModelDebug from "@/components/widgets/RiskModelDebug";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
@@ -127,7 +128,7 @@ function SystemActivity({ signalsReady }: { signalsReady: boolean }) {
   );
 }
 
-function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
+function UrgencyBanner({ signals, riskModel }: { signals: SignalsResponse; riskModel?: RiskModel | null }) {
   if (!signals.data_valid) return null;
   const score   = signals.risk_score;
   const driver  = signals.primary_driver;
@@ -154,6 +155,20 @@ function UrgencyBanner({ signals }: { signals: SignalsResponse }) {
       <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400 leading-relaxed">
         <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
         <span><span className="font-bold">Conditions Stable</span> — Minor risk signals detected. Monitoring recommended.</span>
+      </div>
+    );
+  }
+  // Low risk: check engine early warnings and backend events before declaring "no signals"
+  const earlyWarnings = riskModel?.earlyWarningSignals ?? [];
+  const events        = signals.events ?? [];
+  if (earlyWarnings.length > 0 || events.length > 0) {
+    const context = earlyWarnings.length > 0
+      ? earlyWarnings[0].message
+      : (events[0] as any)?.description ?? (events[0] as any)?.type ?? "active monitoring event";
+    return (
+      <div className="banner-scan mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-sm text-cyan-300 leading-relaxed">
+        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-cyan-400" />
+        <span><span className="font-bold">No price escalation detected</span> — {context}. Continuing to monitor.</span>
       </div>
     );
   }
@@ -411,7 +426,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {signalsReady && <UrgencyBanner signals={signals} />}
+          {signalsReady && <UrgencyBanner signals={signals} riskModel={riskModel} />}
 
           {signalsError && !loading && (
             <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400">
@@ -506,7 +521,7 @@ export default function DashboardPage() {
 
               <EnergyRiskDrivers signals={signals} />
 
-              <MarketInterpretation signals={signals} prices={prices} />
+              <MarketInterpretation signals={signals} prices={prices} riskModel={riskModel ?? undefined} />
 
               {riskModel && (
                 <MarketStatePanel riskModel={riskModel} />
@@ -547,7 +562,10 @@ export default function DashboardPage() {
                 signals={signals}
                 aiLoading={aiLoading}
                 aiSynced={!!aiReasoning}
+                riskModel={riskModel ?? undefined}
               />
+
+              <RiskModelDebug riskModel={riskModel} validation={validation} />
 
             </div>
           )}
