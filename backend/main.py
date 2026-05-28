@@ -32,7 +32,7 @@ ENVIRONMENT  = os.getenv("ENVIRONMENT", "development")
 # Keeps the in-memory ERCOT price cache warm regardless of user traffic.
 # Polls immediately on startup then every POLL_INTERVAL_SECONDS.
 POLL_INTERVAL_SECONDS    = int(os.getenv("ERCOT_POLL_INTERVAL", "300"))    # default 5 min
-GRID_POLL_INTERVAL_SECS  = int(os.getenv("GRID_POLL_INTERVAL",  "1800"))   # default 30 min
+GRID_POLL_INTERVAL_SECS  = int(os.getenv("GRID_POLL_INTERVAL",  "300"))    # default 5 min
 
 # All cities that need background signal snapshots
 GRID_LOCATIONS = [
@@ -52,8 +52,8 @@ async def _grid_signal_loop():
     from services.signal_engine  import run_all_signals
     from services.snapshot_service import save_snapshot
 
-    # Wait for the ERCOT price cache to warm up before first pass
-    await asyncio.sleep(60)
+    # Brief pause to let FastAPI fully start before first pass
+    await asyncio.sleep(15)
 
     log.info("[GRID-POLLER] Multi-location signal poller starting (interval=%ds, %d cities)",
              GRID_POLL_INTERVAL_SECS, len(GRID_LOCATIONS))
