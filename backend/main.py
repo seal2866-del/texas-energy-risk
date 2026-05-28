@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from routers import ercot, weather, gas, signals, alerts, stripe_webhooks, stripe_checkout, ai_reasoning
+from routers import ercot, weather, gas, signals, alerts, stripe_webhooks, stripe_checkout, ai_reasoning, export
 
 load_dotenv()
 
@@ -104,6 +104,7 @@ app.include_router(alerts.router)
 app.include_router(stripe_webhooks.router)
 app.include_router(stripe_checkout.router)
 app.include_router(ai_reasoning.router)
+app.include_router(export.router)
 
 
 # ── Health check ──────────────────────────────────────────────

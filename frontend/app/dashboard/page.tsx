@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle, Loader2, FileDown } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import RiskScore from "@/components/widgets/RiskScore";
@@ -19,6 +19,8 @@ import WhatChanged from "@/components/widgets/WhatChanged";
 import AIExecutiveBrief from "@/components/widgets/AIExecutiveBrief";
 import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
 import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
+import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
+import ScenarioEngine from "@/components/widgets/ScenarioEngine";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { supabase } from "@/lib/supabase";
 import {
@@ -84,6 +86,9 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
   risk_trend:            { trajectory: "stable", label: "Stable", description: "", momentum: "neutral" },
   gas_power_correlation: { correlation_level: "low", sensitivity: "", description: "", henry_hub_price: 0, storage_pct_vs_avg: 0 },
   interval_intelligence: undefined,
+  market_transition:    undefined,
+  scenarios:            [],
+  operational_exposure: undefined,
   summary:    "",
   disclaimer: "",
 };
@@ -171,6 +176,8 @@ export default function DashboardPage() {
   const [aiLoading,    setAiLoading]    = useState(false);
   const [aiError,      setAiError]      = useState(false);
 
+  const [exportingPdf,  setExportingPdf]  = useState(false);
+
   const [loading,       setLoading]       = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
   const [justRefreshed, setJustRefreshed] = useState(false);
@@ -229,6 +236,56 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [fetchAll]);
 
+  const handleExportBrief = async () => {
+    setExportingPdf(true);
+    try {
+      const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const payload = {
+        risk_score:           signals.risk_score === "high" ? 8 : signals.risk_score === "medium" ? 5 : 2,
+        risk_level:           signals.risk_score,
+        risk_direction:       signals.risk_direction,
+        signal_alignment:     signals.signal_alignment?.label,
+        escalation_prob:      signals.escalation_probability?.pct ?? null,
+        confidence:           signals.confidence,
+        location,
+        demand_condition:     signals.demand_pressure?.level,
+        supply_condition:     signals.supply_pressure?.level,
+        market_condition:     signals.market_reaction?.level,
+        ai_summary:           aiReasoning?.executive_summary ?? signals.summary,
+        operational_outlook:  aiReasoning?.recommended_monitoring_focus ?? signals.time_horizons?.outlook,
+        weather_persistence:  signals.weather_persistence,
+        early_warnings:       signals.early_warnings,
+        risk_trend:           signals.risk_trend,
+        interval_intelligence: signals.interval_intelligence,
+        operational_exposure: signals.operational_exposure,
+        market_transition:    signals.market_transition,
+        scenarios:            signals.scenarios,
+        cost_impact:          signals.cost_impact,
+        what_changed:         signals.what_changed,
+      };
+      const res = await fetch(`${BASE}/api/export/brief`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const now  = new Date();
+      a.href     = url;
+      a.download = `tx-energy-brief-${now.toISOString().slice(0,10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[Export] PDF download failed:", err);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   if (!user) return null;
 
   const atmClass = signals.risk_score === "high"   ? "atm-high"
@@ -286,6 +343,19 @@ export default function DashboardPage() {
                 <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
               </button>
+              {signalsReady && (
+                <button
+                  onClick={handleExportBrief}
+                  disabled={exportingPdf}
+                  title="Download executive PDF brief"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/30 text-sm text-blue-300 transition-all disabled:opacity-50"
+                >
+                  {exportingPdf
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <FileDown className="w-4 h-4" />}
+                  {exportingPdf ? "Generating..." : "Export Brief"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -424,6 +494,18 @@ export default function DashboardPage() {
 
               <IntervalIntelligenceWidget
                 intelligence={signals.interval_intelligence}
+              />
+
+              <ScenarioEngine
+                scenarios={signals.scenarios}
+                operationalExposure={signals.operational_exposure}
+                marketTransition={signals.market_transition}
+              />
+
+              <SystemHealthCenter
+                signals={signals}
+                aiLoading={aiLoading}
+                aiSynced={!!aiReasoning}
               />
 
             </div>

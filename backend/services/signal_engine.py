@@ -2245,6 +2245,282 @@ def _compute_interval_intelligence(
     }
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 12 — ENTERPRISE OPERATIONAL INTELLIGENCE ENGINES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _compute_market_transition(
+    risk_score: str, risk_direction: str,
+    market_condition: Dict, risk_trend: Dict,
+    demand: Dict, supply: Dict, market: Dict,
+    signal_alignment: Dict,
+) -> Dict[str, Any]:
+    """
+    Detect operational state transitions BEFORE escalation materialises.
+    Tracks: stable → tightening → elevated → volatile → stabilising.
+    """
+    current_state = market_condition.get("label", "Stable")
+    traj          = risk_trend.get("trajectory", "stable")
+    align_score   = signal_alignment.get("score", 0)
+    demand_lvl    = demand.get("level", "low")
+    supply_lvl    = supply.get("level", "low")
+    market_lvl    = market.get("level", "low")
+
+    # ── Detect transition type ────────────────────────────────────────────────
+    if traj in ("accelerating",) and risk_score == "high":
+        transition      = "escalating"
+        from_state      = "Elevated"
+        to_state        = "Volatile"
+        label           = "Escalating"
+        urgency         = "high"
+        description     = (
+            "Conditions are transitioning from elevated toward volatile operating territory. "
+            "Multiple risk drivers are simultaneously active and trending higher."
+        )
+        action          = "Immediate monitoring escalation recommended across all signal channels."
+
+    elif traj == "tightening" and risk_score in ("low", "medium"):
+        transition      = "tightening"
+        from_state      = "Stable" if risk_score == "low" else "Watch"
+        to_state        = "Tightening"
+        label           = "Tightening"
+        urgency         = "medium"
+        description     = (
+            "Operational pressure is building. Conditions are transitioning from stable "
+            "toward tighter operating bands — a precursor to elevated risk if drivers persist."
+        )
+        action          = "Increase monitoring frequency. Verify ERCOT pricing and weather demand channels."
+
+    elif traj == "deteriorating" and risk_score == "high":
+        transition      = "elevated"
+        from_state      = "Tightening"
+        to_state        = "Elevated Risk"
+        label           = "Elevated"
+        urgency         = "high"
+        description     = (
+            "Conditions have deteriorated into elevated operational territory. "
+            "Risk indicators are sustaining at high levels without improvement signals."
+        )
+        action          = "Activate heightened monitoring posture. Alert thresholds may be approaching."
+
+    elif traj == "improving" and risk_score in ("low", "medium"):
+        transition      = "stabilising"
+        from_state      = "Elevated" if risk_score == "medium" else "Watch"
+        to_state        = "Stabilising"
+        label           = "Stabilising"
+        urgency         = "low"
+        description     = (
+            "Operational conditions are transitioning toward a more stable state. "
+            "Risk indicators are trending lower — sustained improvement is possible if current trajectory holds."
+        )
+        action          = "Maintain standard monitoring. Verify improvement across all data sources before reducing posture."
+
+    elif demand_lvl in ("medium", "high") and supply_lvl in ("medium", "high") and align_score >= 2:
+        transition      = "convergence"
+        from_state      = "Watch"
+        to_state        = "Converging Pressure"
+        label           = "Pressure Convergence"
+        urgency         = "medium"
+        description     = (
+            "Multiple independent risk drivers are converging simultaneously. "
+            "Weather demand and gas supply pressures are both elevated — conditions are sensitive to further pressure."
+        )
+        action          = "Monitor convergence of supply and demand signals. Escalation risk elevated."
+
+    else:
+        transition      = "stable"
+        from_state      = "Stable"
+        to_state        = "Stable"
+        label           = "Stable"
+        urgency         = "low"
+        description     = (
+            "No material state transition detected. Operational conditions are holding at current levels "
+            "without significant directional movement."
+        )
+        action          = "Continue standard monitoring cadence across all signal channels."
+
+    return {
+        "transition":  transition,
+        "from_state":  from_state,
+        "to_state":    to_state,
+        "label":       label,
+        "urgency":     urgency,
+        "description": description,
+        "action":      action,
+    }
+
+
+def _compute_scenarios(
+    risk_score: str, demand: Dict, supply: Dict, market: Dict,
+    weather_persistence: Dict, escalation_prob: Dict,
+    risk_direction: str, signal_alignment: Dict,
+) -> List[Dict[str, Any]]:
+    """
+    Generate conditional operational scenarios — what MIGHT happen if conditions evolve.
+    Uses probabilistic, non-deterministic language only.
+    Max 4 scenarios. Only generates scenarios with meaningful signal basis.
+    """
+    scenarios: List[Dict[str, Any]] = []
+
+    demand_lvl   = demand.get("level",   "low")
+    supply_lvl   = supply.get("level",   "low")
+    market_lvl   = market.get("level",   "low")
+    persist_risk = weather_persistence.get("persistence_risk", "low")
+    esc_pct      = escalation_prob.get("pct", 0) or 0
+    align_score  = signal_alignment.get("score", 0)
+
+    # ── Scenario 1: Sustained heat → demand escalation ────────────────────────
+    if persist_risk in ("moderate", "elevated", "high") or demand_lvl in ("medium", "high"):
+        intensity = "significantly" if persist_risk == "high" else "further"
+        scenarios.append({
+            "id":          "heat_persistence",
+            "trigger":     "If temperatures persist above forecast levels",
+            "outcome":     f"demand pressure may {intensity} strengthen through afternoon peak intervals",
+            "probability": "elevated" if persist_risk in ("elevated", "high") else "moderate",
+            "full":        f"If temperatures persist above forecast levels, demand pressure may {intensity} strengthen through afternoon peak intervals, increasing the likelihood of reserve margin tightening.",
+        })
+
+    # ── Scenario 2: Gas supply tightening → fuel-side sensitivity ────────────
+    if supply_lvl in ("medium", "high") or (supply_lvl == "low" and demand_lvl in ("medium", "high")):
+        scenarios.append({
+            "id":          "gas_supply",
+            "trigger":     "If natural gas supply conditions tighten alongside elevated weather demand",
+            "outcome":     "fuel-side operational sensitivity may elevate and could pressure ERCOT generation dispatch",
+            "probability": "moderate" if supply_lvl == "low" else "elevated",
+            "full":        "If natural gas supply conditions tighten alongside elevated weather demand, fuel-side operational sensitivity may elevate and could pressure ERCOT generation dispatch margins.",
+        })
+
+    # ── Scenario 3: ERCOT volatility acceleration ──────────────────────────
+    if market_lvl in ("medium", "high") or risk_direction == "increasing":
+        scenarios.append({
+            "id":          "volatility",
+            "trigger":     "If ERCOT pricing volatility increases alongside active signal alignment",
+            "outcome":     "operational market sensitivity may escalate and broader cost exposure conditions could emerge",
+            "probability": "elevated" if market_lvl == "high" else "moderate",
+            "full":        "If ERCOT pricing volatility increases alongside active signal alignment, operational market sensitivity may escalate and broader cost exposure conditions could emerge across the near-term window.",
+        })
+
+    # ── Scenario 4: Multi-driver convergence → rapid escalation ──────────────
+    if align_score >= 2 and esc_pct >= 30:
+        scenarios.append({
+            "id":          "convergence",
+            "trigger":     "If current multi-driver alignment sustains or strengthens",
+            "outcome":     "escalation conditions may develop more rapidly than single-driver analysis would suggest",
+            "probability": "moderate" if esc_pct < 50 else "elevated",
+            "full":        "If current multi-driver alignment sustains or strengthens, escalation conditions may develop more rapidly than single-driver analysis would suggest — monitor all three signal channels simultaneously.",
+        })
+
+    # ── Scenario 5 (bonus): Stabilisation path ───────────────────────────────
+    if risk_direction == "decreasing" and risk_score in ("medium", "high"):
+        scenarios.append({
+            "id":          "stabilisation",
+            "trigger":     "If current improving trajectory continues",
+            "outcome":     "conditions may stabilise toward lower operational risk within the near-term outlook",
+            "probability": "moderate",
+            "full":        "If current improving trajectory continues, conditions may stabilise toward lower operational risk within the near-term outlook — pending verification across weather and gas supply channels.",
+        })
+
+    return scenarios[:4]
+
+
+def _compute_operational_exposure(
+    risk_score: str, demand: Dict, supply: Dict, market: Dict,
+    weather_persistence: Dict, escalation_prob: Dict,
+    signal_alignment: Dict, cost_impact: Dict,
+) -> Dict[str, Any]:
+    """
+    4-level operational cost exposure model.
+    Remains strictly informational — no financial advice or guarantees.
+    """
+    demand_lvl   = demand.get("level",   "low")
+    supply_lvl   = supply.get("level",   "low")
+    market_lvl   = market.get("level",   "low")
+    persist_risk = weather_persistence.get("persistence_risk", "low")
+    esc_pct      = escalation_prob.get("pct", 0) or 0
+    align_score  = signal_alignment.get("score", 0)
+
+    # Score from 0–10
+    score = 0
+    score += {"low": 0, "medium": 2, "high": 4}.get(demand_lvl,  0)
+    score += {"low": 0, "medium": 1, "high": 3}.get(supply_lvl,  0)
+    score += {"low": 0, "medium": 1, "high": 2}.get(market_lvl,  0)
+    score += {"low": 0, "moderate": 1, "elevated": 2, "high": 3}.get(persist_risk, 0)
+    score += min(2, esc_pct // 30)
+    score += min(1, align_score // 2)
+
+    if score >= 8:
+        level       = "High Exposure"
+        cls         = "high"
+        short_desc  = "Operational energy exposure is elevated across multiple risk dimensions."
+        detail      = (
+            "Persistent heat conditions, active market sensitivity, and supply-side pressure are "
+            "converging — operational energy cost exposure may be materially elevated during peak "
+            "demand intervals. Operations with significant energy cost sensitivity should monitor "
+            "conditions closely."
+        )
+        drivers = [
+            d for d, v in [
+                ("Weather-driven demand persistence", persist_risk in ("elevated", "high")),
+                ("Market pricing sensitivity active", market_lvl in ("medium", "high")),
+                ("Gas supply pressure contributing", supply_lvl in ("medium", "high")),
+                ("Multiple signal drivers aligned",   align_score >= 2),
+            ] if v
+        ]
+    elif score >= 5:
+        level       = "Elevated Exposure"
+        cls         = "elevated"
+        short_desc  = "Operational exposure is above baseline — conditions warrant active monitoring."
+        detail      = (
+            "A combination of active risk drivers is contributing to above-baseline operational "
+            "energy exposure. Conditions may increase further if current trajectory continues — "
+            "particularly during afternoon and evening peak load intervals."
+        )
+        drivers = [
+            d for d, v in [
+                ("Weather demand above normal range", demand_lvl in ("medium", "high")),
+                ("ERCOT market reaction active",      market_lvl == "medium"),
+                ("Gas supply sensitivity present",    supply_lvl == "medium"),
+                ("Escalation probability moderate",   esc_pct >= 25),
+            ] if v
+        ]
+    elif score >= 2:
+        level       = "Moderate Exposure"
+        cls         = "moderate"
+        short_desc  = "Baseline operational exposure with limited escalation signals."
+        detail      = (
+            "Operational energy exposure is within moderate range. At least one risk driver is "
+            "active, but no material convergence of conditions is currently detected. Standard "
+            "monitoring cadence is appropriate."
+        )
+        drivers = [
+            d for d, v in [
+                ("Minor weather demand variation",    demand_lvl == "medium"),
+                ("Limited market price movement",     market_lvl == "medium"),
+                ("Gas supply within adequate range",  supply_lvl == "low"),
+            ] if v
+        ]
+    else:
+        level       = "Minimal Exposure"
+        cls         = "low"
+        short_desc  = "Operational energy exposure nominal. No material escalation signals detected."
+        detail      = (
+            "Current conditions present minimal operational energy cost exposure risk. "
+            "All monitored signal channels are within normal operating parameters. "
+            "Standard monitoring is sufficient."
+        )
+        drivers = []
+
+    return {
+        "level":       level,
+        "cls":         cls,
+        "score":       score,
+        "short_desc":  short_desc,
+        "detail":      detail,
+        "drivers":     drivers[:4],
+    }
+
+
 def run_all_signals(
     prices:      List[Dict],
     forecasts:   List[Dict],
@@ -2410,6 +2686,22 @@ def run_all_signals(
             weather_persistence, time_horizons,
         )
 
+        # ── Phase 12: Enterprise Operational Intelligence ────────────────────
+        market_transition     = _compute_market_transition(
+            risk_score, risk_direction, market_condition, risk_trend,
+            demand_pressure, supply_pressure, market_reaction, signal_alignment,
+        )
+        scenarios             = _compute_scenarios(
+            risk_score, demand_pressure, supply_pressure, market_reaction,
+            weather_persistence, escalation_probability,
+            risk_direction, signal_alignment,
+        )
+        operational_exposure  = _compute_operational_exposure(
+            risk_score, demand_pressure, supply_pressure, market_reaction,
+            weather_persistence, escalation_probability,
+            signal_alignment, cost_impact,
+        )
+
         # ── Risk headline ─────────────────────────────────────────────────────
         risk_headline = risk_narrative["headline"]
 
@@ -2448,6 +2740,10 @@ def run_all_signals(
             "escalation_probability":         escalation_probability,
             "market_sensitivity":             market_sensitivity,
             "potential_escalation_drivers":   potential_escalation_drivers,
+            # Phase 12 — Enterprise Intelligence
+            "market_transition":              market_transition,
+            "scenarios":                      scenarios,
+            "operational_exposure":           operational_exposure,
             # Phase 10 — Predictive Intelligence
             "weather_persistence":            weather_persistence,
             "early_warnings":                 early_warnings,

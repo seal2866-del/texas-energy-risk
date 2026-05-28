@@ -344,3 +344,123 @@ body::after {
 .confidence-bar-animate {
   animation: confidence-fill 0.8s ease-out forwards;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 12 — LIVE OPERATIONS FEEL
+   Bloomberg Terminal / Palantir aesthetic — subtle, slow, professional.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Operational heartbeat — slow, barely perceptible pulse on active cards ── */
+@keyframes ops-heartbeat {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.00); }
+  50%       { box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.04); }
+}
+.card-glass {
+  animation: ops-heartbeat 8s ease-in-out infinite;
+}
+
+/* ── Data-flow shimmer — very slow left-to-right across panel border ───────── */
+@keyframes data-flow {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+.card-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(20,184,166,0.025) 45%,
+    rgba(20,184,166,0.025) 55%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: data-flow 18s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Monitoring active indicator — slow fade pulse ─────────────────────────── */
+@keyframes monitor-active {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1.0;  }
+}
+.monitor-active-dot {
+  animation: monitor-active 4s ease-in-out infinite;
+}
+
+/* ── Signal refresh sweep — triggered on data refresh ──────────────────────── */
+@keyframes signal-sweep {
+  0%   { opacity: 0; transform: translateY(-100%); }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(100%);  }
+}
+.signal-sweep {
+  animation: signal-sweep 1.2s ease-in-out forwards;
+}
+
+/* ── Soft chart glow drift — slow breathe on chart containers ───────────────── */
+@keyframes chart-breathe {
+  0%, 100% { filter: brightness(1.00) saturate(1.00); }
+  50%       { filter: brightness(1.04) saturate(1.06); }
+}
+.chart-live {
+  animation: chart-breathe 12s ease-in-out infinite;
+}
+
+/* ── Health indicator blink — for degraded/offline states only ─────────────── */
+@keyframes health-blink {
+  0%, 90%, 100% { opacity: 1;   }
+  45%           { opacity: 0.3; }
+}
+.health-blink {
+  animation: health-blink 2.5s ease-in-out infinite;
+}
+
+/* ── Telemetry scan line — very subtle, top of card on active feeds ─────────── */
+@keyframes telem-scan {
+  0%   { left: -20%; opacity: 0;   }
+  10%  { opacity: 0.6; }
+  90%  { opacity: 0.6; }
+  100% { left: 110%;  opacity: 0;  }
+}
+.telem-active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 20%;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(20,184,166,0.20) 50%,
+    transparent
+  );
+  animation: telem-scan 14s linear infinite;
+  pointer-events: none;
+}
+
+/* ── Operational status row pulse ───────────────────────────────────────────── */
+@keyframes status-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1.0; }
+}
+.status-live {
+  animation: status-pulse 5s ease-in-out infinite;
+}
+
+/* ── Reduce motion: respect prefers-reduced-motion ──────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .card-glass,
+  .card-glass::after,
+  .monitor-active-dot,
+  .signal-sweep,
+  .chart-live,
+  .health-blink,
+  .telem-active::after,
+  .status-live {
+    animation: none !important;
+  }
+}

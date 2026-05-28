@@ -181,6 +181,10 @@ export interface SignalsResponse {
   escalation_probability?:       EscalationProbability;
   market_sensitivity?:           MarketSensitivity;
   potential_escalation_drivers?: string[];
+  // Phase 12 — Enterprise Intelligence
+  market_transition?:     MarketTransition;
+  scenarios?:             Scenario[];
+  operational_exposure?:  OperationalExposure;
   // Phase 10 — Predictive Intelligence
   weather_persistence?:   WeatherPersistence;
   early_warnings?:        EarlyWarnings;
@@ -278,6 +282,35 @@ export interface AlertPrefs {
 
 export const updateAlertPrefs = (prefs: AlertPrefs, token: string) =>
   apiFetch<{ success: boolean }>(`/api/alerts/prefs/`, token);
+
+// ── Phase 12 — Enterprise Operational Intelligence Types ──────────────────────
+
+export interface MarketTransition {
+  transition:  "stable" | "tightening" | "elevated" | "convergence" | "escalating" | "stabilising";
+  from_state:  string;
+  to_state:    string;
+  label:       string;
+  urgency:     "low" | "medium" | "high";
+  description: string;
+  action:      string;
+}
+
+export interface Scenario {
+  id:          string;
+  trigger:     string;
+  outcome:     string;
+  probability: "low" | "moderate" | "elevated" | "high";
+  full:        string;
+}
+
+export interface OperationalExposure {
+  level:      string;
+  cls:        "low" | "moderate" | "elevated" | "high";
+  score:      number;
+  short_desc: string;
+  detail:     string;
+  drivers:    string[];
+}
 
 // ── Phase 10 — Predictive Intelligence Types ──────────────────────────────────
 
