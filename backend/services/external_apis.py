@@ -326,12 +326,16 @@ async def fetch_all_hub_prices() -> Dict[str, float]:
 
 
 # ── NOAA / NWS ────────────────────────────────────────────────────────────────
-# Static fast-path for the original four locations.
+# Static fast-path for all eight monitored locations.
 NOAA_OFFICES = {
-    "Houston":     {"office": "HGX", "gridX": 66,  "gridY": 97},
-    "Dallas":      {"office": "FWD", "gridX": 90,  "gridY": 104},
-    "Austin":      {"office": "EWX", "gridX": 155, "gridY": 88},
-    "San Antonio": {"office": "EWX", "gridX": 148, "gridY": 80},
+    "Houston":        {"office": "HGX", "gridX": 66,  "gridY": 97},
+    "Dallas":         {"office": "FWD", "gridX": 90,  "gridY": 104},
+    "Austin":         {"office": "EWX", "gridX": 155, "gridY": 88},
+    "San Antonio":    {"office": "EWX", "gridX": 148, "gridY": 80},
+    "Midland":        {"office": "MAF", "gridX": 80,  "gridY": 54},
+    "Odessa":         {"office": "MAF", "gridX": 73,  "gridY": 52},
+    "Corpus Christi": {"office": "CRP", "gridX": 55,  "gridY": 75},
+    "Lubbock":        {"office": "LUB", "gridX": 77,  "gridY": 59},
 }
 
 # Lat/lon for all 8 monitored cities — used by the dynamic NWS resolver.
