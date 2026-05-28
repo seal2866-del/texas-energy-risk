@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle, Loader2, FileDown } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
@@ -22,7 +22,10 @@ import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligenc
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
 import ScenarioEngine from "@/components/widgets/ScenarioEngine";
 import RiskHistoryChart from "@/components/widgets/RiskHistoryChart";
+import OperationalExposure from "@/components/widgets/OperationalExposure";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
+import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
+import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
 import { supabase } from "@/lib/supabase";
 import {
   getSignals, getERCOTPrices, getWeatherForecast, getGasData, getAIReasoning,
@@ -183,6 +186,28 @@ export default function DashboardPage() {
   const [refreshing,    setRefreshing]    = useState(false);
   const [justRefreshed, setJustRefreshed] = useState(false);
   const [lastUpdated,   setLastUpdated]   = useState<Date | null>(null);
+
+  // ── Central Risk Engine (Phase 3) ─────────────────────────────
+  const riskModel = useMemo<RiskModel | null>(() => {
+    if (!signalsReady || !signals.data_valid) return null;
+    try {
+      const inputs = buildEngineInputs(signals, prices, forecasts, gasRecs);
+      return energyRiskEngine(inputs);
+    } catch { return null; }
+  }, [signals, prices, forecasts, gasRecs, signalsReady]);
+
+  const validation = useMemo<ValidationResult | null>(() => {
+    if (!signalsReady) return null;
+    try {
+      return validateInputs({
+        ercotPrice:         prices[prices.length - 1]?.price_mwh ?? null,
+        ercotPriceHistory:  prices.map(p => ({ price_mwh: p.price_mwh, timestamp: p.timestamp, source: p.source })),
+        sourceHealth:       signals.data_sources,
+        weatherTemp:        forecasts[0]?.temp_high_f ?? null,
+        gasStorage:         gasLatest?.storage_pct_vs_avg ?? null,
+      });
+    } catch { return null; }
+  }, [prices, forecasts, gasLatest, signals.data_sources, signalsReady]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -452,6 +477,10 @@ export default function DashboardPage() {
                 weatherPersistence={signals.weather_persistence}
               />
 
+              {riskModel && (
+                <OperationalExposure riskModel={riskModel} />
+              )}
+
               <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
 
               <WeatherRisk
@@ -479,7 +508,6 @@ export default function DashboardPage() {
               {signals.what_changed && signals.what_changed.length > 0 && (
                 <WhatChanged items={signals.what_changed} />
               )}
-
 
               <AIMarketReasoning
                 reasoning={aiReasoning}
