@@ -270,7 +270,7 @@ export default function PricingPage() {
                 </div>
               </div>
               <a
-                href="mailto:hello@txenergyrisk.com?subject=Enterprise%20Inquiry"
+                href="mailto:wnguyen@myinfinivue.com?subject=Enterprise%20Inquiry"
                 className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 font-semibold transition-all whitespace-nowrap flex-shrink-0"
               >
                 <Mail className="w-4 h-4" />
