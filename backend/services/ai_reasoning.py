@@ -69,21 +69,21 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
     ercot_price      = inputs.get("ercot_price", 0)
     data_health      = inputs.get("data_source_health", "active")
 
-    # -- Executive summary (concise Bloomberg-style)
+    # -- Executive summary (actionable, prescriptive)
     if risk == "high":
-        exec_summary = f"Texas energy risk is elevated. {primary_driver} is the primary driver with a {risk_direction} outlook."
+        exec_summary = f"Immediate attention required. {primary_driver} is driving high-risk conditions — assess open exposure now and confirm contingency protocols are ready."
     elif risk == "medium":
-        exec_summary = f"Texas conditions are moderately tightening. {primary_driver} is building near-term pressure."
+        exec_summary = f"Review operational exposure now. {primary_driver} is building near-term pressure — confirm hedging positions ahead of the next demand peak."
     else:
-        exec_summary = "Texas energy conditions remain stable. No escalation signals are currently active."
+        exec_summary = f"No action required. Current conditions present minimal procurement or operational exposure. Continue standard monitoring and watch afternoon demand peaks between 14:00–19:00 CDT."
 
     # -- Current market interpretation
     if risk == "high":
-        interpretation = f"ERCOT pricing at ${ercot_price:.0f}/MWh reflects elevated stress. {primary_driver} is driving {market_state.lower()} conditions. Pricing sensitivity is heightened."
+        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is pricing in active stress — avoid unhedged spot exposure. {primary_driver} is the dominant driver; conditions warrant continuous monitoring."
     elif risk == "medium":
-        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh reflects {market_state.lower()} conditions. {primary_driver} is the leading pressure factor — conditions may shift if demand or supply dynamics change."
+        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is showing early sensitivity. {primary_driver} is the leading pressure factor — lock in forward positions if procurement windows are open."
     else:
-        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is within normal range. Weather demand is manageable and gas conditions are not creating generation cost pressure."
+        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is within normal operating range. No fuel-side or demand-side constraints require immediate action."
 
     # -- Driver analysis (synthesized)
     if weather_pressure == "high" and gas_pressure in ("medium", "high"):
@@ -208,14 +208,19 @@ def _build_prompt(inputs: Dict[str, Any]) -> str:
     wx_temp       = inputs.get("weather_temperature", "N/A")
     wx_high       = inputs.get("weather_forecast_high", "N/A")
 
-    return f"""You are an AI energy market analyst for a Texas energy intelligence platform.
-Analyze the following market conditions and generate professional operational reasoning.
-Do not provide trading, investment, financial, legal, or procurement advice.
-Focus on: market conditions, risk drivers, demand/supply pressure, ERCOT pricing behavior, gas-to-power impact, data confidence, and what to monitor next.
-Synthesize the RELATIONSHIP between drivers (weather → demand pressure → ERCOT price → gas-to-power cost). Do not analyze each signal in isolation.
-Use language: may, suggests, indicates, monitoring recommended, conditions remain, pressure is building, volatility risk, pricing uncertainty.
-Avoid: buy, sell, trade, guaranteed, will happen, must act, fear language.
-Return ONLY valid JSON with no markdown fences, no preamble, no postscript.
+    return f"""You are an operational intelligence engine for Texas energy professionals — traders, procurement managers, and grid operations teams.
+
+Your job is to turn market data into ACTIONABLE operational guidance. Not descriptions. Not observations. Actions.
+
+Rules:
+- Lead with what the operator should DO or NOT DO, not what conditions ARE.
+- Use direct, confident language. Operators trust specific guidance over vague hedging.
+- Synthesize driver relationships (weather → demand → ERCOT price → gas cost). Never analyze signals in isolation.
+- Do NOT provide investment, trading, financial, or legal advice.
+- Do NOT say: "conditions remain", "monitoring recommended", "risk is low", "situation is stable". These are observations, not guidance.
+- DO say: "No action required", "Review exposure now", "Confirm hedging positions", "Watch the 14:00–19:00 CDT window", "Avoid unhedged spot exposure".
+- Bloomberg terminal tone: direct, specific, zero filler.
+- Return ONLY valid JSON. No markdown. No preamble.
 
 Market data:
 - Risk level: {inputs.get("overall_risk_level", "low")}
@@ -237,15 +242,15 @@ Market data:
 - Data source health: {inputs.get("data_source_health", "active")}
 - Time horizon: {inputs.get("time_horizon", "next 24-48 hours")}
 
-Return this JSON structure exactly. Be concise — Bloomberg terminal style, not research paper. Each field is 1-2 short sentences maximum:
+Return this JSON structure. Each field is 1-2 sentences max. Be specific and prescriptive:
 {{
-  "executive_summary": "1-2 sentences. Direct statement of current Texas energy market status.",
-  "current_market_interpretation": "2 sentences max. Synthesize ERCOT price vs weather vs gas. Use contrast if price is stable but demand elevated.",
-  "key_driver_analysis": "2 sentences. Name the driver relationship. E.g.: weather → demand → ERCOT price → gas cost sensitivity.",
-  "escalation_watch": "1 sentence. What specific condition could cause escalation. Be direct.",
-  "confidence_note": "1 sentence. Data quality status only.",
-  "recommended_monitoring_focus": "1 sentence. Name 1-2 specific metrics.",
-  "historical_context": "1 sentence. Generalized seasonal pattern similarity only. No fabricated events or dates."
+  "executive_summary": "Start with action status: 'No action required.' or 'Review exposure now.' or 'Immediate attention required.' Then one sentence on why.",
+  "current_market_interpretation": "Synthesize what the data means operationally. Name the risk chain. Use contrast where relevant (e.g. price stable but demand elevated).",
+  "key_driver_analysis": "Name the dominant driver relationship and its operational implication. E.g.: Heat at 92°F is pressuring afternoon peak demand — watch the 14:00–18:00 CDT window.",
+  "escalation_watch": "One specific condition that would trigger escalation. Name the threshold. E.g.: If ERCOT prices cross $75/MWh or temperatures exceed 100°F, reassess immediately.",
+  "confidence_note": "Data quality status in one sentence.",
+  "recommended_monitoring_focus": "Name 1-2 specific metrics to watch and why.",
+  "historical_context": "One sentence of generalized seasonal pattern context. No fabricated dates or events."
 }}"""
 
 
