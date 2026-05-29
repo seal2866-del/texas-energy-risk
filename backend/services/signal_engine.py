@@ -2525,6 +2525,7 @@ def run_all_signals(
     prices:      List[Dict],
     forecasts:   List[Dict],
     gas_records: List[Dict],
+    location:    str = "Houston",
 ) -> Dict[str, Any]:
     """
     Run all signal checks and return a unified response dict.
@@ -2646,7 +2647,7 @@ def run_all_signals(
             sd["trend"] = driver_trends.get(sd["type"], "stable")
 
         what_changed = _compute_what_changed(
-            risk_score, demand_pressure, supply_pressure, market_reaction, prices
+            risk_score, demand_pressure, supply_pressure, market_reaction, prices, location
         )
 
         escalation_probability = _compute_escalation_probability(

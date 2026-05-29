@@ -77,7 +77,7 @@ async def get_signals(
         logger.warning("[SIGNALS] Data fetched: prices=%d forecasts=%d gas=%d",
                        len(prices), len(forecasts), len(gas_data))
 
-        result = run_all_signals(prices, forecasts, gas_data)
+        result = run_all_signals(prices, forecasts, gas_data, location=location)
 
         logger.warning("[SIGNALS] Signal engine done: risk=%s data_valid=%s",
                        result.get("risk_score"), result.get("data_valid"))
@@ -107,7 +107,7 @@ async def get_risk_score(location: str = Query(default="Houston")):
         fetch_weather_forecast(location=location, days=1),
         fetch_gas_data(weeks=2),
     )
-    result = run_all_signals(prices, forecasts, gas_data)
+    result = run_all_signals(prices, forecasts, gas_data, location=location)
     return {
         "risk_score":     result["risk_score"],
         "active_signals": result["active_signals"],

@@ -152,4 +152,32 @@ def mock_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
         report_date = (now - timedelta(weeks=week)).date()
         # Gradual drawdown trend with noise
         storage += random.gauss(-30, 20)
-        storage = max(1
+        storage = max(1500, min(3800, storage))
+
+        avg = 2310.0 + random.gauss(0, 30)
+        pct_vs_avg = round(((storage - avg) / avg) * 100, 2)
+
+        if pct_vs_avg < -10:
+            supply_pressure = "low"
+        elif pct_vs_avg > 5:
+            supply_pressure = "high"
+        else:
+            supply_pressure = "normal"
+
+        henry_hub = round(max(1.5, 2.50 + random.gauss(0, 0.3)), 4)
+
+        records.append({
+            "report_date": str(report_date),
+            "storage_bcf": round(storage, 1),
+            "storage_5yr_avg_bcf": round(avg, 1),
+            "storage_pct_vs_avg": pct_vs_avg,
+            "henry_hub_price": henry_hub,
+            "supply_pressure": supply_pressure,
+            "source": "mock",
+        })
+
+    return records
+
+
+def mock_latest_gas() -> Dict[str, Any]:
+    return mock_gas_data(weeks=1)[-1]
