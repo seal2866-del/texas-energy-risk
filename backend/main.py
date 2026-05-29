@@ -74,7 +74,7 @@ async def _grid_signal_loop():
                 gas_records = gas_data.get("records", []) if isinstance(gas_data, dict) else []
                 gas_latest  = gas_data.get("latest",  None) if isinstance(gas_data, dict) else None
 
-                result = run_all_signals(prices, forecasts, gas_records)
+                result = run_all_signals(prices, forecasts, gas_records, location=loc)
 
                 ercot_latest = prices[-1].price_mwh if prices and hasattr(prices[-1], "price_mwh") else None
                 henry_hub    = gas_latest.henry_hub_price if gas_latest and hasattr(gas_latest, "henry_hub_price") else None
