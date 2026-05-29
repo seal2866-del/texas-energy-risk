@@ -29,7 +29,7 @@ const TIERS = [
   {
     id:       "pro",
     name:     "Pro",
-    price:    "$99",
+    price:    "$499",
     period:   "/month",
     note:     "Cancel anytime",
     highlight: true,
@@ -53,7 +53,7 @@ const TIERS = [
   {
     id:       "business",
     name:     "Business",
-    price:    "$299",
+    price:    "$1,199",
     period:   "/month",
     note:     "Billed monthly",
     highlight: false,
