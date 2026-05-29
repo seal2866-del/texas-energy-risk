@@ -34,11 +34,12 @@ const TIERS = [
     note:     "Cancel anytime",
     highlight: true,
     badge:    "Most Popular",
+    priceId:  process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
     features: [
       "Everything in Free, plus:",
       "Real-time email alerts when signals trigger",
       "Custom price & temperature thresholds",
-      "All 4 Texas market locations",
+      "All 8 Texas market locations",
       "7-day weather demand forecast",
       "8-week gas storage history",
       "Primary driver + risk direction analysis",
@@ -57,6 +58,7 @@ const TIERS = [
     period:   "/month",
     note:     "Billed monthly",
     highlight: false,
+    priceId:  process.env.NEXT_PUBLIC_STRIPE_BUSINESS_PRICE_ID,
     features: [
       "Everything in Pro, plus:",
       "Team access (up to 5 users)",
@@ -230,7 +232,7 @@ export default function PricingPage() {
                   </Link>
                 ) : (
                   <button
-                    onClick={() => handleCheckout()}
+                    onClick={() => handleCheckout(tier.priceId)}
                     disabled={loading}
                     className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold transition-all ${
                       tier.highlight
