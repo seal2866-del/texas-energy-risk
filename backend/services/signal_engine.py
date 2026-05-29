@@ -850,25 +850,50 @@ def _build_narrative(
             context += f", and {parts[2]}"
         context += "."
 
-    # Summary
-    summary = (
-        f"Short-term Texas energy risk is {risk_label}. "
-        f"The primary driver is {primary_driver}. "
-        f"{context} "
-        f"Short-term (24-48 hours) outlook: risk {direction_phrase}. "
-        f"Monitoring is recommended."
-    ).strip()
+    # ── Summary (AI Brief — prescriptive, operational) ───────────────────────
+    triggered_signals = [s for s in signals if s.get("triggered")]
 
-    # Explanation (for risk score card)
+    if risk_score == "low" and not triggered_signals:
+        summary = (
+            "No action required. Current conditions indicate minimal procurement or "
+            "operational exposure over the next 24 hours. "
+            f"{context} "
+            "Continue standard monitoring cadence and watch afternoon demand peaks "
+            "between 14:00–19:00 CDT."
+        ).strip()
+    elif risk_score == "low" and triggered_signals:
+        summary = (
+            "No immediate action required, though one risk signal warrants attention. "
+            f"{context} "
+            "Review exposure ahead of peak demand hours and confirm hedging positions "
+            "are aligned with current conditions."
+        ).strip()
+    elif risk_score == "medium":
+        summary = (
+            "Elevated conditions detected — review operational exposure now. "
+            f"{context} "
+            "Consider locking in forward positions if procurement windows are open. "
+            "Increase monitoring frequency through the next 6–24 hours."
+        ).strip()
+    else:  # high
+        summary = (
+            "Immediate attention required. High-risk conditions are active across "
+            "multiple signals. "
+            f"{context} "
+            "Assess open procurement exposure, activate contingency protocols if applicable, "
+            "and monitor ERCOT real-time pricing continuously."
+        ).strip()
+
+    # ── Explanation (risk score card — one authoritative sentence) ────────────
     triggered_labels = {
         "price_volatility": "ERCOT price volatility",
         "weather_demand":   "weather-driven demand pressure",
         "gas_supply":       "natural gas supply tightness",
     }
     stable_labels = {
-        "price_volatility": "ERCOT prices are stable",
-        "weather_demand":   "weather demand is normal",
-        "gas_supply":       "natural gas supply is adequate",
+        "price_volatility": "ERCOT prices stable",
+        "weather_demand":   "weather demand normal",
+        "gas_supply":       "gas supply adequate",
     }
     triggered_types = {s["signal_type"] for s in signals if s.get("triggered")}
     stable_types    = {"price_volatility", "weather_demand", "gas_supply"} - triggered_types
@@ -876,56 +901,56 @@ def _build_narrative(
     if risk_score == "high":
         driver_str  = " and ".join(triggered_labels[t] for t in triggered_types if t in triggered_labels)
         stable_str  = ", ".join(stable_labels[t] for t in stable_types if t in stable_labels)
-        explanation = f"High risk driven by simultaneous {driver_str}."
+        explanation = f"Converging risk: {driver_str} active simultaneously."
         if stable_str:
             explanation += f" {stable_str.capitalize()}."
     elif risk_score == "medium" and triggered_types:
         t           = next(iter(triggered_types))
         stable_str  = " and ".join(stable_labels[s] for s in stable_types if s in stable_labels)
-        explanation = f"Medium risk driven by {triggered_labels.get(t, t)}."
+        explanation = f"Elevated exposure from {triggered_labels.get(t, t)}."
         if stable_str:
             explanation += f" {stable_str.capitalize()}."
     else:
-        explanation = "All monitored risk drivers -- price, weather, and gas supply -- are within normal ranges."
+        explanation = "All risk drivers within normal operating ranges. No material exposure detected."
 
-    # Impact
-    triggered_signals = [s for s in signals if s.get("triggered")]
+    # ── Impact (what this means operationally) ────────────────────────────────
     if not triggered_signals:
         impact = (
-            "All monitored risk drivers are within normal operating ranges. "
-            "No near-term risk elevation detected. Conditions are expected to remain stable "
-            "over the short-term (0-6h) and near-term (6-24h) outlook."
+            "No procurement or operational action required at this time. "
+            "Conditions support standard operations through the next 24 hours. "
+            "Reassess if afternoon temperatures exceed forecast highs or "
+            "ERCOT prices move above $50/MWh."
         )
     elif risk_score == "high" and len(triggered_signals) >= 2:
         impact = (
-            "Multiple converging risk signals are active, increasing the likelihood of "
-            "short-term grid stress and price volatility over the next 24-48 hours. "
-            "Conditions warrant close monitoring."
+            "Multiple converging signals indicate heightened grid stress. "
+            "Procurement teams should assess open exposure immediately. "
+            "Operations should confirm demand response capacity and review "
+            "contingency protocols for the next 24–48 hours."
         )
     else:
         impact_map = {
             "weather_demand": {
-                "high":   "Extreme temperatures may significantly increase grid load and tighten reserve margins, increasing the likelihood of short-term price volatility over the next 24-48 hours.",
-                "medium": "Elevated temperatures may increase grid load and pressure peak-hour pricing, increasing the likelihood of reserve margin tightening over the next 24 hours.",
+                "high":   "Extreme heat is driving grid load toward peak capacity. Evaluate demand curtailment options and confirm forward hedges cover afternoon exposure windows (14:00–19:00 CDT).",
+                "medium": "Elevated temperatures are pressuring afternoon peak pricing. Review spot vs. fixed-price exposure ahead of the 14:00–18:00 CDT demand window.",
             },
             "price_volatility": {
-                "high":   "Sustained ERCOT price spikes may signal constrained grid conditions, increasing the likelihood of continued volatility and potential supply stress over the next 24 hours.",
-                "medium": "Elevated ERCOT prices may reflect a tightening supply-demand balance, increasing the likelihood of further price movement over the next 24-48 hours.",
+                "high":   "ERCOT spot prices are signaling active grid stress. Avoid unhedged spot exposure until prices stabilize. Consider locking forward positions if procurement windows are open.",
+                "medium": "ERCOT pricing is showing sensitivity. Confirm hedging positions are aligned and set alerts for any move above your threshold price.",
             },
             "gas_supply": {
-                "high":   "A critical gas storage deficit may constrain fuel supply for gas-fired generation, increasing the likelihood of supply-side stress during demand peaks over the next 48-72 hours.",
-                "medium": "Below-average gas storage may reduce the supply buffer, increasing the likelihood of price sensitivity during any demand surge over the next 48-72 hours.",
+                "high":   "Gas storage deficit may constrain generation during demand peaks. Assess fuel supply agreements and confirm backup generation capacity is available.",
+                "medium": "Below-average gas storage is reducing the supply buffer. Monitor Henry Hub pricing and assess impact on generation cost exposure over the next 48–72 hours.",
             },
         }
         target   = triggered_signals[0]
         sig_type = target.get("signal_type", "")
         severity = target.get("severity", "medium")
-        impact   = impact_map.get(sig_type, {}).get(severity, "Active risk signals detected. Monitor conditions closely over the next 24-48 hours.")
+        impact   = impact_map.get(sig_type, {}).get(severity, "Active risk signal detected. Review operational exposure and confirm monitoring cadence over the next 24 hours.")
 
-    # market_context is the short authoritative contrast sentence for all panels
+    # market_context — short authoritative sentence for all panels
     market_context = context if context else (
-        f"Short-term Texas energy risk is {risk_score.capitalize()}. "
-        f"The primary driver is {primary_driver}."
+        f"Risk is {risk_score.capitalize()}. Primary driver: {primary_driver}."
     )
 
     return summary, explanation, impact, market_context
@@ -1301,97 +1326,101 @@ def _compute_risk_narrative(
     """
     risk_label = risk_score.capitalize()
 
-    # Temporal framing (Phase 11 item 4)
-    headline       = f"Texas energy risk is {risk_label} for the next 0–6 hours"
-    temporal_ctx   = "0–6 hours"
-    next_period    = "Conditions may change within the next 6–24 hours based on forecast demand trends."
-
     demand_level = demand_pressure.get("level", "low")
     supply_level = supply_pressure.get("level", "low")
     market_level = market_reaction.get("level", "low")
+
+    # ── Headline — prescriptive, not descriptive ──────────────────────────────
+    if risk_score == "low":
+        headline = "No action required — conditions support normal operations"
+    elif risk_score == "medium":
+        headline = "Elevated exposure detected — review procurement position now"
+    else:
+        headline = "Immediate attention required — high-risk conditions active"
+
+    temporal_ctx = "0–6 hours"
+    next_period  = "Reassess at next refresh. Conditions may shift within the next 6–24 hours."
 
     # ── Sentence 1: weather → demand chain ────────────────────────────────────
     if demand_level == "high":
         if weather_val >= TEMP_HIGH_THRESHOLD_F:
             s1 = (
-                f"Extreme temperatures of {weather_val:.0f}°F are driving significant "
-                "cooling demand across the Texas grid, placing substantial load on power "
-                "generation resources."
+                f"Extreme heat of {weather_val:.0f}°F is driving significant cooling demand "
+                "across the Texas grid — reserve margins are under pressure and afternoon "
+                "peak exposure (14:00–19:00 CDT) is elevated."
             )
         else:
             s1 = (
-                f"Severe cold of {weather_val:.0f}°F is driving significant heating "
-                "demand across Texas, placing substantial load on the grid."
+                f"Severe cold of {weather_val:.0f}°F is driving significant heating demand — "
+                "grid load is elevated and overnight exposure warrants attention."
             )
     elif demand_level == "medium":
         if weather_val >= TEMP_HIGH_THRESHOLD_F:
             s1 = (
-                f"Elevated temperatures of {weather_val:.0f}°F are increasing cooling "
-                "demand pressure on the Texas grid, with peak load expected during "
-                "afternoon hours."
+                f"Temperatures of {weather_val:.0f}°F are pressuring afternoon peak demand. "
+                "Confirm hedging positions cover the 14:00–18:00 CDT window."
             )
         elif weather_val > 0:
             s1 = (
-                f"Cold temperatures of {weather_val:.0f}°F are increasing heating "
-                "demand, with elevated overnight grid load expected."
+                f"Cool temperatures of {weather_val:.0f}°F are elevating overnight heating demand. "
+                "Monitor early-morning grid load for any supply tightness."
             )
         else:
-            s1 = "Weather-driven demand pressure is moderate, with conditions above normal levels."
+            s1 = "Demand pressure is moderate — above normal but within manageable operating range."
     else:
         s1 = (
-            "Weather conditions are within normal seasonal ranges, with no elevated "
-            "demand pressure on the Texas grid at this time."
+            "Weather conditions are within normal seasonal ranges. "
+            "No demand-driven grid pressure expected through the next 24 hours."
         )
 
     # ── Sentence 2: gas → generation cost chain ───────────────────────────────
     gas_abs = abs(gas_pct)
     if supply_level == "high":
         s2 = (
-            f"Natural gas — which fuels a significant portion of Texas power generation — "
-            f"is critically below seasonal averages ({gas_abs:.0f}% below the 5-year average), "
-            "substantially reducing the fuel buffer available to meet any demand surge."
+            f"Gas storage is critically low — {gas_abs:.0f}% below the 5-year average — "
+            "reducing the fuel buffer available for gas-fired generation during any demand surge. "
+            "Assess fuel supply agreements now."
         )
     elif supply_level == "medium":
         s2 = (
-            f"Natural gas supply remains {gas_abs:.0f}% below seasonal averages, "
-            "which may increase cost sensitivity and reduce the available fuel buffer "
-            "during periods of elevated generation demand."
+            f"Gas storage is {gas_abs:.0f}% below seasonal averages, reducing the supply buffer "
+            "and increasing cost sensitivity during demand peaks. "
+            "Monitor Henry Hub for any further movement."
         )
     else:
         s2 = (
-            "Natural gas supply conditions appear adequate, with storage near seasonal "
-            "norms and no fuel availability concerns that would compound demand pressure."
+            "Natural gas supply is adequate with storage near seasonal norms. "
+            "No fuel-side constraints expected to compound demand pressure."
         )
 
-    # ── Sentence 3: ERCOT → real-time balance reflection ─────────────────────
+    # ── Sentence 3: ERCOT → real-time market signal ───────────────────────────
     price_str = f"${price_val:.0f}/MWh" if price_val > 0 else "current levels"
     if market_level == "high":
         s3 = (
-            f"ERCOT Houston Hub pricing at {price_str} already reflects these converging "
-            "pressures — the real-time market is pricing in elevated risk conditions."
+            f"ERCOT Houston Hub at {price_str} is already pricing in elevated stress — "
+            "avoid unhedged spot exposure until prices normalize."
         )
     elif market_level == "medium":
         s3 = (
-
-            f"ERCOT pricing at {price_str} is showing sensitivity to current conditions, "
-            "with moderate market stress reflected in near-term pricing."
+            f"ERCOT pricing at {price_str} is showing early sensitivity to current conditions. "
+            "Set price alerts and confirm forward positions are in place."
         )
     else:
         s3 = (
-            f"ERCOT pricing at {price_str} remains within normal bounds, "
-            "suggesting the market has not yet priced in significant stress."
+            f"ERCOT pricing at {price_str} is within normal operating range — "
+            "no immediate market-driven action required."
         )
 
     # ── Direction modifier ────────────────────────────────────────────────────
     if risk_direction == "increasing":
         next_period = (
-            "Risk conditions are trending higher — conditions within the next 6–24 hours "
-            "may exceed current levels if demand and supply pressures persist."
+            "Conditions are trending higher. Increase monitoring frequency and confirm "
+            "contingency protocols are ready if risk escalates within the next 6–24 hours."
         )
     elif risk_direction == "decreasing":
         next_period = (
-            "Risk conditions are trending lower — the 6–24 hour outlook suggests "
-            "easing pressure barring new weather or supply disruptions."
+            "Conditions are trending lower. Continue standard monitoring — "
+            "risk is expected to ease over the next 6–24 hours barring new disruptions."
         )
 
     body = f"{s1} {s2} {s3}"
