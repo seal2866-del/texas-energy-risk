@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 
-export default function UnsubscribePage() {
+function UnsubscribeContent() {
   const params = useSearchParams();
   const token  = params.get("token");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -50,5 +50,13 @@ export default function UnsubscribePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function UnsubscribePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#080d1a] flex items-center justify-center"><p className="text-gray-400">Loading...</p></div>}>
+      <UnsubscribeContent />
+    </Suspense>
   );
 }
