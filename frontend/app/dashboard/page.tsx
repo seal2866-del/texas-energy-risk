@@ -22,6 +22,14 @@ import OperationalWatchList from "@/components/widgets/OperationalWatchList";
 import CostExposure from "@/components/widgets/CostExposure";
 import OperationalStatusBanner from "@/components/widgets/OperationalStatusBanner";
 import ManagementSummary from "@/components/widgets/ManagementSummary";
+import ExecutiveDecisionCard from "@/components/widgets/ExecutiveDecisionCard";
+import ExecutiveKPIRow from "@/components/widgets/ExecutiveKPIRow";
+import WatchToday from "@/components/widgets/WatchToday";
+import NextReview from "@/components/widgets/NextReview";
+import CostImpact from "@/components/widgets/CostImpact";
+import WhyRiskIsLow from "@/components/widgets/WhyRiskIsLow";
+import ScenarioAnalysis from "@/components/widgets/ScenarioAnalysis";
+import RootCauseEngine from "@/components/widgets/RootCauseEngine";
 import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
 import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
@@ -536,7 +544,30 @@ export default function DashboardPage() {
                   Priority: Risk State → Actions → Brief → Assessment
               ═══════════════════════════════════════════════════════ */}
 
-              {/* 1. Risk Score + ERCOT Price */}
+              {/* ── EXECUTIVE DECISION CARD — first thing seen ──────── */}
+              <ExecutiveDecisionCard
+                riskScore={signals.risk_score}
+                riskDirection={signals.risk_direction}
+                confidence={signals.confidence}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                marketReaction={signals.market_reaction}
+                activeSignals={signals.active_signals}
+                computedAt={signals.computed_at}
+              />
+
+              {/* ── EXECUTIVE KPI ROW — single glance summary ────────── */}
+              <ExecutiveKPIRow
+                riskScore={signals.risk_score}
+                riskDirection={signals.risk_direction}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                marketReaction={signals.market_reaction}
+                activeSignals={signals.active_signals}
+                confidence={signals.confidence}
+              />
+
+              {/* ── Risk Score + ERCOT Price ─────────────────────────── */}
               <RiskScore
                 score={signals.risk_score}
                 activeSignals={signals.active_signals}
@@ -563,7 +594,7 @@ export default function DashboardPage() {
               />
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
-              {/* 2. Recommended Actions — full width */}
+              {/* ── Recommended Actions ──────────────────────────────── */}
               <RecommendedActions
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
@@ -573,7 +604,7 @@ export default function DashboardPage() {
                 computedAt={signals.computed_at}
               />
 
-              {/* 3. Management Summary — full width (exec only) */}
+              {/* ── Management Summary ───────────────────────────────── */}
               <ManagementSummary
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
@@ -583,7 +614,7 @@ export default function DashboardPage() {
                 computedAt={signals.computed_at}
               />
 
-              {/* 4. Executive Brief — full width */}
+              {/* ── Executive Brief ──────────────────────────────────── */}
               <AIExecutiveBrief
                 signals={signals}
                 reasoning={aiReasoning}
@@ -593,7 +624,7 @@ export default function DashboardPage() {
                 earlyWarnings={riskModel?.earlyWarningSignals}
               />
 
-              {/* 5. Impact Assessment + Cost Exposure */}
+              {/* ── Impact Assessment + Cost Impact ──────────────────── */}
               <ImpactAssessment
                 riskScore={signals.risk_score}
                 demandPressure={signals.demand_pressure}
@@ -603,6 +634,26 @@ export default function DashboardPage() {
                 dataSources={signals.data_sources}
               />
               <CostExposure
+                riskScore={signals.risk_score}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                marketReaction={signals.market_reaction}
+              />
+
+              {/* ── Watch Today + Next Review ────────────────────────── */}
+              <WatchToday
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+              />
+              <NextReview
+                riskScore={signals.risk_score}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+              />
+
+              {/* ── Cost Impact — full width ─────────────────────────── */}
+              <CostImpact
                 riskScore={signals.risk_score}
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
                 marketReaction={signals.market_reaction}
@@ -624,6 +675,24 @@ export default function DashboardPage() {
               ═══════════════════════════════════════════════════════ */}
               {!execMode && (
                 <>
+                  <WhyRiskIsLow
+                    riskScore={signals.risk_score}
+                    demandPressure={signals.demand_pressure}
+                    supplyPressure={signals.supply_pressure}
+                    marketReaction={signals.market_reaction}
+                    gasToPower={signals.gas_to_power_impact}
+                    dataSources={signals.data_sources}
+                  />
+                  <RootCauseEngine
+                    signals={signals}
+                    snapshots={snapshots}
+                  />
+                  <ScenarioAnalysis
+                    riskScore={signals.risk_score}
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                  />
                   <OperationalWatchList
                     riskScore={signals.risk_score}
                     ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
