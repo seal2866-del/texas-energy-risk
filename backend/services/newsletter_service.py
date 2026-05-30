@@ -44,7 +44,7 @@ def _fetch_week_snapshots(location: str = "Houston") -> list[dict]:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
     r = (
         sb.table("signal_snapshots")
-          .select("risk_score, risk_numeric, computed_at, ercot_price, henry_hub")
+          .select("risk_score, computed_at, ercot_price, henry_hub")
           .eq("location", location)
           .gte("computed_at", cutoff)
           .order("computed_at")
@@ -99,7 +99,8 @@ def _build_newsletter_prompt(
     price_delta = ercot - prior_ercot
 
     # Week trend
-    scores     = [s.get("risk_numeric", 2.0) for s in week_snapshots if s.get("risk_numeric")]
+    def _score(s): return {"high": 7.5, "medium": 4.5}.get(s.get("risk_score", "low"), 2.0)
+    scores     = [_score(s) for s in week_snapshots]
     avg_score  = sum(scores) / len(scores) if scores else 2.0
     peak_score = max(scores) if scores else 2.0
 
