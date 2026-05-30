@@ -174,10 +174,6 @@ Return ONLY valid JSON — no markdown, no preamble:
   "confidence_reasons": ["3-4 reasons explaining confidence level. Analytical."],
   "watch_items": ["3-5 specific operational watch items with thresholds."]
 }}"""
-  "monitoring_focus": "One sentence. What to specifically track and when.",
-  "escalation_triggers": "One sentence. Specific thresholds that would change the posture.",
-  "outlook_note": "1-2 sentences. Operational outlook for the coming week. Cautious language only."
-}}"""
 
 
 async def generate_newsletter_content(
@@ -197,7 +193,7 @@ async def generate_newsletter_content(
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         msg    = client.messages.create(
             model=AI_MODEL,
-            max_tokens=1500,
+            max_tokens=3000,
             messages=[{"role": "user", "content": prompt}],
         )
         raw  = msg.content[0].text.strip()
