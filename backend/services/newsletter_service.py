@@ -133,7 +133,7 @@ STRICT LANGUAGE RULES:
 
 Current Texas Conditions (Houston primary):
 - Risk Level: {risk.upper()} | Trend: {trend}
-- ERCOT: {ercot_str} | Prior week: ${prior_ercot:.2f}/MWh | Change: {'+' if price_pct >= 0 else ''}{price_pct:.1f}%
+- ERCOT: {_fmt_ercot(ercot)} | Prior week: {_fmt_ercot(prior_ercot)} | Change: {'+' if price_pct >= 0 else ''}{price_pct:.1f}%
 - Week avg risk: {avg_score:.1f}/10 | Peak: {peak_score:.1f}/10
 - Weather Demand: {current.get('weather_demand_pressure', 'low').upper()}
 - Gas Supply: {current.get('gas_supply_pressure', 'low').upper()}
@@ -205,10 +205,19 @@ async def generate_newsletter_content(
         return _fallback_content(current, prior)
 
 
+def _fmt_ercot(price) -> str:
+    """Format ERCOT price safely — never show $0.00."""
+    if price and float(price) > 0:
+        return f"${float(price):.2f}/MWh"
+    return "Awaiting ERCOT Feed"
+
+
 def _fallback_content(current: dict, prior: dict) -> dict:
     """Rule-based fallback if AI is unavailable."""
-    risk   = current.get("risk_score", "low")
-    ercot  = current.get("ercot_price", 0) or 0
+    risk      = current.get("risk_score", "low")
+    ercot_raw = current.get("ercot_price")
+    ercot     = float(ercot_raw) if (ercot_raw and float(ercot_raw) > 0) else None
+    ercot_str = _fmt_ercot(ercot)
     action = (
         "Operational review recommended." if risk == "high" else
         "Enhanced monitoring recommended." if risk == "medium" else
@@ -268,8 +277,8 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
     """Build V3 HTML email — executive operational briefing format."""
     risk        = current.get("risk_score", "low")
     ercot_raw   = current.get("ercot_price")
-    ercot       = ercot_raw if (ercot_raw and ercot_raw > 0) else None
-    ercot_str   = f"{ercot_str}" if ercot else "Awaiting ERCOT Feed"
+    ercot       = float(ercot_raw) if (ercot_raw and float(ercot_raw) > 0) else None
+    ercot_str   = _fmt_ercot(ercot)
     risk_color  = "#ef4444" if risk == "high" else "#f59e0b" if risk == "medium" else "#10b981"
     fe_url     = os.getenv("FRONTEND_URL", "https://texas-energy-risk.vercel.app")
     unsub_url  = f"{fe_url}/unsubscribe?token={{{{unsubscribe_token}}}}"
@@ -715,9 +724,10 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
 
 def build_text_email(content: dict, current: dict) -> str:
     """Plain text version."""
-    risk  = current.get("risk_score", "low").upper()
-    ercot = current.get("ercot_price", 0) or 0
-    watch = "\n".join(f"  • {item}" for item in (content.get("watch_items") or []))
+    risk      = current.get("risk_score", "low").upper()
+    ercot_raw = current.get("ercot_price")
+    ercot_str = _fmt_ercot(float(ercot_raw) if ercot_raw else None)
+    watch     = "\n".join(f"  • {item}" for item in (content.get("watch_items") or []))
 
     return f"""TEXAS ENERGY RISK BRIEF
 Weekly Operational Intelligence for Texas Energy Markets
