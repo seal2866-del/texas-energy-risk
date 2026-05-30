@@ -23,37 +23,37 @@ export default function EscalationPath({ ercotPrice, temperature, henryHub, risk
   const steps: Step[] = [
     {
       trigger:  "ERCOT > $35/MWh",
-      action:   "Review procurement exposure",
+      action:   "Increased monitoring priority may apply",
       severity: "watch",
       active:   price >= 35,
     },
     {
       trigger:  "ERCOT > $50/MWh",
-      action:   "Initiate dispatch review",
+      action:   "Elevated operational awareness — review per internal procedures",
       severity: "elevated",
       active:   price >= 50,
     },
     {
       trigger:  "Temperature > 95°F",
-      action:   "Review peak demand readiness",
+      action:   "Demand conditions may warrant increased monitoring frequency",
       severity: "watch",
       active:   temp >= 95,
     },
     {
       trigger:  "Temperature > 100°F",
-      action:   "Activate demand response protocols",
+      action:   "Elevated operational significance — internal procedures may apply",
       severity: "critical",
       active:   temp >= 100,
     },
     {
       trigger:  "Henry Hub > $3.00/MMBtu",
-      action:   "Review fuel supply sensitivity",
+      action:   "Gas supply conditions may warrant increased awareness",
       severity: "watch",
       active:   hh >= 3.0,
     },
     {
       trigger:  "ERCOT > $100/MWh",
-      action:   "Escalate to operations leadership immediately",
+      action:   "Significant conditions — internal escalation procedures may be warranted",
       severity: "critical",
       active:   price >= 100,
     },
@@ -68,9 +68,9 @@ export default function EscalationPath({ ercotPrice, temperature, henryHub, risk
   return (
     <div className="card-glass border border-white/8 rounded-2xl p-5 lg:col-span-2">
       <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">
-        If Conditions Change
+        Escalation Threshold Monitoring
       </p>
-      <p className="text-xs text-gray-500 mb-4">Operational playbook — actions triggered by threshold breaches</p>
+      <p className="text-xs text-gray-500 mb-4">Conditions being monitored — thresholds that may increase operational significance</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {steps.map((step) => {

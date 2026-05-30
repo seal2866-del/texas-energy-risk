@@ -18,7 +18,7 @@ function getSummary(
   supply: string,
 ): string {
   if (risk === "high") {
-    return "Multiple monitored indicators have exceeded escalation thresholds. Immediate operational review is recommended. Procurement, dispatch, and fuel-supply teams should be notified.";
+    return "Multiple monitored indicators reflect elevated operational significance. Conditions may warrant increased management visibility and review of internal escalation procedures according to organizational protocols.";
   }
 
   if (risk === "medium") {
@@ -27,15 +27,14 @@ function getSummary(
       primaryDriver.includes("price")   ? "ERCOT pricing sensitivity is elevated" :
       primaryDriver.includes("gas")     ? "Natural gas supply tightness is emerging" :
                                           "Operational conditions are moderately elevated";
-    return `${driver}. Enhanced monitoring and procurement review are recommended during peak demand periods.`;
+    return `${driver}. Increased monitoring frequency during peak demand periods may be appropriate according to internal procedures.`;
   }
 
-  // Low risk
   if (direction === "increasing") {
-    return "Texas operations remain within normal parameters, though conditions are trending toward elevated monitoring. No immediate action is required — reassess at the next scheduled review window.";
+    return "Current conditions remain within normal operating parameters, though conditions are trending toward elevated monitoring priority. Standard procedures apply — reassess at the next scheduled review window.";
   }
 
-  return "Texas operations remain within normal parameters. No procurement, dispatch, or fuel-supply actions are recommended at this time.";
+  return "Current Texas energy conditions remain within normal operating parameters across monitored signals. Standard monitoring procedures apply.";
 }
 
 export default function ManagementSummary({
@@ -69,7 +68,7 @@ export default function ManagementSummary({
           </div>
           <p className="text-sm text-gray-200 leading-relaxed">{summary}</p>
           <p className="text-[10px] text-gray-600 mt-2">
-            Suitable for internal distribution. Not financial, investment, or procurement advice.
+            Situational awareness only. Not financial, investment, procurement, or operational advice.
           </p>
         </div>
       </div>
