@@ -155,10 +155,24 @@ export default function LandingPage() {
               <span className="text-orange-400">for Texas Operations</span>
             </h1>
 
-            <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-10 leading-relaxed drop-shadow-md">
+            <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
               Monitor ERCOT pricing, weather-driven demand, and natural gas supply conditions
-              before energy volatility impacts operations, infrastructure, and cost.
+              before volatility impacts operations, procurement, and infrastructure planning.
             </p>
+
+            {/* Trust indicators */}
+            <div className="flex flex-wrap items-center justify-center gap-6 mb-10">
+              {[
+                "Real-time Monitoring",
+                "Predictive Analytics",
+                "AI-Assisted Interpretation",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2 text-sm text-gray-300">
+                  <span className="text-green-400 font-bold">✓</span>
+                  {item}
+                </div>
+              ))}
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/login?signup=true"
@@ -176,7 +190,7 @@ export default function LandingPage() {
               ERCOT · NOAA · EIA · Informational intelligence platform
             </p>
 
-            {/* Operational status strip */}
+            {/* Data sources strip */}
             <div className="mt-16 flex flex-wrap items-center justify-center gap-6">
               {[
                 { label: "ERCOT Pricing",    color: "text-orange-400", dot: "bg-orange-400" },
