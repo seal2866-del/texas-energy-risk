@@ -69,123 +69,89 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
     ercot_price      = inputs.get("ercot_price", 0)
     data_health      = inputs.get("data_source_health", "active")
 
-    # -- Executive summary (actionable, prescriptive)
+    # ── 1. Recommended Action ─────────────────────────────────────────────────
     if risk == "high":
-        exec_summary = f"Immediate attention required. {primary_driver} is driving high-risk conditions — assess open exposure now and confirm contingency protocols are ready."
+        recommended_action = "Operational readiness review recommended."
+        exec_summary = f"Operational readiness review recommended. {primary_driver} is driving elevated risk — assess open exposure and confirm contingency protocols are ready."
     elif risk == "medium":
-        exec_summary = f"Review operational exposure now. {primary_driver} is building near-term pressure — confirm hedging positions ahead of the next demand peak."
+        recommended_action = "Enhanced monitoring recommended."
+        exec_summary = f"Enhanced monitoring recommended. {primary_driver} is building near-term pressure — confirm hedging positions ahead of the next demand peak."
     else:
-        exec_summary = f"No action required. Current conditions present minimal procurement or operational exposure. Continue standard monitoring and watch afternoon demand peaks between 14:00–19:00 CDT."
+        recommended_action = "No action required."
+        exec_summary = "No action required. All monitored drivers present no immediate operational constraint."
 
-    # -- Current market interpretation
+    # ── 2. Operational Exposure ───────────────────────────────────────────────
     if risk == "high":
-        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is pricing in active stress — avoid unhedged spot exposure. {primary_driver} is the dominant driver; conditions warrant continuous monitoring."
+        operational_exposure = "Elevated energy cost exposure may develop during peak demand intervals. Unhedged positions are at risk."
     elif risk == "medium":
-        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is showing early sensitivity. {primary_driver} is the leading pressure factor — lock in forward positions if procurement windows are open."
+        operational_exposure = "Moderate pricing sensitivity may emerge during peak demand periods. Review open procurement exposure."
     else:
-        interpretation = f"ERCOT at ${ercot_price:.0f}/MWh is within normal operating range. No fuel-side or demand-side constraints require immediate action."
+        operational_exposure = "Minimal operational or procurement exposure detected. Standard operations supported through next 24 hours."
 
-    # -- Driver analysis (synthesized)
-    if weather_pressure == "high" and gas_pressure in ("medium", "high"):
-        driver_analysis = (
-            "Elevated weather demand is compounding existing gas supply pressure, increasing "
-            "generation cost sensitivity. The alignment of thermal load and fuel cost pressure "
-            "suggests heightened near-term pricing uncertainty across Texas power markets."
-        )
-    elif weather_pressure in ("medium", "high") and ercot_volatility in ("medium", "high"):
-        driver_analysis = (
-            "Weather-driven demand pressure and ERCOT price volatility are moving in the same "
-            "direction, suggesting the grid is beginning to reflect demand stress in real-time "
-            "pricing. Gas supply conditions are a secondary monitoring factor."
-        )
+    # ── 3. Escalation Trigger ─────────────────────────────────────────────────
+    if risk == "high":
+        escalation = f"Immediate review if ERCOT exceeds $100/MWh or generation availability drops below reserve margin thresholds."
+    elif risk == "medium":
+        escalation = f"Escalate operational review if ERCOT pricing exceeds $50/MWh or temperatures exceed forecast by more than 5°F."
+    else:
+        escalation = f"Escalate review if ERCOT exceeds $35/MWh during the 14:00–19:00 CDT demand window or temperatures exceed 95°F."
+
+    # ── 4. Monitoring Focus ───────────────────────────────────────────────────
+    if risk == "high":
+        monitoring = "Monitor real-time ERCOT pricing, generation availability, and gas supply conditions continuously."
+    elif weather_pressure in ("medium", "high") and gas_pressure in ("medium", "high"):
+        monitoring = "Track ERCOT 5-minute LMP during 14:00–19:00 CDT and Henry Hub for any spike above $3.00/MMBtu."
     elif weather_pressure in ("medium", "high"):
-        driver_analysis = (
-            f"Weather-driven demand is the primary pressure factor. Elevated temperatures are "
-            f"increasing load on the Texas grid. ERCOT pricing has "
-            f"{'begun to reflect this stress' if ercot_volatility != 'low' else 'remained relatively stable'}, "
-            f"while gas supply conditions are currently {'tightening' if gas_pressure != 'low' else 'adequate'}."
-        )
+        monitoring = "Track ERCOT 5-minute LMP 14:00–19:00 CDT for demand-driven price behavior. Monitor updated temperature forecasts every 2 hours."
     elif gas_pressure in ("medium", "high"):
-        driver_analysis = (
-            "Natural gas supply conditions are the primary pressure factor. Tighter storage "
-            "or elevated Henry Hub pricing may increase generation cost sensitivity, particularly "
-            "if demand rises during peak periods. ERCOT pricing may begin to reflect this "
-            "cost pressure if weather demand increases."
-        )
+        monitoring = "Monitor Henry Hub pricing and EIA weekly storage report for any further supply deterioration."
+    else:
+        monitoring = "Monitor ERCOT pricing during the 14:00–19:00 CDT afternoon peak window. No elevated monitoring required outside peak hours."
+
+    # ── 5. Supporting Analysis (driver chain — comes last) ────────────────────
+    if weather_pressure == "high" and gas_pressure in ("medium", "high"):
+        driver_analysis = "Heat-driven demand is compounding gas supply tightness — thermal load and fuel cost pressure are aligned, increasing near-term pricing sensitivity across Texas power markets."
+    elif weather_pressure in ("medium", "high") and ercot_volatility in ("medium", "high"):
+        driver_analysis = "Weather demand and ERCOT volatility are moving together — the grid is beginning to price in demand stress. Gas supply is a secondary watch factor."
+    elif weather_pressure in ("medium", "high"):
+        driver_analysis = f"Temperature-driven demand is the primary pressure factor. ERCOT pricing has {'begun to reflect this stress' if ercot_volatility != 'low' else 'remained stable'}, with gas supply currently {'tightening' if gas_pressure != 'low' else 'adequate'}."
+    elif gas_pressure in ("medium", "high"):
+        driver_analysis = "Gas supply tightness is the primary pressure factor. Generation cost sensitivity may increase if demand rises during peak periods."
     elif ercot_volatility in ("medium", "high"):
-        driver_analysis = (
-            "ERCOT pricing volatility is elevated relative to current weather and gas conditions. "
-            "This divergence suggests the market movement may be driven by localized grid "
-            "conditions or short-term imbalances rather than broad weather or fuel demand."
-        )
+        driver_analysis = "ERCOT pricing volatility is elevated relative to weather and gas fundamentals — likely driven by localized grid conditions or short-term imbalances."
     else:
-        driver_analysis = (
-            "No dominant risk driver is currently active. Weather demand, gas supply, and ERCOT "
-            "pricing are all within normal operating ranges. Market conditions reflect "
-            "standard seasonal operating patterns with adequate supply and manageable demand."
-        )
+        driver_analysis = "No dominant risk driver active. Demand, supply, and pricing are within normal seasonal operating ranges."
 
-    # -- Escalation watch
-    if risk == "high":
-        escalation = f"Monitor ERCOT real-time pricing and weather forecasts closely. Conditions may escalate if {primary_driver.lower()} intensifies."
-    elif risk == "medium":
-        escalation = f"Near-term escalation risk may increase if {primary_driver.lower()} worsens. Continued monitoring is warranted."
-    else:
-        escalation = "No escalation signals active. Routine monitoring of ERCOT pricing and weather forecasts is sufficient."
-
-    # -- Confidence note
+    # ── Confidence note ───────────────────────────────────────────────────────
     if not data_valid or data_health in ("stale", "unavailable", "degraded"):
-        conf_note = (
-            "Signal confidence is reduced due to delayed or unavailable data sources. "
-            "Current interpretation is based on available data; conclusions should be "
-            "reviewed with reduced confidence until source freshness improves."
-        )
+        conf_note = f"Confidence limited ({confidence}%). One or more data sources are delayed or unavailable — interpret with caution."
     elif confidence >= 80:
-        conf_note = (
-            f"Signal confidence is high at {confidence}%. Assessment is based on verified "
-            f"real-time ERCOT, weather, and gas data."
-        )
+        conf_note = f"High confidence ({confidence}%). Assessment based on verified real-time ERCOT, weather, and gas data."
     elif confidence >= 60:
-        conf_note = (
-            f"Signal confidence is moderate at {confidence}%. Assessment reflects currently "
-            f"available market data with standard analytical uncertainty."
-        )
+        conf_note = f"Moderate confidence ({confidence}%). Assessment reflects available market data with standard analytical uncertainty."
     else:
-        conf_note = (
-            f"Signal confidence is currently {confidence}%. Conditions are monitored but "
-            f"assessment certainty is limited by data availability or mixed signals."
-        )
+        conf_note = f"Confidence limited ({confidence}%). Mixed or incomplete signals — treat assessment as directional only."
 
-    # -- Monitoring focus
-    monitoring_items = []
+    # ── Historical context ────────────────────────────────────────────────────
     if weather_pressure in ("medium", "high"):
-        monitoring_items.append("ERCOT pricing and weather forecasts")
-    if gas_pressure in ("medium", "high"):
-        monitoring_items.append("Henry Hub and EIA storage")
-    if ercot_volatility in ("medium", "high"):
-        monitoring_items.append("ERCOT settlement prices")
-    if not monitoring_items:
-        monitoring_items = ["ERCOT price trends and EIA gas storage"]
-    monitoring = f"Monitor {', '.join(monitoring_items)}. Risk direction: {risk_direction}."
-
-    # Historical context (generalized seasonal pattern language)
-    season_note = ""
-    if weather_pressure in ("medium", "high"):
-        season_note = "Current conditions reflect elevated summer demand patterns typical of Texas peak heat periods."
+        season_note = "Afternoon demand peaks during Texas summer heat periods typically require 2–4 GW incremental generation; current supply posture appears adequate."
     elif gas_pressure in ("medium", "high"):
-        season_note = "Current supply conditions resemble prior tightening periods during seasonal storage draws."
+        season_note = "Seasonal storage draws during peak demand periods can amplify gas price sensitivity — monitor weekly EIA reports."
     elif risk == "high":
-        season_note = "Conditions resemble prior elevated market stress periods with multiple active drivers."
+        season_note = "Multi-signal stress events in Texas have historically produced sharp intraday ERCOT price spikes — maintain heightened readiness."
     else:
-        season_note = "Current conditions are within normal seasonal operating parameters."
+        season_note = "Current conditions are consistent with normal seasonal operating parameters for this period."
 
     return {
         "executive_summary":             exec_summary,
-        "current_market_interpretation": interpretation,
-        "key_driver_analysis":           driver_analysis,
-        "escalation_watch":              escalation,
-        "confidence_note":               conf_note,
+        "recommended_action":            recommended_action,
+        "operational_exposure":          operational_exposure,
+        "escalation_trigger":            escalation,
         "recommended_monitoring_focus":  monitoring,
+        "key_driver_analysis":           driver_analysis,
+        "current_market_interpretation": driver_analysis,  # backward compat
+        "escalation_watch":              escalation,        # backward compat
+        "confidence_note":               conf_note,
         "historical_context":            season_note,
         "generated_at":                  datetime.now(timezone.utc).isoformat(),
         "model":                         "rule-based-fallback",
@@ -208,22 +174,46 @@ def _build_prompt(inputs: Dict[str, Any]) -> str:
     wx_temp       = inputs.get("weather_temperature", "N/A")
     wx_high       = inputs.get("weather_forecast_high", "N/A")
 
-    return f"""You are an operational intelligence engine for Texas energy professionals — traders, procurement managers, and grid operations teams.
+    risk_level = inputs.get("overall_risk_level", "low")
 
-Your job is to turn market data into ACTIONABLE operational guidance. Not descriptions. Not observations. Actions.
+    # Risk-level-specific action templates to anchor Claude's output
+    if risk_level == "high":
+        action_anchor = "Recommended Action: Operational readiness review recommended."
+        exposure_anchor = "Operational Exposure: Elevated energy cost exposure may develop during peak demand intervals."
+    elif risk_level == "medium":
+        action_anchor = "Recommended Action: Enhanced monitoring recommended."
+        exposure_anchor = "Operational Exposure: Moderate pricing sensitivity may emerge during peak demand periods."
+    else:
+        action_anchor = "Recommended Action: No action required."
+        exposure_anchor = "Operational Exposure: Minimal operational or procurement exposure detected."
+
+    return f"""You are an Operations Center intelligence system for Texas energy professionals — refineries, manufacturers, data centers, and energy procurement teams.
+
+CRITICAL FORMATTING RULE: Every output field must answer "What should I do?" BEFORE answering "Why?"
+NEVER start any field with: weather, ERCOT price, gas storage, temperatures, or any market condition.
+ALWAYS start with: what action is required, what exposure exists, what to monitor, or what triggers escalation.
+
+Output priority order (strictly enforced):
+1. Recommended Action — what to do right now
+2. Operational Exposure — what is at risk
+3. Escalation Trigger — the specific threshold that changes the answer
+4. Monitoring Focus — exactly what to watch and when
+5. Supporting Analysis — the "why" comes last, briefly
 
 Rules:
-- Lead with what the operator should DO or NOT DO, not what conditions ARE.
-- Use direct, confident language. Operators trust specific guidance over vague hedging.
+- Operations Center tone: direct, specific, zero filler. Like a control room briefing.
+- Never say: "conditions remain", "situation is stable", "monitoring is recommended", "risk is low/high".
+- Always say: "No action required.", "Review exposure now.", "Confirm hedging positions.", specific thresholds.
 - Synthesize driver relationships (weather → demand → ERCOT price → gas cost). Never analyze signals in isolation.
-- Do NOT provide investment, trading, financial, or legal advice.
-- Do NOT say: "conditions remain", "monitoring recommended", "risk is low", "situation is stable". These are observations, not guidance.
-- DO say: "No action required", "Review exposure now", "Confirm hedging positions", "Watch the 14:00–19:00 CDT window", "Avoid unhedged spot exposure".
-- Bloomberg terminal tone: direct, specific, zero filler.
+- Do NOT provide investment, trading, financial, legal, or procurement advice.
 - Return ONLY valid JSON. No markdown. No preamble.
 
+Current risk level: {risk_level.upper()}
+Anchor your recommended_action exactly as: "{action_anchor}"
+Anchor your operational_exposure exactly as: "{exposure_anchor}"
+
 Market data:
-- Risk level: {inputs.get("overall_risk_level", "low")}
+- Risk level: {risk_level}
 - Confidence: {inputs.get("confidence_score", 70)}%
 - Market state: {inputs.get("market_state", "Stable")}
 - Risk direction: {inputs.get("risk_direction", "stable")}
@@ -242,15 +232,16 @@ Market data:
 - Data source health: {inputs.get("data_source_health", "active")}
 - Time horizon: {inputs.get("time_horizon", "next 24-48 hours")}
 
-Return this JSON structure. Each field is 1-2 sentences max. Be specific and prescriptive:
+Return this exact JSON structure. Each field max 2 sentences. Start every field with action/exposure/trigger — never with market data:
 {{
-  "executive_summary": "Start with action status: 'No action required.' or 'Review exposure now.' or 'Immediate attention required.' Then one sentence on why.",
-  "current_market_interpretation": "Synthesize what the data means operationally. Name the risk chain. Use contrast where relevant (e.g. price stable but demand elevated).",
-  "key_driver_analysis": "Name the dominant driver relationship and its operational implication. E.g.: Heat at 92°F is pressuring afternoon peak demand — watch the 14:00–18:00 CDT window.",
-  "escalation_watch": "One specific condition that would trigger escalation. Name the threshold. E.g.: If ERCOT prices cross $75/MWh or temperatures exceed 100°F, reassess immediately.",
-  "confidence_note": "Data quality status in one sentence.",
-  "recommended_monitoring_focus": "Name 1-2 specific metrics to watch and why.",
-  "historical_context": "One sentence of generalized seasonal pattern context. No fabricated dates or events."
+  "executive_summary": "One sentence starting with recommended action. E.g.: 'No action required. All monitored drivers present no immediate operational constraint.'",
+  "recommended_action": "The specific action. E.g.: 'No action required.' or 'Review open exposure now.' or 'Initiate operational readiness review.'",
+  "operational_exposure": "What is operationally at risk right now. Start with exposure level, not market data.",
+  "escalation_trigger": "The exact threshold that changes the answer. Name the number. E.g.: 'Escalate if ERCOT exceeds $35/MWh or forecast high exceeds 98°F.'",
+  "recommended_monitoring_focus": "Exactly what to watch, when, and why. Name the specific metric and time window.",
+  "key_driver_analysis": "Supporting analysis only — comes after action. Synthesize the driver chain briefly.",
+  "confidence_note": "Data quality in one sentence.",
+  "historical_context": "One sentence of generalized seasonal context. No fabricated dates or events."
 }}"""
 
 
