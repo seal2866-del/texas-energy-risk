@@ -554,7 +554,6 @@ export default function DashboardPage() {
                 <PredictiveOutlook snapshots={snapshots} />
               )}
 
-              {/* ── Supporting data ──────────────────────────────────── */}
               {riskModel && (
                 <OperationalExposure riskModel={riskModel} />
               )}
