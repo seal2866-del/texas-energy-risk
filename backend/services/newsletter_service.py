@@ -162,7 +162,7 @@ Return ONLY valid JSON — no markdown, no preamble:
   "risk_trend_desc": "One sentence describing the trend direction.",
   "most_important_signal": "One operational signal. 2-3 sentences. Control room language.",
   "most_important_signal_title": "Short title. E.g.: 'Afternoon Temperature Watch'",
-  "what_changed_ercot": "ERCOT: ${prior_ercot:.2f} → ${ercot:.2f} ({'+' if price_pct >= 0 else ''}{price_pct:.1f}%)",
+  "what_changed_ercot": "ERCOT: {_fmt_ercot(prior_ercot)} → {_fmt_ercot(ercot)} ({'+' if price_pct >= 0 else ''}{price_pct:.1f}%)",
   "what_changed_weather": "Temperature outlook change this week vs prior week.",
   "what_changed_gas": "Henry Hub / gas storage change this week vs prior.",
   "what_changed_risk": "Risk score change this week vs prior.",
