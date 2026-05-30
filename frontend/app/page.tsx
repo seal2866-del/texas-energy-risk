@@ -151,7 +151,7 @@ export default function LandingPage() {
             </div>
 
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6 drop-shadow-xl max-w-5xl mx-auto">
-              AI Energy Intelligence<br className="hidden sm:block" />
+              Energy Risk Intelligence<br className="hidden sm:block" />
               <span className="text-orange-400">for Texas Operations</span>
             </h1>
 
