@@ -33,18 +33,30 @@ export default function AdminNewsletter() {
   const headers = { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" };
 
   const fetchIssues = async () => {
-    const r = await fetch(`${API}/api/newsletter/admin/issues`, { headers });
-    if (r.ok) setIssues(await r.json());
+    try {
+      const r = await fetch(`${API}/api/newsletter/admin/issues`, { headers });
+      if (r.ok) setIssues(await r.json());
+    } catch (e) {
+      console.error("Failed to fetch issues", e);
+    }
   };
 
-  useEffect(() => { fetchIssues(); }, []);
+  useEffect(() => { if (authed && adminKey) fetchIssues(); }, [authed]);
 
   const generate = async () => {
     setLoading(true); setMsg("");
-    const r = await fetch(`${API}/api/newsletter/admin/generate`, { method: "POST", headers });
-    const d = await r.json();
-    setMsg(r.ok ? `Draft created: ${d.issue_id}` : "Generation failed");
-    await fetchIssues();
+    try {
+      const r = await fetch(`${API}/api/newsletter/admin/generate`, { method: "POST", headers });
+      const d = await r.json();
+      if (r.ok) {
+        setMsg(`Draft created: ${d.issue_id}`);
+        await fetchIssues();
+      } else {
+        setMsg(`Error ${r.status}: ${d.detail || "Generation failed"}`);
+      }
+    } catch (e: any) {
+      setMsg(`Network error: ${e.message}`);
+    }
     setLoading(false);
   };
 
