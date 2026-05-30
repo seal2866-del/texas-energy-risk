@@ -15,6 +15,8 @@ import RecentAlerts from "@/components/widgets/RecentAlerts";
 import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
 import WhatChanged from "@/components/widgets/WhatChanged";
 import AIExecutiveBrief from "@/components/widgets/AIExecutiveBrief";
+import CurrentRecommendation from "@/components/widgets/CurrentRecommendation";
+import EscalationMeter from "@/components/widgets/EscalationMeter";
 import RecommendedActions from "@/components/widgets/RecommendedActions";
 import OperationalConsiderations from "@/components/widgets/OperationalConsiderations";
 import MonitoringPriorities from "@/components/widgets/MonitoringPriorities";
@@ -147,6 +149,44 @@ function SystemActivity({ signalsReady }: { signalsReady: boolean }) {
       <span className="text-xs text-gray-600 transition-opacity duration-500">
         {signalsReady ? ACTIVITY_MESSAGES[idx] : "Initializing data feeds..."}
       </span>
+    </div>
+  );
+}
+
+function CollapsibleAnalystNotes({ reasoning, aiLoading, aiError, computedAt, confidence, signals, location }: {
+  reasoning: AIReasoningResponse | null;
+  aiLoading: boolean;
+  aiError: string;
+  computedAt: string;
+  confidence: number | null;
+  signals: SignalsResponse;
+  location: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card-glass border border-white/8 rounded-2xl overflow-hidden lg:col-span-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/3 transition-colors"
+      >
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 text-left">Analyst Notes</p>
+          <p className="text-xs text-gray-400 text-left">Market interpretation, supporting evidence, and AI reasoning</p>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+      </button>
+      {open && (
+        <div className="px-1 pb-1">
+          <AIExecutiveBrief
+            signals={signals}
+            reasoning={reasoning}
+            aiLoading={aiLoading}
+            computedAt={computedAt}
+            location={location}
+            earlyWarnings={undefined}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -551,25 +591,29 @@ export default function DashboardPage() {
             <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4${justRefreshed ? " card-refreshing" : ""}`}>
 
               {/* ═══════════════════════════════════════════════════════
-                  SCREEN 1 — Decision-making information
-                  Priority: Risk State → Actions → Brief → Assessment
+                  EXECUTIVE MODE — Answer 4 questions in 10 seconds:
+                  1. What is happening?
+                  2. Does it require action?
+                  3. What to monitor?
+                  4. When to check again?
               ═══════════════════════════════════════════════════════ */}
 
-              {/* ── EXECUTIVE DECISION CARD — first thing seen ──────── */}
-              <ExecutiveDecisionCard
+              {/* 1. CURRENT RECOMMENDATION — dominant first element */}
+              <CurrentRecommendation
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
                 confidence={signals.confidence}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
                 demandPressure={signals.demand_pressure}
                 supplyPressure={signals.supply_pressure}
                 marketReaction={signals.market_reaction}
                 activeSignals={signals.active_signals}
                 computedAt={signals.computed_at}
-                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
-                temperature={forecasts[0]?.temp_high_f ?? undefined}
               />
 
-              {/* ── EXECUTIVE KPI ROW — single glance summary ────────── */}
+              {/* 2. KPI STRIP — single glance */}
               <ExecutiveKPIRow
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
@@ -580,7 +624,7 @@ export default function DashboardPage() {
                 confidence={signals.confidence}
               />
 
-              {/* ── Risk Score + ERCOT Price ─────────────────────────── */}
+              {/* 3. Risk Score + ERCOT Price */}
               <RiskScore
                 score={signals.risk_score}
                 activeSignals={signals.active_signals}
@@ -607,18 +651,15 @@ export default function DashboardPage() {
               />
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
-              {/* ── Operational Considerations ───────────────────────── */}
-              <OperationalConsiderations
+              {/* 4. Escalation Meter + Monitoring Priorities */}
+              <EscalationMeter
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
-                demandPressure={signals.demand_pressure}
-                supplyPressure={signals.supply_pressure}
-                marketReaction={signals.market_reaction}
+                escalationProbability={signals.escalation_probability}
                 activeSignals={signals.active_signals}
-                computedAt={signals.computed_at}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
               />
-
-              {/* ── Monitoring Priorities ────────────────────────────── */}
               <MonitoringPriorities
                 riskScore={signals.risk_score}
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
@@ -629,27 +670,7 @@ export default function DashboardPage() {
                 dataSources={signals.data_sources}
               />
 
-              {/* ── Management Summary ───────────────────────────────── */}
-              <ManagementSummary
-                riskScore={signals.risk_score}
-                riskDirection={signals.risk_direction}
-                primaryDriver={signals.primary_driver}
-                demandPressure={signals.demand_pressure}
-                supplyPressure={signals.supply_pressure}
-                computedAt={signals.computed_at}
-              />
-
-              {/* ── Executive Brief ──────────────────────────────────── */}
-              <AIExecutiveBrief
-                signals={signals}
-                reasoning={aiReasoning}
-                aiLoading={aiLoading}
-                computedAt={signals.computed_at}
-                location={location}
-                earlyWarnings={riskModel?.earlyWarningSignals}
-              />
-
-              {/* ── Impact Assessment + Cost Impact ──────────────────── */}
+              {/* 5. Impact Assessment */}
               <ImpactAssessment
                 riskScore={signals.risk_score}
                 demandPressure={signals.demand_pressure}
@@ -658,38 +679,21 @@ export default function DashboardPage() {
                 gasToPower={signals.gas_to_power_impact}
                 dataSources={signals.data_sources}
               />
-              <CostExposure
-                riskScore={signals.risk_score}
-                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
-                marketReaction={signals.market_reaction}
-              />
-
-              {/* ── Watch Today + Next Review ────────────────────────── */}
               <WatchToday
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
                 temperature={forecasts[0]?.temp_high_f ?? undefined}
                 henryHub={gasLatest?.henry_hub_price ?? undefined}
               />
-              <NextReview
-                riskScore={signals.risk_score}
-                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
-                temperature={forecasts[0]?.temp_high_f ?? undefined}
-                henryHub={gasLatest?.henry_hub_price ?? undefined}
-              />
 
-              {/* ── Cost Impact — full width ─────────────────────────── */}
-              <CostImpact
-                riskScore={signals.risk_score}
-                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
-                marketReaction={signals.market_reaction}
-              />
-
-              {/* ── Escalation Path — operational playbook ───────────── */}
-              <EscalationPath
-                riskScore={signals.risk_score}
-                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
-                temperature={forecasts[0]?.temp_high_f ?? undefined}
-                henryHub={gasLatest?.henry_hub_price ?? undefined}
+              {/* 6. Analyst Notes (formerly Executive Brief) — lower position */}
+              <CollapsibleAnalystNotes
+                reasoning={aiReasoning}
+                aiLoading={aiLoading}
+                aiError={aiError}
+                computedAt={signals.computed_at}
+                confidence={signals.confidence}
+                signals={signals}
+                location={location}
               />
 
 

@@ -173,19 +173,23 @@ export default function LandingPage() {
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6 drop-shadow-xl max-w-5xl mx-auto">
-              Know When Texas Energy<br className="hidden sm:block" />
-              <span className="text-orange-400">Becomes Operational Risk</span>
+              Energy Risk Intelligence<br className="hidden sm:block" />
+              <span className="text-orange-400">for Texas Operations</span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
-              Monitor ERCOT pricing, weather-driven demand, and natural gas supply conditions
-              before volatility impacts operations, procurement, energy costs, and infrastructure planning.
+              Know when rising energy costs, weather-driven demand, or gas supply pressures
+              require operational attention — before they impact operations and planning.
             </p>
 
             {/* Trust indicators */}
             <div className="flex flex-wrap items-center justify-center gap-6 mb-10">
-              {["Real-time Monitoring", "Predictive Analytics", "AI-Assisted Interpretation"].map((item) => (
+              {[
+                "Detect escalation conditions earlier",
+                "Reduce energy cost surprises",
+                "Monitor Texas exposure in real time",
+              ].map((item) => (
                 <div key={item} className="flex items-center gap-2 text-sm text-gray-300">
                   <span className="text-green-400 font-bold">✓</span>
                   {item}
