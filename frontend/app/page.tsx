@@ -11,11 +11,36 @@ import Footer from "@/components/ui/Footer";
 
 // ── What happens when conditions change ───────────────────────────────────────
 const CONSEQUENCE_CARDS = [
-  { icon: <Zap className="w-5 h-5 text-orange-400" />,       text: "ERCOT prices spike unexpectedly" },
-  { icon: <CloudLightning className="w-5 h-5 text-amber-400" />, text: "Heat drives demand higher" },
-  { icon: <Flame className="w-5 h-5 text-red-400" />,        text: "Natural gas supply tightens" },
-  { icon: <DollarSign className="w-5 h-5 text-yellow-400" />, text: "Operating costs escalate" },
-  { icon: <Clock className="w-5 h-5 text-gray-400" />,       text: "Procurement teams react too late" },
+  {
+    icon:  <Zap className="w-5 h-5 text-orange-400" />,
+    title: "ERCOT Price Volatility",
+    desc:  "ERCOT pricing can move rapidly during periods of grid stress, increasing operational energy costs with little warning.",
+    color: "border-orange-500/15 hover:border-orange-500/25",
+  },
+  {
+    icon:  <CloudLightning className="w-5 h-5 text-amber-400" />,
+    title: "Extreme Heat Events",
+    desc:  "High temperatures drive electricity demand higher and can tighten reserve margins across the Texas grid.",
+    color: "border-amber-500/15 hover:border-amber-500/25",
+  },
+  {
+    icon:  <Flame className="w-5 h-5 text-red-400" />,
+    title: "Natural Gas Constraints",
+    desc:  "Storage declines, pipeline disruptions, or supply pressure can create downstream operational risk across energy-intensive operations.",
+    color: "border-red-500/15 hover:border-red-500/25",
+  },
+  {
+    icon:  <DollarSign className="w-5 h-5 text-yellow-400" />,
+    title: "Procurement Cost Escalation",
+    desc:  "Energy procurement teams may face higher costs when market conditions deteriorate faster than expected.",
+    color: "border-yellow-500/15 hover:border-yellow-500/25",
+  },
+  {
+    icon:  <AlertTriangle className="w-5 h-5 text-gray-400" />,
+    title: "Reactive Operations",
+    desc:  "Without forward visibility, organizations often respond after conditions have already escalated — limiting available options.",
+    color: "border-gray-500/15 hover:border-gray-500/25",
+  },
 ];
 
 // ── What you get ──────────────────────────────────────────────────────────────
@@ -247,32 +272,45 @@ export default function LandingPage() {
         </section>
 
         {/* ── What Happens When Conditions Change ───────────────────────────── */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold mb-5">
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold mb-5">
               <AlertTriangle className="w-3.5 h-3.5" />
-              The Problem
+              Operational Context
             </div>
             <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
               What Happens When Conditions Change?
             </h2>
-            <p className="text-gray-400 max-w-xl mx-auto leading-relaxed">
-              Texas energy markets can shift within hours. Most operations teams find out after the fact.
+            <p className="text-gray-400 max-w-2xl mx-auto leading-relaxed">
+              Texas energy markets can shift rapidly. Operational teams often discover problems only after
+              costs, supply conditions, or demand pressures have already escalated.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+          {/* 5 scenario cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             {CONSEQUENCE_CARDS.map((c) => (
-              <div key={c.text} className="bg-white/3 border border-white/6 rounded-xl p-4 text-center">
-                <div className="flex justify-center mb-2">{c.icon}</div>
-                <p className="text-xs text-gray-300 font-medium leading-snug">{c.text}</p>
+              <div key={c.title} className={`bg-white/3 border rounded-xl p-5 transition-colors ${c.color}`}>
+                <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center mb-3">
+                  {c.icon}
+                </div>
+                <h3 className="text-sm font-bold text-white mb-2">{c.title}</h3>
+                <p className="text-xs text-gray-400 leading-relaxed">{c.desc}</p>
               </div>
             ))}
           </div>
 
-          <div className="text-center p-5 rounded-xl bg-orange-500/8 border border-orange-500/20">
-            <p className="text-sm font-semibold text-orange-300">
-              TX Energy Risk identifies developing pressure <span className="font-black">before</span> escalation impacts operations.
+          {/* How TX Energy Risk Helps */}
+          <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-6 sm:p-8">
+            <h3 className="text-lg font-black text-orange-300 mb-3">How TX Energy Risk Helps</h3>
+            <p className="text-sm text-gray-300 leading-relaxed mb-3">
+              TX Energy Risk continuously monitors ERCOT pricing, weather demand pressure, and natural gas
+              conditions to identify developing operational risk before escalation impacts planning,
+              procurement, or infrastructure operations.
+            </p>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              The platform is designed to provide early visibility, operational context, and actionable
+              intelligence so teams can make informed decisions before conditions become constraints.
             </p>
           </div>
         </section>
