@@ -119,12 +119,12 @@ export default function ImpactAssessment({
       <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">Data Reliability</p>
       <div className="space-y-2">
         {[
-          { label: "ERCOT Feed",     ...ercot },
-          { label: "NOAA Weather",   ...noaa  },
-          { label: "Gas Storage",    ...eia   },
-        ].map(({ label, pct, label: pctLabel }) => (
-          <div key={label} className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">{label}</span>
+          { name: "ERCOT Feed",   ...ercot },
+          { name: "NOAA Weather", ...noaa  },
+          { name: "Gas Storage",  ...eia   },
+        ].map(({ name, pct, label: pctLabel }) => (
+          <div key={name} className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">{name}</span>
             <div className="flex items-center gap-2">
               <div className="w-20 h-1 bg-white/10 rounded-full overflow-hidden">
                 <div
