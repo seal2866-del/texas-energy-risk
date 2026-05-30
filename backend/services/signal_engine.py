@@ -665,7 +665,7 @@ def check_weather_demand(forecasts: List[Dict]) -> Dict[str, Any]:
         "Short-term (0-6h): normal demand · Near-term (6-24h): no weather risk · Outlook (24-48h): stable demand expected",
         f"Forecast high of {high_f:.0f}\u00b0F in {location}, reflecting normal seasonal conditions."
         " Current temperatures indicate no weather-driven demand pressure on the grid.",
-        "No weather-driven demand signals active. Demand conditions are expected to remain stable.",
+        "No weather-driven action required. Normal seasonal conditions — no demand pressure on the grid.",
     )
 
 
@@ -732,11 +732,11 @@ def _build_time_horizons(
     risk_label = risk_score.capitalize()
 
     if risk_score == "high":
-        short = f"Short-term (0-6h): High risk -- {primary_driver} is the primary driver. Close monitoring is recommended."
+        short = f"Short-term (0-6h): Immediate attention required — {primary_driver} is active. Assess exposure now."
     elif risk_score == "medium":
-        short = f"Short-term (0-6h): Medium risk -- {primary_driver} is elevating conditions. Continued monitoring is recommended."
+        short = f"Short-term (0-6h): Review exposure now — {primary_driver} is elevating conditions. Confirm hedging positions."
     else:
-        short = "Short-term (0-6h): Low risk -- all monitored drivers within normal operating range."
+        short = "Short-term (0-6h): No action required — all monitored drivers within normal operating range."
 
     weather_sig = next((s for s in signals if s.get("signal_type") == "weather_demand"), None)
     near_high   = weather_sig and weather_sig.get("triggered") and float(weather_sig.get("value") or 0) >= TEMP_HIGH_THRESHOLD_F
@@ -1023,8 +1023,8 @@ def _compute_demand_pressure(weather_sig: Dict) -> Dict[str, Any]:
     else:
         level = "low"
         expl  = (
-            "Demand pressure is low. Weather conditions are within normal seasonal range "
-            "with no significant demand signals active."
+            "No demand-driven action required. Weather is within normal seasonal range — "
+            "no grid load pressure expected through the next 24 hours."
         )
 
     return {"level": level, "explanation": expl, "score": score}
@@ -1074,8 +1074,8 @@ def _compute_supply_pressure(gas_sig: Dict, gas_records: List[Dict]) -> Dict[str
         level    = "low"
         pct_str  = f"{abs(pct_val):.1f}% {'above' if pct_val >= 0 else 'below'}"
         expl     = (
-            f"Supply pressure is low. Natural gas storage is {pct_str} the 5-year average, "
-            "suggesting adequate fuel supply buffer."
+            f"No fuel-supply action required. Gas storage is {pct_str} the 5-year average — "
+            "adequate buffer exists for current generation demand."
             + henry_note
         )
 
@@ -1104,15 +1104,15 @@ def _compute_market_reaction(price_sig: Dict) -> Dict[str, Any]:
     elif val >= PRICE_ABS_HIGH_MWH * 0.7 and val > 0:
         level = "low"
         expl  = (
-            f"Market reaction remains low but approaching elevated thresholds. "
-            f"ERCOT pricing at ${val:.0f}/MWh is within range but warrants monitoring."
+            f"ERCOT at ${val:.0f}/MWh is within range but approaching watch levels. "
+            f"Set a price alert above ${int(val * 1.15)}/MWh and monitor the afternoon peak window."
         )
     else:
         price_str = f"${val:.0f}/MWh" if val > 0 else "within normal range"
         level     = "low"
         expl      = (
-            f"Market reaction remains low. ERCOT Houston Hub pricing at {price_str} "
-            "is stable and within normal operating range."
+            f"No market-driven action required. ERCOT Houston Hub at {price_str} — "
+            "pricing is stable with no immediate volatility risk."
         )
 
     return {"level": level, "explanation": expl, "score": score}
@@ -1182,8 +1182,8 @@ def _compute_gas_to_power_impact(
     else:
         level = "low"
         expl  = (
-            "Gas-to-power impact is low. Natural gas storage and pricing conditions "
-            "suggest adequate fuel supply for current power generation demand." + henry_note
+            "No gas-to-power action required. Storage and pricing conditions support "
+            "adequate fuel supply for current generation demand." + henry_note
         )
 
     return {"level": level, "explanation": expl}
