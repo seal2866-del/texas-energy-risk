@@ -23,6 +23,7 @@ import EscalationDrivers from "@/components/widgets/EscalationDrivers";
 import ConfidenceBreakdown from "@/components/widgets/ConfidenceBreakdown";
 import CorrelationEngine from "@/components/widgets/CorrelationEngine";
 import SignalTimeline from "@/components/widgets/SignalTimeline";
+import RiskTrajectory from "@/components/widgets/RiskTrajectory";
 import RecommendedActions from "@/components/widgets/RecommendedActions";
 import OperationalConsiderations from "@/components/widgets/OperationalConsiderations";
 import MonitoringPriorities from "@/components/widgets/MonitoringPriorities";
@@ -704,13 +705,44 @@ export default function DashboardPage() {
 
 
               {/* ═══════════════════════════════════════════════════════
-                  ANALYST MODE — Answers: Why? What changed? What matters?
-                  Layout: Signal Attribution → Changes → Drivers →
-                          Scenarios → Intelligence → Data
+                  ANALYST MODE Phase 2
+                  Answers: Why is the score X? What changed? What next?
+                  TOP:    Risk Score → Signal Attribution → What Changed → Escalation Drivers
+                  MIDDLE: Scenario Modeling → Risk Trajectory → Confidence
+                  BOTTOM: Analyst Intelligence → Data Sources → System Health
               ═══════════════════════════════════════════════════════ */}
               {!execMode && (
                 <>
-                  {/* TOP: What is driving risk right now */}
+                  {/* ── TOP: Causality ───────────────────────────────────── */}
+
+                  {/* Risk Score stays — anchor for all analysis */}
+                  <RiskScore
+                    score={signals.risk_score}
+                    activeSignals={signals.active_signals}
+                    computedAt={signals.computed_at}
+                    summary={signals.summary}
+                    confidence={signals.confidence}
+                    confidenceNote={signals.confidence_note}
+                    explanation={signals.explanation}
+                    impact={signals.impact}
+                    primaryDriver={signals.primary_driver}
+                    riskDirection={signals.risk_direction}
+                    riskDirectionContext={signals.risk_direction_context}
+                    signalDrivers={signals.signal_drivers}
+                    secondaryFactors={signals.secondary_factors}
+                    dataValid={signals.data_valid}
+                    dataStatus={signals.data_status}
+                    riskHeadline={signals.risk_headline}
+                    timeHorizons={signals.time_horizons}
+                    marketCondition={signals.market_condition}
+                    alertSeverity={signals.alert_severity}
+                    signalAlignment={signals.signal_alignment}
+                    panelGlow={riskGlow}
+                    earlyWarnings={riskModel?.earlyWarningSignals}
+                  />
+                  <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
+
+                  {/* Signal Attribution — what is driving the score */}
                   <SignalContributors
                     demandPressure={signals.demand_pressure}
                     supplyPressure={signals.supply_pressure}
@@ -718,6 +750,8 @@ export default function DashboardPage() {
                     gasToPower={signals.gas_to_power_impact}
                     activeSignals={signals.active_signals}
                   />
+
+                  {/* What Changed — movement is more important than snapshot */}
                   <WhatChangedDetail
                     snapshots={snapshots}
                     currentPrice={prices[prices.length - 1]?.price_mwh ?? 0}
@@ -726,7 +760,7 @@ export default function DashboardPage() {
                     escalationPct={signals.escalation_probability ?? 10}
                   />
 
-                  {/* Signal Timeline */}
+                  {/* Signal Timeline — 6h and 24h deltas */}
                   <SignalTimeline
                     snapshots={snapshots}
                     currentPrice={prices[prices.length - 1]?.price_mwh ?? 0}
@@ -734,7 +768,7 @@ export default function DashboardPage() {
                     currentRisk={signals.risk_score}
                   />
 
-                  {/* MIDDLE: Future escalation risk */}
+                  {/* Escalation Drivers — what could change the score */}
                   <EscalationDrivers
                     riskScore={signals.risk_score}
                     ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
@@ -744,7 +778,45 @@ export default function DashboardPage() {
                     supplyPressure={signals.supply_pressure}
                   />
 
-                  <RiskMomentum snapshots={snapshots} currentScore={signals.risk_score} />
+                  {/* Signal Relationships — correlation map */}
+                  <CorrelationEngine
+                    demandPressure={signals.demand_pressure}
+                    supplyPressure={signals.supply_pressure}
+                    marketReaction={signals.market_reaction}
+                    gasToPower={signals.gas_to_power_impact}
+                    riskDirection={signals.risk_direction}
+                  />
+
+                  {/* ── MIDDLE: Forward-looking ───────────────────────────── */}
+
+                  {/* Scenario Modeling */}
+                  <ScenarioAnalysis
+                    riskScore={signals.risk_score}
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                  />
+
+                  {/* Risk Trajectory */}
+                  <RiskTrajectory
+                    snapshots={snapshots}
+                    currentScore={signals.risk_score}
+                    riskDirection={signals.risk_direction}
+                  />
+
+                  {/* Confidence Breakdown */}
+                  <ConfidenceBreakdown
+                    confidence={signals.confidence}
+                    dataSources={signals.data_sources}
+                  />
+
+                  {/* Supporting signal detail */}
+                  <EnergyRiskDrivers signals={signals} />
+                  <TimeToThreshold
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                  />
                   <AlertPreview
                     riskScore={signals.risk_score}
                     riskDirection={signals.risk_direction}
@@ -754,42 +826,6 @@ export default function DashboardPage() {
                     demandPressure={signals.demand_pressure}
                     supplyPressure={signals.supply_pressure}
                   />
-
-                  <RiskTimeline
-                    riskScore={signals.risk_score}
-                    riskDirection={signals.risk_direction}
-                    snapshots={snapshots}
-                    timeHorizons={signals.time_horizons}
-                  />
-
-                  <ScenarioAnalysis
-                    riskScore={signals.risk_score}
-                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
-                    temperature={forecasts[0]?.temp_high_f ?? undefined}
-                    henryHub={gasLatest?.henry_hub_price ?? undefined}
-                  />
-
-                  {/* Signal relationships */}
-                  <CorrelationEngine
-                    demandPressure={signals.demand_pressure}
-                    supplyPressure={signals.supply_pressure}
-                    marketReaction={signals.market_reaction}
-                    gasToPower={signals.gas_to_power_impact}
-                    riskDirection={signals.risk_direction}
-                  />
-
-                  <TimeToThreshold
-                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
-                    temperature={forecasts[0]?.temp_high_f ?? undefined}
-                    henryHub={gasLatest?.henry_hub_price ?? undefined}
-                  />
-
-                  {/* Confidence + signal detail */}
-                  <ConfidenceBreakdown
-                    confidence={signals.confidence}
-                    dataSources={signals.data_sources}
-                  />
-                  <EnergyRiskDrivers signals={signals} />
 
                   <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
                   <WeatherRisk
@@ -805,11 +841,7 @@ export default function DashboardPage() {
                     panelGlow={gasGlow}
                   />
 
-                  {/* BOTTOM: Analyst Intelligence + historical */}
-                  <IntervalIntelligenceWidget intelligence={signals.interval_intelligence} />
-                  {signalsReady && snapshots.length >= 6 && <PredictiveOutlook snapshots={snapshots} />}
-                  {signalsReady && <RiskHistoryChart location={location} />}
-                  {riskModel && <OperationalExposure riskModel={riskModel} />}
+                  {/* ── BOTTOM: Analyst Intelligence + historical ─────────── */}
 
                   <CollapsibleAI
                     reasoning={aiReasoning}
@@ -818,6 +850,9 @@ export default function DashboardPage() {
                     computedAt={signals.computed_at}
                     confidence={signals.confidence}
                   />
+
+                  {signalsReady && <RiskHistoryChart location={location} />}
+                  {signalsReady && snapshots.length >= 6 && <PredictiveOutlook snapshots={snapshots} />}
 
                   <DataSources sources={signals.data_sources} computedAt={signals.computed_at} />
                   <RecentAlerts />
