@@ -57,8 +57,8 @@ const INTELLIGENCE_MODULES = [
   },
   {
     icon: <Brain       className="w-5 h-5 text-teal-400" />,
-    title:  "AI Market Reasoning",
-    desc:   "Claude AI synthesizes all three risk channels into institutional-quality operational intelligence with executive summaries and escalation watch.",
+    title:  "Operational Intelligence Engine",
+    desc:   "Synthesizes ERCOT pricing, weather demand, and gas supply signals into executive-ready operational briefs with recommended actions and escalation triggers.",
   },
   {
     icon: <Bell        className="w-5 h-5 text-green-400" />,
@@ -157,7 +157,7 @@ export default function LandingPage() {
 
             <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
               Monitor ERCOT pricing, weather-driven demand, and natural gas supply conditions
-              before volatility impacts operations, procurement, and infrastructure planning.
+              before volatility impacts operations, procurement, energy costs, and infrastructure planning.
             </p>
 
             {/* Trust indicators */}
