@@ -15,19 +15,19 @@ interface Props {
 }
 
 function getNextReview(): string {
-  const now = new Date();
-  const h   = now.getHours();
+  const h = new Date().getHours();
+  if (h < 6)  return "06:00 CDT";
   if (h < 14) return "14:00 CDT";
   if (h < 16) return "16:00 CDT";
   if (h < 19) return "19:00 CDT";
-  return "Next scheduled refresh";
+  return "06:00 CDT tomorrow";
 }
 
 function minutesToNextReview(): string {
-  const now  = new Date();
-  const h    = now.getHours();
-  const m    = now.getMinutes();
-  const targets = [14, 16, 19];
+  const now     = new Date();
+  const h       = now.getHours();
+  const m       = now.getMinutes();
+  const targets = [6, 14, 16, 19];
   for (const t of targets) {
     if (h < t) {
       const mins = (t - h) * 60 - m;
@@ -35,13 +35,17 @@ function minutesToNextReview(): string {
       return `${Math.floor(mins / 60)}h ${mins % 60}m`;
     }
   }
-  return "Next refresh";
+  // After 19:00 — next is 06:00 tomorrow
+  const minsToMidnight = (24 - h) * 60 - m;
+  const total = minsToMidnight + 6 * 60;
+  return `${Math.floor(total / 60)}h ${total % 60}m`;
 }
 
 function confidenceLabel(c: number | null | undefined): string {
   if (!c) return "Moderate";
   if (c >= 80) return "High";
-  if (c >= 60) return "Moderate";
+  if (c >= 50) return "Moderate";
+  if (c >= 35) return "Acceptable";
   return "Limited";
 }
 

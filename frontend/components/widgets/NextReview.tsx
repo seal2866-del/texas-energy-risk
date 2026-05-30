@@ -12,10 +12,11 @@ function getNextReviewTime(risk: string): string {
   if (risk === "high")   return "Continuous monitoring";
   if (risk === "medium") return "Every 30 minutes";
   const h = new Date().getHours();
+  if (h < 6)  return "06:00 CDT";
   if (h < 14) return "14:00 CDT";
   if (h < 16) return "16:00 CDT";
   if (h < 19) return "19:00 CDT";
-  return "Next scheduled refresh";
+  return "06:00 CDT tomorrow";
 }
 
 export default function NextReview({ riskScore, ercotPrice, temperature, henryHub }: Props) {
