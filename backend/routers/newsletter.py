@@ -116,8 +116,12 @@ async def unsubscribe(token: str = Query(...)):
 async def generate_draft(authorization: str = Header(default="")):
     """Trigger AI generation of a new weekly draft."""
     _require_admin(authorization)
-    issue_id = await generate_and_save_draft()
-    return {"status": "draft_created", "issue_id": issue_id}
+    try:
+        issue_id = await generate_and_save_draft()
+        return {"status": "draft_created", "issue_id": issue_id}
+    except Exception as e:
+        log.error(f"[NEWSLETTER] Generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
