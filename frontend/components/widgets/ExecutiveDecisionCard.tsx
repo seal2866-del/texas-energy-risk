@@ -72,12 +72,12 @@ export default function ExecutiveDecisionCard({
     risk === "high" || activeSignals >= 2
       ? {
           icon:       <XCircle className="w-8 h-8 text-red-400" />,
-          label:      "IMMEDIATE REVIEW REQUIRED",
-          detail:     "Multiple escalation thresholds exceeded.",
+          label:      "ELEVATED OPERATIONAL CONDITIONS",
+          detail:     "Multiple signals indicate elevated operational significance.",
           sub:        [
-            "Procurement and operations teams should be notified.",
-            "Review open exposure and confirm contingency protocols.",
-            "Increase monitoring frequency immediately.",
+            "Internal escalation procedures may be warranted per organizational protocols.",
+            "Increased monitoring frequency and management visibility may apply.",
+            "Review contingency plans according to internal procedures.",
           ],
           bg:         "bg-red-500/8",
           border:     "border-red-500/25",
@@ -87,12 +87,12 @@ export default function ExecutiveDecisionCard({
       : risk === "medium"
       ? {
           icon:       <AlertTriangle className="w-8 h-8 text-amber-400" />,
-          label:      "ENHANCED MONITORING RECOMMENDED",
-          detail:     "Demand pressure approaching threshold.",
+          label:      "INCREASED MONITORING PRIORITY",
+          detail:     "Moderate operational conditions detected.",
           sub:        [
-            "Review procurement positions ahead of peak demand window.",
-            "Monitor ERCOT pricing during 14:00–19:00 CDT.",
-            "Validate fuel supply sensitivity.",
+            "Increased monitoring frequency may be appropriate during peak demand windows.",
+            "Review current conditions according to internal operational procedures.",
+            "Monitor ERCOT pricing and weather forecasts during 14:00–19:00 CDT.",
           ],
           bg:         "bg-amber-500/8",
           border:     "border-amber-500/25",
@@ -101,11 +101,11 @@ export default function ExecutiveDecisionCard({
         }
       : {
           icon:       <CheckCircle className="w-8 h-8 text-green-400" />,
-          label:      "NO ACTION REQUIRED",
-          detail:     "Operations remain stable.",
+          label:      "STABLE CONDITIONS",
+          detail:     "No elevated operational pressure detected.",
           sub:        [
-            "No procurement, dispatch, or fuel-supply actions recommended.",
-            "Continue standard monitoring cadence.",
+            "Standard monitoring procedures apply.",
+            "Reassess during the afternoon demand window (14:00–19:00 CDT).",
           ],
           bg:         "bg-green-500/5",
           border:     "border-green-500/20",

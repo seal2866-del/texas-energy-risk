@@ -16,6 +16,8 @@ import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
 import WhatChanged from "@/components/widgets/WhatChanged";
 import AIExecutiveBrief from "@/components/widgets/AIExecutiveBrief";
 import RecommendedActions from "@/components/widgets/RecommendedActions";
+import OperationalConsiderations from "@/components/widgets/OperationalConsiderations";
+import MonitoringPriorities from "@/components/widgets/MonitoringPriorities";
 import ImpactAssessment from "@/components/widgets/ImpactAssessment";
 import EscalationTriggers from "@/components/widgets/EscalationTriggers";
 import OperationalWatchList from "@/components/widgets/OperationalWatchList";
@@ -603,14 +605,26 @@ export default function DashboardPage() {
               />
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
-              {/* ── Recommended Actions ──────────────────────────────── */}
-              <RecommendedActions
+              {/* ── Operational Considerations ───────────────────────── */}
+              <OperationalConsiderations
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
                 demandPressure={signals.demand_pressure}
                 supplyPressure={signals.supply_pressure}
                 marketReaction={signals.market_reaction}
+                activeSignals={signals.active_signals}
                 computedAt={signals.computed_at}
+              />
+
+              {/* ── Monitoring Priorities ────────────────────────────── */}
+              <MonitoringPriorities
+                riskScore={signals.risk_score}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                dataSources={signals.data_sources}
               />
 
               {/* ── Management Summary ───────────────────────────────── */}

@@ -732,11 +732,11 @@ def _build_time_horizons(
     risk_label = risk_score.capitalize()
 
     if risk_score == "high":
-        short = f"Short-term (0-6h): Immediate attention required — {primary_driver} is active. Assess exposure now."
+        short = f"Short-term (0-6h): Elevated operational conditions — {primary_driver} is the primary driver. Increased monitoring priority may apply."
     elif risk_score == "medium":
-        short = f"Short-term (0-6h): Review exposure now — {primary_driver} is elevating conditions. Confirm hedging positions."
+        short = f"Short-term (0-6h): Moderate operational conditions — {primary_driver} is elevating monitoring priority. Review according to internal procedures."
     else:
-        short = "Short-term (0-6h): No action required — all monitored drivers within normal operating range."
+        short = "Short-term (0-6h): Stable conditions — all monitored drivers within normal operating range."
 
     weather_sig = next((s for s in signals if s.get("signal_type") == "weather_demand"), None)
     near_high   = weather_sig and weather_sig.get("triggered") and float(weather_sig.get("value") or 0) >= TEMP_HIGH_THRESHOLD_F
@@ -850,38 +850,36 @@ def _build_narrative(
             context += f", and {parts[2]}"
         context += "."
 
-    # ── Summary (AI Brief — prescriptive, operational) ───────────────────────
+    # ── Summary (situational awareness — never advisory) ─────────────────────
     triggered_signals = [s for s in signals if s.get("triggered")]
 
     if risk_score == "low" and not triggered_signals:
         summary = (
-            "No action required. Current conditions indicate minimal procurement or "
-            "operational exposure over the next 24 hours. "
+            "Current conditions remain stable across monitored signals. "
             f"{context} "
-            "Continue standard monitoring cadence and watch afternoon demand peaks "
-            "between 14:00–19:00 CDT."
+            "Standard monitoring procedures apply. "
+            "Reassess during the afternoon demand window (14:00–19:00 CDT)."
         ).strip()
     elif risk_score == "low" and triggered_signals:
         summary = (
-            "No immediate action required, though one risk signal warrants attention. "
+            "Conditions are generally stable, though one signal warrants monitoring attention. "
             f"{context} "
-            "Review exposure ahead of peak demand hours and confirm hedging positions "
-            "are aligned with current conditions."
+            "Increased awareness during peak demand hours may be appropriate according "
+            "to internal procedures."
         ).strip()
     elif risk_score == "medium":
         summary = (
-            "Elevated conditions detected — review operational exposure now. "
+            "Moderate operational conditions detected. "
             f"{context} "
-            "Consider locking in forward positions if procurement windows are open. "
-            "Increase monitoring frequency through the next 6–24 hours."
+            "Increased monitoring frequency during the next 6–24 hours may be warranted. "
+            "Review according to internal operational procedures."
         ).strip()
     else:  # high
         summary = (
-            "Immediate attention required. High-risk conditions are active across "
-            "multiple signals. "
+            "Elevated operational conditions active across multiple signals. "
             f"{context} "
-            "Assess open procurement exposure, activate contingency protocols if applicable, "
-            "and monitor ERCOT real-time pricing continuously."
+            "Internal escalation procedures and contingency review may be warranted. "
+            "Continuous monitoring of ERCOT pricing and grid conditions is appropriate."
         ).strip()
 
     # ── Explanation (risk score card — one authoritative sentence) ────────────
@@ -916,37 +914,36 @@ def _build_narrative(
     # ── Impact (what this means operationally) ────────────────────────────────
     if not triggered_signals:
         impact = (
-            "No procurement or operational action required at this time. "
-            "Conditions support standard operations through the next 24 hours. "
-            "Reassess if afternoon temperatures exceed forecast highs or "
-            "ERCOT prices move above $50/MWh."
+            "Minimal operational impact expected under current conditions. "
+            "Standard operations are supported through the next 24 hours. "
+            "Conditions may warrant increased awareness if afternoon temperatures "
+            "or ERCOT prices approach watch thresholds."
         )
     elif risk_score == "high" and len(triggered_signals) >= 2:
         impact = (
-            "Multiple converging signals indicate heightened grid stress. "
-            "Procurement teams should assess open exposure immediately. "
-            "Operations should confirm demand response capacity and review "
-            "contingency protocols for the next 24–48 hours."
+            "Multiple converging signals indicate elevated operational significance. "
+            "Conditions may warrant internal escalation procedures and management visibility. "
+            "Continuous monitoring of ERCOT pricing and grid conditions is appropriate."
         )
     else:
         impact_map = {
             "weather_demand": {
-                "high":   "Extreme heat is driving grid load toward peak capacity. Evaluate demand curtailment options and confirm forward hedges cover afternoon exposure windows (14:00–19:00 CDT).",
-                "medium": "Elevated temperatures are pressuring afternoon peak pricing. Review spot vs. fixed-price exposure ahead of the 14:00–18:00 CDT demand window.",
+                "high":   "Extreme temperatures are driving grid load toward peak capacity. Operational significance is elevated — conditions may warrant internal review and increased monitoring during afternoon peak hours (14:00–19:00 CDT).",
+                "medium": "Elevated temperatures are increasing demand pressure. Operational awareness during afternoon peak periods (14:00–18:00 CDT) may be warranted according to internal procedures.",
             },
             "price_volatility": {
-                "high":   "ERCOT spot prices are signaling active grid stress. Avoid unhedged spot exposure until prices stabilize. Consider locking forward positions if procurement windows are open.",
-                "medium": "ERCOT pricing is showing sensitivity. Confirm hedging positions are aligned and set alerts for any move above your threshold price.",
+                "high":   "ERCOT pricing reflects elevated grid conditions. Operational significance is high — monitoring frequency and internal visibility may warrant review according to organizational procedures.",
+                "medium": "ERCOT pricing is showing moderate sensitivity. Monitoring conditions during peak hours and reviewing according to internal procedures may be appropriate.",
             },
             "gas_supply": {
-                "high":   "Gas storage deficit may constrain generation during demand peaks. Assess fuel supply agreements and confirm backup generation capacity is available.",
-                "medium": "Below-average gas storage is reducing the supply buffer. Monitor Henry Hub pricing and assess impact on generation cost exposure over the next 48–72 hours.",
+                "high":   "Gas storage conditions may constrain generation fuel availability during demand peaks. Operational awareness of supply-side conditions is warranted.",
+                "medium": "Below-average gas storage is reducing the supply buffer. Monitoring Henry Hub pricing and supply conditions over the next 48–72 hours may be appropriate.",
             },
         }
         target   = triggered_signals[0]
         sig_type = target.get("signal_type", "")
         severity = target.get("severity", "medium")
-        impact   = impact_map.get(sig_type, {}).get(severity, "Active risk signal detected. Review operational exposure and confirm monitoring cadence over the next 24 hours.")
+        impact   = impact_map.get(sig_type, {}).get(severity, "Elevated signal detected. Increased monitoring cadence may be appropriate according to internal operational procedures.")
 
     # market_context — short authoritative sentence for all panels
     market_context = context if context else (
@@ -1023,8 +1020,8 @@ def _compute_demand_pressure(weather_sig: Dict) -> Dict[str, Any]:
     else:
         level = "low"
         expl  = (
-            "No demand-driven action required. Weather is within normal seasonal range — "
-            "no grid load pressure expected through the next 24 hours."
+            "Demand conditions within normal seasonal range. No elevated grid load pressure "
+            "detected through the next 24 hours."
         )
 
     return {"level": level, "explanation": expl, "score": score}
@@ -1074,8 +1071,8 @@ def _compute_supply_pressure(gas_sig: Dict, gas_records: List[Dict]) -> Dict[str
         level    = "low"
         pct_str  = f"{abs(pct_val):.1f}% {'above' if pct_val >= 0 else 'below'}"
         expl     = (
-            f"No fuel-supply action required. Gas storage is {pct_str} the 5-year average — "
-            "adequate buffer exists for current generation demand."
+            f"Gas supply within expected range. Storage is {pct_str} the 5-year average — "
+            "adequate buffer for current generation demand conditions."
             + henry_note
         )
 
@@ -1111,8 +1108,8 @@ def _compute_market_reaction(price_sig: Dict) -> Dict[str, Any]:
         price_str = f"${val:.0f}/MWh" if val > 0 else "within normal range"
         level     = "low"
         expl      = (
-            f"No market-driven action required. ERCOT Houston Hub at {price_str} — "
-            "pricing is stable with no immediate volatility risk."
+            f"ERCOT Houston Hub at {price_str} — pricing within normal operating range. "
+            "No elevated market-driven pressure detected."
         )
 
     return {"level": level, "explanation": expl, "score": score}
@@ -1330,13 +1327,13 @@ def _compute_risk_narrative(
     supply_level = supply_pressure.get("level", "low")
     market_level = market_reaction.get("level", "low")
 
-    # ── Headline — prescriptive, not descriptive ──────────────────────────────
+    # ── Headline — situational awareness ──────────────────────────────────────
     if risk_score == "low":
-        headline = "No action required — conditions support normal operations"
+        headline = "Stable conditions — no elevated operational pressure detected"
     elif risk_score == "medium":
-        headline = "Elevated exposure detected — review procurement position now"
+        headline = "Moderate conditions — increased monitoring priority may apply"
     else:
-        headline = "Immediate attention required — high-risk conditions active"
+        headline = "Elevated conditions — internal escalation procedures may be warranted"
 
     temporal_ctx = "0–6 hours"
     next_period  = "Reassess at next refresh. Conditions may shift within the next 6–24 hours."

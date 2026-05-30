@@ -69,32 +69,32 @@ def _rule_based_fallback(inputs: Dict[str, Any]) -> Dict[str, Any]:
     ercot_price      = inputs.get("ercot_price", 0)
     data_health      = inputs.get("data_source_health", "active")
 
-    # ── 1. Recommended Action ─────────────────────────────────────────────────
+    # ── 1. Situation & Executive Summary ─────────────────────────────────────
     if risk == "high":
-        recommended_action = "Operational readiness review recommended."
-        exec_summary = f"Operational readiness review recommended. {primary_driver} is driving elevated risk — assess open exposure and confirm contingency protocols are ready."
+        recommended_action = "Elevated operational awareness — consider internal escalation procedures."
+        exec_summary = f"Elevated operational conditions detected. {primary_driver} is the primary driver of current risk levels. Conditions may warrant increased monitoring frequency and management visibility according to internal procedures."
     elif risk == "medium":
-        recommended_action = "Enhanced monitoring recommended."
-        exec_summary = f"Enhanced monitoring recommended. {primary_driver} is building near-term pressure — confirm hedging positions ahead of the next demand peak."
+        recommended_action = "Increased monitoring priority — review according to internal procedures."
+        exec_summary = f"Moderate operational conditions detected. {primary_driver} is contributing to elevated monitoring priority. Conditions may warrant increased attention during peak demand windows."
     else:
-        recommended_action = "No action required."
-        exec_summary = "No action required. All monitored drivers present no immediate operational constraint."
+        recommended_action = "Routine monitoring — no elevated operational conditions detected."
+        exec_summary = "Current conditions remain stable across monitored signals. No elevated operational pressure detected. Standard monitoring procedures apply."
 
-    # ── 2. Operational Exposure ───────────────────────────────────────────────
+    # ── 2. Operational Significance ───────────────────────────────────────────
     if risk == "high":
-        operational_exposure = "Elevated energy cost exposure may develop during peak demand intervals. Unhedged positions are at risk."
+        operational_exposure = "Current conditions indicate elevated operational significance. Multiple signals are aligned — monitoring frequency and internal visibility may warrant review according to organizational procedures."
     elif risk == "medium":
-        operational_exposure = "Moderate pricing sensitivity may emerge during peak demand periods. Review open procurement exposure."
+        operational_exposure = "Conditions indicate moderate operational significance. Potential for increased sensitivity during peak demand periods — monitor according to internal protocols."
     else:
-        operational_exposure = "Minimal operational or procurement exposure detected. Standard operations supported through next 24 hours."
+        operational_exposure = "Operational significance is low under current conditions. No indication of near-term disruption to normal operating parameters."
 
-    # ── 3. Escalation Trigger ─────────────────────────────────────────────────
+    # ── 3. Escalation Thresholds Being Monitored ──────────────────────────────
     if risk == "high":
-        escalation = f"Immediate review if ERCOT exceeds $100/MWh or generation availability drops below reserve margin thresholds."
+        escalation = "Conditions may warrant increased internal visibility if ERCOT exceeds $100/MWh or generation availability notices are issued."
     elif risk == "medium":
-        escalation = f"Escalate operational review if ERCOT pricing exceeds $50/MWh or temperatures exceed forecast by more than 5°F."
+        escalation = "Conditions may warrant increased monitoring priority if ERCOT pricing exceeds $50/MWh or temperatures exceed forecast by more than 5°F."
     else:
-        escalation = f"Escalate review if ERCOT exceeds $35/MWh during the 14:00–19:00 CDT demand window or temperatures exceed 95°F."
+        escalation = "Monitoring thresholds: ERCOT above $35/MWh or temperatures above 95°F may increase operational monitoring priority."
 
     # ── 4. Monitoring Focus ───────────────────────────────────────────────────
     if risk == "high":
@@ -187,24 +187,34 @@ def _build_prompt(inputs: Dict[str, Any]) -> str:
         action_anchor = "Recommended Action: No action required."
         exposure_anchor = "Operational Exposure: Minimal operational or procurement exposure detected."
 
-    return f"""You are an Operations Center intelligence system for Texas energy professionals — refineries, manufacturers, data centers, and energy procurement teams.
+    return f"""You are an operational intelligence system for Texas energy professionals — refineries, manufacturers, data centers, infrastructure operators, and energy-intensive industrial teams.
 
-CRITICAL FORMATTING RULE: Every output field must answer "What should I do?" BEFORE answering "Why?"
-NEVER start any field with: weather, ERCOT price, gas storage, temperatures, or any market condition.
-ALWAYS start with: what action is required, what exposure exists, what to monitor, or what triggers escalation.
+PURPOSE: Provide situational awareness and operational context. Never recommend business decisions, transactions, procurement actions, or financial strategies.
 
-Output priority order (strictly enforced):
-1. Recommended Action — what to do right now
-2. Operational Exposure — what is at risk
-3. Escalation Trigger — the specific threshold that changes the answer
-4. Monitoring Focus — exactly what to watch and when
-5. Supporting Analysis — the "why" comes last, briefly
+STRICT RULES — NEVER generate:
+- Recommended actions (buy, sell, hedge, procure, lock contracts, execute)
+- Financial advice, trading signals, procurement instructions
+- Statements telling users what they "should" or "must" do
+- Price predictions stated as certainties
 
-Rules:
-- Operations Center tone: direct, specific, zero filler. Like a control room briefing.
-- Never say: "conditions remain", "situation is stable", "monitoring is recommended", "risk is low/high".
-- Always say: "No action required.", "Review exposure now.", "Confirm hedging positions.", specific thresholds.
-- Synthesize driver relationships (weather → demand → ERCOT price → gas cost). Never analyze signals in isolation.
+ALWAYS use language that describes conditions and awareness:
+- "Current conditions indicate..."
+- "Conditions may warrant monitoring..."
+- "Operational awareness recommended..."
+- "Monitor according to internal procedures..."
+- "Potential operational sensitivity..."
+- "Situational awareness: conditions are..."
+- "Escalation threshold monitoring active..."
+
+OUTPUT STRUCTURE (strictly enforced):
+1. Situation — what is currently happening (factual, descriptive)
+2. Operational Significance — why it matters operationally (context only)
+3. Monitoring Focus — what deserves attention and when
+4. Potential Impact — what could change if conditions shift (descriptive only)
+5. Escalation Triggers — specific thresholds being monitored
+6. Assessment Reliability — data quality status
+
+Tone: Institutional. Factual. Awareness-oriented. Like an operations briefing, not a trading desk.
 - Do NOT provide investment, trading, financial, legal, or procurement advice.
 - Return ONLY valid JSON. No markdown. No preamble.
 
@@ -232,16 +242,17 @@ Market data:
 - Data source health: {inputs.get("data_source_health", "active")}
 - Time horizon: {inputs.get("time_horizon", "next 24-48 hours")}
 
-Return this exact JSON structure. Each field max 2 sentences. Start every field with action/exposure/trigger — never with market data:
+Return this exact JSON structure. Each field max 2 sentences. Descriptive and awareness-oriented — never advisory:
 {{
-  "executive_summary": "One sentence starting with recommended action. E.g.: 'No action required. All monitored drivers present no immediate operational constraint.'",
-  "recommended_action": "The specific action. E.g.: 'No action required.' or 'Review open exposure now.' or 'Initiate operational readiness review.'",
-  "operational_exposure": "What is operationally at risk right now. Start with exposure level, not market data.",
-  "escalation_trigger": "The exact threshold that changes the answer. Name the number. E.g.: 'Escalate if ERCOT exceeds $35/MWh or forecast high exceeds 98°F.'",
-  "recommended_monitoring_focus": "Exactly what to watch, when, and why. Name the specific metric and time window.",
-  "key_driver_analysis": "Supporting analysis only — comes after action. Synthesize the driver chain briefly.",
-  "confidence_note": "Data quality in one sentence.",
-  "historical_context": "One sentence of generalized seasonal context. No fabricated dates or events."
+  "executive_summary": "Situation summary. E.g.: 'Current conditions remain stable. No elevated operational pressure detected across monitored signals.'",
+  "situation": "What is currently happening. Factual description of conditions only.",
+  "operational_significance": "Why current conditions matter operationally. Context only — no recommendations.",
+  "monitoring_focus": "What deserves monitoring attention, when, and why. Descriptive — not directive.",
+  "potential_impact": "What could change if conditions shift. Descriptive consequences only — no certainties.",
+  "escalation_trigger": "Specific thresholds being monitored. E.g.: 'Conditions may warrant increased monitoring if ERCOT exceeds $35/MWh or temperatures exceed 95°F.'",
+  "assessment_reliability": "Data quality status. Which feeds are current, which may be on slower cadence.",
+  "key_driver_analysis": "Synthesize the driver chain briefly. Factual only.",
+  "confidence_note": "Overall assessment reliability in one sentence."
 }}"""
 
 
