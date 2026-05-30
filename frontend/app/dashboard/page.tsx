@@ -36,6 +36,7 @@ import RiskMomentum from "@/components/widgets/RiskMomentum";
 import AlertPreview from "@/components/widgets/AlertPreview";
 import RiskTimeline from "@/components/widgets/RiskTimeline";
 import AIInsightEngine from "@/components/widgets/AIInsightEngine";
+import EscalationPath from "@/components/widgets/EscalationPath";
 import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
 import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
@@ -560,6 +561,8 @@ export default function DashboardPage() {
                 marketReaction={signals.market_reaction}
                 activeSignals={signals.active_signals}
                 computedAt={signals.computed_at}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
               />
 
               {/* ── EXECUTIVE KPI ROW — single glance summary ────────── */}
@@ -665,16 +668,14 @@ export default function DashboardPage() {
                 marketReaction={signals.market_reaction}
               />
 
-              {/* ═══════════════════════════════════════════════════════
-                  BOTH MODES — Escalation Triggers (always visible)
-              ═══════════════════════════════════════════════════════ */}
-              <EscalationTriggers
+              {/* ── Escalation Path — operational playbook ───────────── */}
+              <EscalationPath
+                riskScore={signals.risk_score}
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
                 temperature={forecasts[0]?.temp_high_f ?? undefined}
                 henryHub={gasLatest?.henry_hub_price ?? undefined}
-                dataSources={signals.data_sources}
-                computedAt={signals.computed_at}
               />
+
 
               {/* ═══════════════════════════════════════════════════════
                   ANALYST MODE ONLY — Operational depth
@@ -751,6 +752,13 @@ export default function DashboardPage() {
                     ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
                     temperature={forecasts[0]?.temp_high_f ?? undefined}
                     henryHub={gasLatest?.henry_hub_price ?? undefined}
+                  />
+                  <EscalationTriggers
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                    dataSources={signals.data_sources}
+                    computedAt={signals.computed_at}
                   />
                   <OperationalWatchList
                     riskScore={signals.risk_score}
