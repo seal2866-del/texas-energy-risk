@@ -14,9 +14,10 @@ import AIMarketReasoning from "@/components/widgets/AIMarketReasoning";
 import DataSources from "@/components/widgets/DataSources";
 import RecentAlerts from "@/components/widgets/RecentAlerts";
 import EnergyRiskDrivers from "@/components/widgets/EnergyRiskDrivers";
-import MarketInterpretation from "@/components/widgets/MarketInterpretation";
 import WhatChanged from "@/components/widgets/WhatChanged";
 import AIExecutiveBrief from "@/components/widgets/AIExecutiveBrief";
+import RecommendedActions from "@/components/widgets/RecommendedActions";
+import ImpactAssessment from "@/components/widgets/ImpactAssessment";
 import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
 import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
@@ -486,11 +487,17 @@ export default function DashboardPage() {
                 <RiskHistoryChart location={location} />
               )}
 
-              {signalsReady && snapshots.length >= 6 && (
-                <PredictiveOutlook snapshots={snapshots} />
-              )}
+              {/* ── Recommended Actions — full width, top priority ──── */}
+              <RecommendedActions
+                riskScore={signals.risk_score}
+                riskDirection={signals.risk_direction}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                marketReaction={signals.market_reaction}
+                computedAt={signals.computed_at}
+              />
 
-              {/* ── AI Executive Brief — full width below top row ─────── */}
+              {/* ── AI Executive Brief ───────────────────────────────── */}
               <AIExecutiveBrief
                 signals={signals}
                 reasoning={aiReasoning}
@@ -500,16 +507,28 @@ export default function DashboardPage() {
                 earlyWarnings={riskModel?.earlyWarningSignals}
               />
 
-              <EarlyWarningEngine
-                earlyWarnings={signals.early_warnings}
-                riskTrend={signals.risk_trend}
-                weatherPersistence={signals.weather_persistence}
+              {/* ── Impact Assessment + AI Market Reasoning ──────────── */}
+              <ImpactAssessment
+                riskScore={signals.risk_score}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                marketReaction={signals.market_reaction}
+                gasToPower={signals.gas_to_power_impact}
+                dataSources={signals.data_sources}
               />
 
-              {riskModel && (
-                <OperationalExposure riskModel={riskModel} />
-              )}
+              <AIMarketReasoning
+                reasoning={aiReasoning}
+                loading={aiLoading}
+                error={aiError}
+                computedAt={signals.computed_at}
+                confidence={signals.confidence}
+              />
 
+              {/* ── Risk Drivers ─────────────────────────────────────── */}
+              <EnergyRiskDrivers signals={signals} />
+
+              {/* ── Outlook: ERCOT + Weather + Gas ───────────────────── */}
               <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
 
               <WeatherRisk
@@ -526,34 +545,29 @@ export default function DashboardPage() {
                 panelGlow={gasGlow}
               />
 
+              {/* ── Multi-interval outlook ───────────────────────────── */}
               <IntervalIntelligenceWidget
                 intelligence={signals.interval_intelligence}
               />
 
-              <EnergyRiskDrivers signals={signals} />
-
-              <MarketInterpretation signals={signals} prices={prices} riskModel={riskModel ?? undefined} />
-
-              {riskModel && (
-                <MarketStatePanel riskModel={riskModel} />
+              {signalsReady && snapshots.length >= 6 && (
+                <PredictiveOutlook snapshots={snapshots} />
               )}
+
+              {/* ── Supporting data ──────────────────────────────────── */}
+              {riskModel && (
+                <OperationalExposure riskModel={riskModel} />
+              )}
+
+              <EarlyWarningEngine
+                earlyWarnings={signals.early_warnings}
+                riskTrend={signals.risk_trend}
+                weatherPersistence={signals.weather_persistence}
+              />
 
               {signals.what_changed && signals.what_changed.length > 0 && (
                 <WhatChanged items={signals.what_changed} />
               )}
-
-              <AIMarketReasoning
-                reasoning={aiReasoning}
-                loading={aiLoading}
-                error={aiError}
-                computedAt={signals.computed_at}
-                confidence={signals.confidence}
-              />
-
-              <AISummary
-                signals={signals}
-                computedAt={signals.computed_at}
-              />
 
               <DataSources
                 sources={signals.data_sources}
@@ -561,13 +575,6 @@ export default function DashboardPage() {
               />
 
               <RecentAlerts />
-
-              <ScenarioEngine
-                scenarios={signals.scenarios}
-                operationalExposure={signals.operational_exposure}
-                marketTransition={signals.market_transition}
-                earlyWarnings={riskModel?.earlyWarningSignals}
-              />
 
               <SystemHealthCenter
                 signals={signals}
