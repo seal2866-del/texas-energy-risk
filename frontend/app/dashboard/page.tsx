@@ -30,6 +30,12 @@ import CostImpact from "@/components/widgets/CostImpact";
 import WhyRiskIsLow from "@/components/widgets/WhyRiskIsLow";
 import ScenarioAnalysis from "@/components/widgets/ScenarioAnalysis";
 import RootCauseEngine from "@/components/widgets/RootCauseEngine";
+import TopRisks from "@/components/widgets/TopRisks";
+import TimeToThreshold from "@/components/widgets/TimeToThreshold";
+import RiskMomentum from "@/components/widgets/RiskMomentum";
+import AlertPreview from "@/components/widgets/AlertPreview";
+import RiskTimeline from "@/components/widgets/RiskTimeline";
+import AIInsightEngine from "@/components/widgets/AIInsightEngine";
 import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
 import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
@@ -675,6 +681,59 @@ export default function DashboardPage() {
               ═══════════════════════════════════════════════════════ */}
               {!execMode && (
                 <>
+                  {/* ── Intelligence: Top Risks + Momentum + Alert Preview ── */}
+                  <TopRisks
+                    demandPressure={signals.demand_pressure}
+                    supplyPressure={signals.supply_pressure}
+                    marketReaction={signals.market_reaction}
+                    gasToPower={signals.gas_to_power_impact}
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                  />
+                  <RiskMomentum
+                    snapshots={snapshots}
+                    currentScore={signals.risk_score}
+                  />
+                  <AlertPreview
+                    riskScore={signals.risk_score}
+                    riskDirection={signals.risk_direction}
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                    demandPressure={signals.demand_pressure}
+                    supplyPressure={signals.supply_pressure}
+                  />
+
+                  {/* ── Time to Threshold + Risk Timeline ───────────────── */}
+                  <TimeToThreshold
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                  />
+                  <RiskTimeline
+                    riskScore={signals.risk_score}
+                    riskDirection={signals.risk_direction}
+                    snapshots={snapshots}
+                    timeHorizons={signals.time_horizons}
+                  />
+
+                  {/* ── AI Insight Engine ────────────────────────────────── */}
+                  <AIInsightEngine
+                    riskScore={signals.risk_score}
+                    demandPressure={signals.demand_pressure}
+                    supplyPressure={signals.supply_pressure}
+                    marketReaction={signals.market_reaction}
+                    gasToPower={signals.gas_to_power_impact}
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                    temperature={forecasts[0]?.temp_high_f ?? undefined}
+                    henryHub={gasLatest?.henry_hub_price ?? undefined}
+                    riskDirection={signals.risk_direction}
+                    activeSignals={signals.active_signals}
+                    computedAt={signals.computed_at}
+                  />
+
+                  {/* ── Why + Root Cause + Scenarios ─────────────────────── */}
                   <WhyRiskIsLow
                     riskScore={signals.risk_score}
                     demandPressure={signals.demand_pressure}
