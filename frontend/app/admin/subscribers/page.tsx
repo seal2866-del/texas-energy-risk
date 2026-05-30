@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { UserPlus, Download, Search } from "lucide-react";
 
 const API  = process.env.NEXT_PUBLIC_API_URL || "https://texas-energy-risk-production.up.railway.app";
-const AUTH = process.env.NEXT_PUBLIC_NEWSLETTER_ADMIN_SECRET || "";
 
 interface Subscriber {
   id:           string;
@@ -31,8 +30,29 @@ export default function AdminSubscribers() {
   const [newCo,    setNewCo]   = useState("");
   const [newSeg,   setNewSeg]  = useState("");
   const [msg,     setMsg]     = useState("");
+  const [adminKey, setAdminKey] = useState("");
+  const [authed,   setAuthed]   = useState(false);
 
-  const headers = { Authorization: `Bearer ${AUTH}`, "Content-Type": "application/json" };
+  const headers = { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" };
+
+  if (!authed) {
+    return (
+      <div className="min-h-screen bg-[#080d1a] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm card-glass border border-white/8 rounded-2xl p-6">
+          <h1 className="text-lg font-black text-white mb-1">Subscriber Admin</h1>
+          <p className="text-xs text-gray-400 mb-4">Enter your admin password to continue.</p>
+          <input type="password" value={adminKey} onChange={e => setAdminKey(e.target.value)}
+            placeholder="Admin password"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none mb-3"
+            onKeyDown={e => e.key === "Enter" && setAuthed(true)} />
+          <button onClick={() => setAuthed(true)}
+            className="w-full py-3 bg-orange-500 hover:bg-orange-600 rounded-xl text-sm font-bold text-white transition-all">
+            Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const fetchSubs = async () => {
     const params = new URLSearchParams({ limit: "200" });
