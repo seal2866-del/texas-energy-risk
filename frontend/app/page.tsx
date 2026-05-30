@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
+import NewsletterSignup from "@/components/NewsletterSignup";
 
 // ── What happens when conditions change ───────────────────────────────────────
 const CONSEQUENCE_CARDS = [
@@ -481,6 +482,11 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* ── Newsletter Signup ─────────────────────────────────────────────── */}
+        <section className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <NewsletterSignup />
         </section>
 
         {/* ── Final CTA ─────────────────────────────────────────────────────── */}
