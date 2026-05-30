@@ -133,7 +133,7 @@ STRICT LANGUAGE RULES:
 
 Current Texas Conditions (Houston primary):
 - Risk Level: {risk.upper()} | Trend: {trend}
-- ERCOT: ${ercot:.2f}/MWh | Prior week: ${prior_ercot:.2f}/MWh | Change: {'+' if price_pct >= 0 else ''}{price_pct:.1f}%
+- ERCOT: {ercot_str} | Prior week: ${prior_ercot:.2f}/MWh | Change: {'+' if price_pct >= 0 else ''}{price_pct:.1f}%
 - Week avg risk: {avg_score:.1f}/10 | Peak: {peak_score:.1f}/10
 - Weather Demand: {current.get('weather_demand_pressure', 'low').upper()}
 - Gas Supply: {current.get('gas_supply_pressure', 'low').upper()}
@@ -220,8 +220,8 @@ def _fallback_content(current: dict, prior: dict) -> dict:
     )
     return {
         "subject":                  f"Texas Energy Risk Brief — Week of {datetime.now().strftime('%B %d, %Y')}",
-        "preview_text":             f"{action} Texas ERCOT at ${ercot:.2f}/MWh. {risk.capitalize()} risk conditions.",
-        "executive_summary":        f"{action} Current Texas energy conditions reflect {risk} operational risk. ERCOT Houston Hub at ${ercot:.2f}/MWh.",
+        "preview_text":             f"{action} Texas ERCOT at {ercot_str}. {risk.capitalize()} risk conditions.",
+        "executive_summary":        f"{action} Current Texas energy conditions reflect {risk} operational risk. ERCOT Houston Hub at {ercot_str}.",
         "recommended_action":       action,
         "action_reasons":           [
             "ERCOT pricing below escalation thresholds",
@@ -240,7 +240,7 @@ def _fallback_content(current: dict, prior: dict) -> dict:
         "risk_trend_desc":          "Conditions are stable relative to prior reporting period.",
         "most_important_signal_title": "ERCOT Afternoon Price Window",
         "most_important_signal":    "Monitor ERCOT pricing during the 14:00–19:00 CDT afternoon demand window. Current pricing remains below watch thresholds.",
-        "what_changed_ercot":       f"ERCOT: ${ercot:.2f}/MWh (current week)",
+        "what_changed_ercot":       f"ERCOT: {ercot_str} (current week)",
         "what_changed_weather":     "Temperature outlook within seasonal norms",
         "what_changed_gas":         "Gas storage conditions stable",
         "what_changed_risk":        f"Risk Score: {risk.capitalize()} (no material change)",
@@ -270,9 +270,11 @@ def _fallback_content(current: dict, prior: dict) -> dict:
 
 def build_html_email(content: dict, current: dict, regional: dict[str, dict], issue_id: str) -> str:
     """Build V3 HTML email — executive operational briefing format."""
-    risk       = current.get("risk_score", "low")
-    ercot      = current.get("ercot_price", 0) or 0
-    risk_color = "#ef4444" if risk == "high" else "#f59e0b" if risk == "medium" else "#10b981"
+    risk        = current.get("risk_score", "low")
+    ercot_raw   = current.get("ercot_price")
+    ercot       = ercot_raw if (ercot_raw and ercot_raw > 0) else None
+    ercot_str   = f"{ercot_str}" if ercot else "Awaiting ERCOT Feed"
+    risk_color  = "#ef4444" if risk == "high" else "#f59e0b" if risk == "medium" else "#10b981"
     fe_url     = os.getenv("FRONTEND_URL", "https://texas-energy-risk.vercel.app")
     unsub_url  = f"{fe_url}/unsubscribe?token={{{{unsubscribe_token}}}}"
 
@@ -307,7 +309,7 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
 
     # Escalation trigger dashboard
     triggers = [
-        ("ERCOT > $35/MWh",        ercot >= 35),
+        ("ERCOT > $35/MWh",        bool(ercot and ercot >= 35)),
         ("Temperature > 95°F",      False),
         ("Henry Hub > $3.00/MMBtu", False),
         ("ERCOT Emergency Notice",  False),
@@ -430,7 +432,7 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
       <td style="width:33%;padding:0 3px;">
         <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
           <tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;">ERCOT Hub</td></tr>
-          <tr><td style="font-size:18px;font-weight:900;color:#f97316;">${ercot:.2f}/MWh</td></tr>
+          <tr><td style="font-size:18px;font-weight:900;color:#f97316;">{ercot_str}</td></tr>
           <tr><td style="font-size:10px;color:#64748b;">Houston Hub</td></tr>
         </table>
       </td>
@@ -620,7 +622,7 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
         <td style="width:50%;padding-left:8px;">
           <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
             <tr><td style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">ERCOT Houston Hub</td></tr>
-            <tr><td style="font-size:16px;font-weight:900;color:#f97316;">${ercot:.2f}/MWh</td></tr>
+            <tr><td style="font-size:16px;font-weight:900;color:#f97316;">{ercot_str}</td></tr>
           </table>
         </td>
       </tr>
@@ -733,7 +735,7 @@ EXECUTIVE SUMMARY
 CURRENT CONDITIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Texas Risk Level:     {risk}
-ERCOT Houston Hub:    ${ercot:.2f}/MWh
+ERCOT Houston Hub:    {ercot_str}
 Recommended Action:   {content.get("recommended_action", "No action required.")}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -776,6 +778,19 @@ async def generate_and_save_draft() -> str:
     prior    = _fetch_prior_week_snapshot("Houston")
     week     = _fetch_week_snapshots("Houston")
     regional = _fetch_regional_snapshots()
+
+    # If snapshot has no ERCOT price, fetch it live
+    if not current.get("ercot_price"):
+        try:
+            from services.external_apis import fetch_ercot_prices
+            prices = await fetch_ercot_prices(hours=2)
+            if prices:
+                latest_price = prices[-1].get("price_mwh") if isinstance(prices[-1], dict) else getattr(prices[-1], "price_mwh", None)
+                if latest_price and latest_price > 0:
+                    current["ercot_price"] = latest_price
+                    log.info(f"[NEWSLETTER] Fetched live ERCOT price: ${latest_price:.2f}/MWh")
+        except Exception as e:
+            log.warning(f"[NEWSLETTER] Could not fetch live ERCOT price: {e}")
 
     content  = await generate_newsletter_content(current, prior, week, regional)
 
