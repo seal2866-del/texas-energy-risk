@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle, Send, Eye, RefreshCw, Loader2 } from "lucide-react";
 
-const API  = process.env.NEXT_PUBLIC_API_URL || "https://texas-energy-risk-production.up.railway.app";
+const API  = "";
 
 interface Issue {
   id:                string;
