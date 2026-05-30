@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle, Loader2, FileDown } from "lucide-react";
+import { RefreshCw, MapPin, AlertTriangle, AlertCircle, CheckCircle, Loader2, FileDown, ChevronDown, ChevronUp } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import RiskScore from "@/components/widgets/RiskScore";
@@ -9,7 +9,6 @@ import ERCOTPriceMonitor from "@/components/widgets/ERCOTPriceMonitor";
 import VolatilityAlert from "@/components/widgets/VolatilityAlert";
 import WeatherRisk from "@/components/widgets/WeatherRisk";
 import GasSupply from "@/components/widgets/GasSupply";
-import AISummary from "@/components/widgets/AISummary";
 import AIMarketReasoning from "@/components/widgets/AIMarketReasoning";
 import DataSources from "@/components/widgets/DataSources";
 import RecentAlerts from "@/components/widgets/RecentAlerts";
@@ -18,14 +17,15 @@ import WhatChanged from "@/components/widgets/WhatChanged";
 import AIExecutiveBrief from "@/components/widgets/AIExecutiveBrief";
 import RecommendedActions from "@/components/widgets/RecommendedActions";
 import ImpactAssessment from "@/components/widgets/ImpactAssessment";
+import EscalationTriggers from "@/components/widgets/EscalationTriggers";
+import OperationalWatchList from "@/components/widgets/OperationalWatchList";
+import CostExposure from "@/components/widgets/CostExposure";
 import EarlyWarningEngine from "@/components/widgets/EarlyWarningEngine";
 import IntervalIntelligenceWidget from "@/components/widgets/IntervalIntelligence";
 import SystemHealthCenter from "@/components/widgets/SystemHealthCenter";
-import ScenarioEngine from "@/components/widgets/ScenarioEngine";
 import RiskHistoryChart from "@/components/widgets/RiskHistoryChart";
 import PredictiveOutlook from "@/components/widgets/PredictiveOutlook";
 import OperationalExposure from "@/components/widgets/OperationalExposure";
-import MarketStatePanel from "@/components/widgets/MarketStatePanel";
 import RiskModelDebug from "@/components/widgets/RiskModelDebug";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
@@ -126,6 +126,41 @@ function SystemActivity({ signalsReady }: { signalsReady: boolean }) {
       <span className="text-xs text-gray-600 transition-opacity duration-500">
         {signalsReady ? ACTIVITY_MESSAGES[idx] : "Initializing data feeds..."}
       </span>
+    </div>
+  );
+}
+
+function CollapsibleAI({ reasoning, aiLoading, aiError, computedAt, confidence }: {
+  reasoning: AIReasoningResponse | null;
+  aiLoading: boolean;
+  aiError: string;
+  computedAt: string;
+  confidence: number | null;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card-glass border border-white/8 rounded-2xl overflow-hidden lg:col-span-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/3 transition-colors"
+      >
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 text-left">AI Deep Analysis</p>
+          <p className="text-xs text-gray-400 text-left">Expand for full AI market reasoning</p>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+      </button>
+      {open && (
+        <div className="px-1 pb-1">
+          <AIMarketReasoning
+            reasoning={reasoning}
+            loading={aiLoading}
+            error={aiError}
+            computedAt={computedAt}
+            confidence={confidence}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -456,6 +491,12 @@ export default function DashboardPage() {
           ) : (
             <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4${justRefreshed ? " card-refreshing" : ""}`}>
 
+              {/* ═══════════════════════════════════════════════════════
+                  SCREEN 1 — Decision-making information
+                  Priority: Risk State → Actions → Brief → Assessment
+              ═══════════════════════════════════════════════════════ */}
+
+              {/* 1. Risk Score + ERCOT Price */}
               <RiskScore
                 score={signals.risk_score}
                 activeSignals={signals.active_signals}
@@ -480,14 +521,9 @@ export default function DashboardPage() {
                 panelGlow={riskGlow}
                 earlyWarnings={riskModel?.earlyWarningSignals}
               />
-
               <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
-              {signalsReady && (
-                <RiskHistoryChart location={location} />
-              )}
-
-              {/* ── Recommended Actions — full width, top priority ──── */}
+              {/* 2. Recommended Actions — full width */}
               <RecommendedActions
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
@@ -497,7 +533,7 @@ export default function DashboardPage() {
                 computedAt={signals.computed_at}
               />
 
-              {/* ── AI Executive Brief ───────────────────────────────── */}
+              {/* 3. Executive Brief — full width */}
               <AIExecutiveBrief
                 signals={signals}
                 reasoning={aiReasoning}
@@ -507,7 +543,7 @@ export default function DashboardPage() {
                 earlyWarnings={riskModel?.earlyWarningSignals}
               />
 
-              {/* ── Impact Assessment + AI Market Reasoning ──────────── */}
+              {/* 4. Impact Assessment + Cost Exposure */}
               <ImpactAssessment
                 riskScore={signals.risk_score}
                 demandPressure={signals.demand_pressure}
@@ -516,27 +552,45 @@ export default function DashboardPage() {
                 gasToPower={signals.gas_to_power_impact}
                 dataSources={signals.data_sources}
               />
-
-              <AIMarketReasoning
-                reasoning={aiReasoning}
-                loading={aiLoading}
-                error={aiError}
-                computedAt={signals.computed_at}
-                confidence={signals.confidence}
+              <CostExposure
+                riskScore={signals.risk_score}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                marketReaction={signals.market_reaction}
               />
 
-              {/* ── Risk Drivers ─────────────────────────────────────── */}
+              {/* ═══════════════════════════════════════════════════════
+                  SCREEN 2 — Operational monitoring
+                  Priority: Triggers → Watch List → Drivers → Outlook
+              ═══════════════════════════════════════════════════════ */}
+
+              {/* 5. Escalation Triggers — full width */}
+              <EscalationTriggers
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                dataSources={signals.data_sources}
+                computedAt={signals.computed_at}
+              />
+
+              {/* 6. Operational Watch List + Risk Drivers */}
+              <OperationalWatchList
+                riskScore={signals.risk_score}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                gasStorageVsAvg={gasLatest?.storage_pct_vs_avg ?? undefined}
+                demandPressure={signals.demand_pressure}
+                dataSources={signals.data_sources}
+              />
               <EnergyRiskDrivers signals={signals} />
 
-              {/* ── Outlook: ERCOT + Weather + Gas ───────────────────── */}
+              {/* 7. Signal detail: ERCOT / Weather / Gas */}
               <VolatilityAlert signal={signals.signals?.price_volatility ?? EMPTY_SIGNAL} />
-
               <WeatherRisk
                 forecasts={forecasts}
                 signal={signals.signals?.weather_demand ?? EMPTY_SIGNAL}
                 panelGlow={weatherGlow}
               />
-
               <GasSupply
                 records={gasRecs}
                 latest={gasLatest}
@@ -545,13 +599,18 @@ export default function DashboardPage() {
                 panelGlow={gasGlow}
               />
 
-              {/* ── Multi-interval outlook ───────────────────────────── */}
-              <IntervalIntelligenceWidget
-                intelligence={signals.interval_intelligence}
-              />
-
+              {/* 8. Multi-interval outlook */}
+              <IntervalIntelligenceWidget intelligence={signals.interval_intelligence} />
               {signalsReady && snapshots.length >= 6 && (
                 <PredictiveOutlook snapshots={snapshots} />
+              )}
+
+              {/* ═══════════════════════════════════════════════════════
+                  LOWER — Historical + AI deep analysis (collapsible)
+              ═══════════════════════════════════════════════════════ */}
+
+              {signalsReady && (
+                <RiskHistoryChart location={location} />
               )}
 
               {riskModel && (
@@ -568,20 +627,23 @@ export default function DashboardPage() {
                 <WhatChanged items={signals.what_changed} />
               )}
 
-              <DataSources
-                sources={signals.data_sources}
+              {/* AI Deep Analysis — collapsible */}
+              <CollapsibleAI
+                reasoning={aiReasoning}
+                aiLoading={aiLoading}
+                aiError={aiError}
                 computedAt={signals.computed_at}
+                confidence={signals.confidence}
               />
 
+              <DataSources sources={signals.data_sources} computedAt={signals.computed_at} />
               <RecentAlerts />
-
               <SystemHealthCenter
                 signals={signals}
                 aiLoading={aiLoading}
                 aiSynced={!!aiReasoning}
                 riskModel={riskModel ?? undefined}
               />
-
               <RiskModelDebug riskModel={riskModel} validation={validation} />
 
             </div>

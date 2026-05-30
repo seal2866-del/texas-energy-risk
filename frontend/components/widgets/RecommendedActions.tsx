@@ -22,14 +22,27 @@ function getActions(
   supply: string,
   market: string,
 ): { actions: Action[]; nextReview: string } {
+  if (risk === "critical") {
+    return {
+      actions: [
+        { icon: "alert", text: "Immediate operational review recommended" },
+        { icon: "alert", text: "Review procurement and demand exposure now" },
+        { icon: "alert", text: "Confirm contingency plans are activated" },
+        { icon: "alert", text: "Escalate to operations leadership immediately" },
+        { icon: "alert", text: "Monitor ERCOT pricing continuously" },
+      ],
+      nextReview: "Continuous — do not leave unmonitored",
+    };
+  }
+
   if (risk === "high") {
     return {
       actions: [
-        { icon: "alert", text: "Initiate operational readiness review" },
-        { icon: "alert", text: "Confirm fuel supply positions" },
-        { icon: "alert", text: "Evaluate hedging strategy" },
-        { icon: "alert", text: "Increase monitoring frequency to every 15 minutes" },
-        { icon: "alert", text: "Validate generation availability with dispatch team" },
+        { icon: "alert", text: "Operational readiness review recommended" },
+        { icon: "alert", text: "Review procurement exposure" },
+        { icon: "alert", text: "Confirm fuel supply and generation availability" },
+        { icon: "alert", text: "Increase monitoring frequency" },
+        { icon: "alert", text: "Notify operations leadership if escalation persists" },
       ],
       nextReview: "Immediate — continuous monitoring required",
     };
