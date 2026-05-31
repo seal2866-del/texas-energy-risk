@@ -1,7 +1,8 @@
-# TX Energy Risk — Project Archive
-**Last updated:** May 30, 2026
-**Current stable tag:** v4.0-stable
+# Texas Grid Intel — Project Archive
+**Last updated:** May 31, 2026
+**Current stable tag:** v4.2-stable
 **Repository:** github.com/seal2866-del/texas-energy-risk
+**Production URL:** https://texasgridintel.com
 
 ---
 
@@ -43,28 +44,71 @@
 - [x] #21 Transform platform language — advisory to operational awareness
 - [x] #22 Complete language transformation (EscalationPath, ManagementSummary, Phase 2 & 4 engines)
 
+### Prospecting CRM — v4.1
+- [x] #29 Add trading/energy industries to prospecting filters
+        → Added: Energy Trading, Natural Gas Trading, Power Marketing, Power Generation, Energy Procurement
+- [x] #30 Add trading job titles to prospecting filters
+        → Added: Energy Trader, Gas Trader, Power Trader, Risk Manager, Market Analyst,
+           Director of Energy Trading, VP Energy Trading, Portfolio Manager, Hedging Manager
+- [x] #31 Update lead scoring for trading industries
+        → Energy Trading: +20, Natural Gas Trading: +20, Power Marketing: +18, Energy Procurement: +18, Power Generation: +15
+        → Trading/risk titles now score full 15pts on operational title relevance
+- [x] #32 Add trading titles to Apollo default search list
+
+### Domain Migration & SEO — v4.2
+- [x] #33 Purchase and configure texasgridintel.com domain
+        → Domain added to Vercel, SSL live
+- [x] #34 Full SEO implementation
+        → layout.tsx: title template, meta description, 17 keywords, canonical URL
+        → Open Graph tags (og:title, og:description, og:image, og:locale, og:site_name)
+        → Twitter card (summary_large_image)
+        → JSON-LD structured data: WebSite + Organization + SoftwareApplication with pricing
+        → robots: index/follow, dashboard/admin/prospecting blocked
+        → sitemap.ts: dynamic sitemap.xml with all public routes + priority weights
+        → robots.ts: robots.txt with allow/disallow rules
+        → opengraph-image.tsx: auto-generated branded OG image (1200x630)
+        → Per-page layouts: /pricing, /dashboard (noindex), /terms
+- [x] #35 Update all hardcoded URLs to texasgridintel.com
+        → backend/main.py: CORS origins updated
+        → backend/services/alert_service.py: DASHBOARD_URL, ALERTS_URL
+        → backend/services/newsletter_service.py: unsubscribe + dashboard links
+        → backend/routers/prospecting.py: FRONTEND_URL fallback
+        → backend/routers/newsletter.py: FRONTEND_URL fallback
+- [x] #36 Update Railway FRONTEND_URL → https://texasgridintel.com
+- [x] #37 Rebrand footer: TX Energy Risk → Texas Grid Intel
+        → © Texas Grid Intel. All rights reserved.
+        → support@txenergyrisk.com → support@texasgridintel.com
+
 ---
 
 ## PENDING TASKS
 
 - [ ] #6  Setup Stripe test mode and verify Pro/Business checkout
-        → Needs txenergyrisk.com domain first
         → Test card: 4242 4242 4242 4242
         → Pro price ID: price_1TcWGoBHRBiXHk4GqI5MgpSm
         → Business price ID: price_1TcWPBBHRBiXHk4GtgHeppBJ
 
 - [ ] #7  Verify alert emails end-to-end
-        → alert@investorlens.capital is verified in Resend (temporary)
-        → Switch to alerts@txenergyrisk.com once domain is added
+        → ALERT_FROM_EMAIL still using temporary address — update once txenergyrisk.com/texasgridintel.com email is configured in Resend
+        → Switch to alerts@texasgridintel.com
+
+- [ ] #38 Google Search Console verification
+        → Property: texasgridintel.com
+        → DNS TXT method attempted — awaiting propagation (retry in 1-2 hrs)
+        → Alternative: use HTML tag method, add token to layout.tsx verification field
+
+- [ ] #39 Apollo Basic plan upgrade ($49/mo)
+        → Required to unlock prospecting search API
+        → APOLLO_API_KEY is set in Railway, just needs paid plan
 
 ---
 
 ## NEXT SESSION PRIORITIES
 
-1. **Apollo Basic plan** ($49/mo) → unlocks prospecting search API
-2. **txenergyrisk.com domain** → add to Resend, update ALERT_FROM_EMAIL in Railway
-3. **Stripe test mode** → verify Pro/Business checkout end-to-end
-4. **Alert email test** → set low threshold, confirm email fires
+1. **Google Search Console** → retry DNS verification or switch to HTML tag method
+2. **Stripe test mode (#6)** → verify Pro/Business checkout end-to-end
+3. **Alert email test (#7)** → set low threshold, confirm email fires to texasgridintel.com address
+4. **Apollo Basic plan (#39)** → upgrade to unlock prospecting search
 
 ---
 
@@ -82,8 +126,8 @@
 - ERCOT_API_ENABLED = true
 - NOAA_BASE_URL = https://api.weather.gov
 - RESEND_API_KEY
-- ALERT_FROM_EMAIL = alerts@investorlens.capital (temp — switch to txenergyrisk.com)
-- FRONTEND_URL = https://texas-energy-risk.vercel.app
+- ALERT_FROM_EMAIL = (temp address — update to alerts@texasgridintel.com)
+- FRONTEND_URL = https://texasgridintel.com ✓ UPDATED
 - ENVIRONMENT = production
 - APOLLO_API_KEY (set — needs Basic plan upgrade)
 - NEWSLETTER_ADMIN_SECRET
@@ -95,12 +139,17 @@
 
 ---
 
-## EMAIL ADDRESSES (configure when domain ready)
-- alerts@txenergyrisk.com
-- support@txenergyrisk.com
-- sales@txenergyrisk.com
-- contact@txenergyrisk.com
-- admin@txenergyrisk.com
+## EMAIL ADDRESSES
+
+### Active (temporary)
+- alerts@investorlens.capital — alert emails (temp, verified in Resend)
+
+### Configure in Resend when ready
+- alerts@texasgridintel.com
+- support@texasgridintel.com
+- sales@texasgridintel.com
+- contact@texasgridintel.com
+- admin@texasgridintel.com
 
 ---
 
@@ -130,6 +179,8 @@
 - v3.8-stable — Apollo prospecting integration
 - v3.9-stable — Prospecting CRM full pipeline
 - v4.0-stable — Supabase grants, CRM complete
+- v4.1-stable — Trading industries + job titles + lead scoring
+- v4.2-stable — Domain migration to texasgridintel.com + full SEO + footer rebrand
 
 ---
 
@@ -143,6 +194,17 @@
 - /admin/newsletter — Newsletter issue management
 - /admin/subscribers — Newsletter subscriber management
 - /unsubscribe — One-click unsubscribe
+
+---
+
+## SEO FILES (added v4.2)
+- frontend/app/layout.tsx — global metadata, OG, Twitter, JSON-LD structured data
+- frontend/app/sitemap.ts — dynamic sitemap.xml
+- frontend/app/robots.ts — robots.txt
+- frontend/app/opengraph-image.tsx — auto-generated OG image (1200x630)
+- frontend/app/pricing/layout.tsx — pricing page metadata
+- frontend/app/dashboard/layout.tsx — dashboard metadata (noindex)
+- frontend/app/terms/layout.tsx — terms page metadata
 
 ---
 
