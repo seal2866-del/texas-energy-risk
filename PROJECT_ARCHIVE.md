@@ -1,6 +1,6 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** May 31, 2026 (session 4)
-**Current stable tag:** v4.5-stable
+**Last updated:** May 31, 2026 (session 5)
+**Current stable tag:** v4.6-stable
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -130,6 +130,20 @@
 - [x] #52 Fix EIA fetcher to use confirmed v2 futures endpoint
 - [x] #53 Match ERCOT price font to Henry Hub (text-5xl font-black tracking-tight)
 - [x] #54 Move Henry Hub to top of Executive + Analyst Mode (full widget, no compact)
+
+### Operational Cost Impact Card — v4.6
+- [x] #55 Build OperationalCostImpact widget
+        → 3 facility tiers: Small Facility (0.5MW), Midstream Site (3MW), Large Plant (9.5MW)
+        → Live calculation: ERCOT price × load × 24h + Henry Hub gas exposure
+        → Demand multiplier: low×1.0 / medium×1.10 / high×1.25
+        → Risk premium: low×1.0 / medium×1.07 / high×1.15
+        → Progress bars per facility, cost breakdown (power vs gas)
+        → "Based on" row: ERCOT $/MWh, Henry Hub $/MMBtu, demand level
+        → Uplift warning when conditions add cost above baseline
+        → Clearly labeled estimates — not financial advice
+- [x] #56 Wire into Executive + Analyst Mode dashboards
+        → Positioned after Henry Hub widget in both modes
+        → Passes live ERCOT price, Henry Hub price, demand level, risk score
         → Debug endpoint confirmed v2_futures works: $3.10/MMBtu
         → Strategy 1 now hits confirmed working endpoint first
         → Mock data never cached (re-fetches until real data available)
@@ -240,6 +254,7 @@
 - v4.3-stable — Google Search Console verified + sitemap submitted
 - v4.4-stable — Account settings, forgot/reset password, login rebrand
 - v4.5-stable — Henry Hub: live EIA price, 10-day chart, signal engine integration, ERCOT font match
+- v4.6-stable — Operational Cost Impact card (Small/Midstream/Large facility estimates)
 
 ---
 
