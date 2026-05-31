@@ -189,10 +189,32 @@
 
 ## NEXT SESSION PRIORITIES
 
-1. **Stripe test mode (#6)** → verify Pro/Business checkout end-to-end
-2. **Alert email test (#7)** → set low threshold, confirm email fires, update to alerts@texasgridintel.com in Resend
-3. **Apollo Basic plan (#53)** → upgrade to unlock prospecting search API
-4. **Search Console** → check pages discovered (submitted May 31)
+## NEXT 30-DAY FOCUS (Starting Next Session)
+
+### Weekly Texas Energy Risk Brief — Every Monday
+Send to email subscribers:
+- ERCOT outlook
+- Weather outlook
+- Hurricane outlook
+- Natural gas outlook
+- Top risks for industrial operators
+
+### Funnel
+Apollo → Prospect → Audience → Resend → Newsletter → Demo → Customer
+
+### Priority Task List
+1. **Newsletter automation (Resend)** — automate weekly brief delivery
+2. **Apollo prospect import** — bulk import and enrich leads
+3. **Prospect analytics** — conversion funnel dashboard
+4. **Email capture** — improve signup rate on homepage/landing
+5. **Demo request workflow** — automate demo booking and follow-up
+6. **Stripe subscriptions (#6)** — verify Pro/Business checkout end-to-end (test card: 4242 4242 4242 4242)
+7. **Executive brief generation** — AI-generated weekly executive summary
+
+### Backlog (lower priority)
+- Alert email test (#7) → switch to alerts@texasgridintel.com in Resend
+- Apollo Basic plan (#53) → upgrade at apollo.io ($49/mo)
+- Search Console → check pages discovered (submitted May 31)
 
 ---
 
