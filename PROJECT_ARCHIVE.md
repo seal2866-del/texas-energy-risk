@@ -1,6 +1,6 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** May 31, 2026 (session 3)
-**Current stable tag:** v4.4-stable
+**Last updated:** May 31, 2026 (session 4)
+**Current stable tag:** v4.5-stable
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -97,6 +97,47 @@
         → Redirect URL https://texasgridintel.com/reset-password added
 - [x] #43 Rebrand login page: TX Energy Risk → Texas Grid Intel
 
+### Henry Hub Natural Gas Price — v4.5
+- [x] #45 Add Henry Hub price fetcher (external_apis.py)
+        → EIA v2 futures endpoint (RNGWHHD series) — confirmed working
+        → Returns current price, daily/weekly % change, market state, watch threshold
+        → 10-day price history for charting
+        → Cached 4 hours. Never serves cached mock data.
+- [x] #46 Add /api/gas/henry-hub endpoint + debug endpoint
+        → GET /api/gas/henry-hub — live EIA data
+        → GET /api/gas/henry-hub/debug — raw EIA strategy diagnostics
+- [x] #47 Integrate Henry Hub into signal_engine.py
+        → check_henry_hub() signal detector with 4 market states
+        → _compute_henry_hub_exposure() for cost/operational exposure
+        → Boosts supply_pressure when Henry Hub is triggered
+        → Included in signal maps, escalation probability, cost exposure, AI brief
+- [x] #48 Pass Henry Hub into signals router
+        → Fetched in parallel with ERCOT, NOAA, EIA in signals.py
+        → Passed into run_all_signals() as henry_hub_data param
+- [x] #49 Build HenryHubWidget frontend component
+        → Big price display (5xl, color-coded by market state)
+        → 10-day SVG line chart with threshold bands at $3/$4/$6
+        → Daily/weekly change chips with trend arrows
+        → 4-state threshold ladder (Normal/Watch/Elevated/Critical)
+        → Compact mode for strip display
+        → "Daily EIA · Not Live" label clearly shown
+- [x] #50 Add HenryHubData type to SignalsResponse in api.ts
+        → Fixed TypeScript stripping henry_hub from signals response
+- [x] #51 Wire Henry Hub into dashboards
+        → Executive Mode: full widget above Risk Score
+        → Analyst Mode: full widget above ERCOT Price Monitor
+        → Removed duplicate from bottom of Analyst panel
+- [x] #52 Fix EIA fetcher to use confirmed v2 futures endpoint
+        → Debug endpoint confirmed v2_futures works: $3.10/MMBtu
+        → Strategy 1 now hits confirmed working endpoint first
+        → Mock data never cached (re-fetches until real data available)
+
+### Market States (Henry Hub)
+- Normal:   < $3.00/MMBtu
+- Watch:    $3.00–$4.00/MMBtu
+- Elevated: $4.00–$6.00/MMBtu
+- Critical: > $6.00/MMBtu
+
 ---
 
 ## PENDING TASKS
@@ -110,7 +151,7 @@
         → ALERT_FROM_EMAIL still using temporary address — update once txenergyrisk.com/texasgridintel.com email is configured in Resend
         → Switch to alerts@texasgridintel.com
 
-- [ ] #44 Apollo Basic plan upgrade ($49/mo)
+- [ ] #53 Apollo Basic plan upgrade ($49/mo)
         → Required to unlock prospecting search API
         → APOLLO_API_KEY is set in Railway, just needs paid plan
 
@@ -120,7 +161,7 @@
 
 1. **Stripe test mode (#6)** → verify Pro/Business checkout end-to-end
 2. **Alert email test (#7)** → set low threshold, confirm email fires, update to alerts@texasgridintel.com in Resend
-3. **Apollo Basic plan (#44)** → upgrade to unlock prospecting search API
+3. **Apollo Basic plan (#53)** → upgrade to unlock prospecting search API
 4. **Search Console** → check pages discovered (submitted May 31)
 
 ---
@@ -196,6 +237,7 @@
 - v4.2-stable — Domain migration to texasgridintel.com + full SEO + footer rebrand
 - v4.3-stable — Google Search Console verified + sitemap submitted
 - v4.4-stable — Account settings, forgot/reset password, login rebrand
+- v4.5-stable — Henry Hub: live EIA price, 10-day chart, signal engine integration
 
 ---
 
