@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     creator: "@texasgridintel",
   },
   verification: {
-    google: "",   // add Google Search Console verification token here
+    google: "OEjZ_NTVicLfTYNUqro7o5NdpcQVlBjDRFcxl5dow_M",
   },
   category: "energy",
 };
