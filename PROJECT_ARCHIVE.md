@@ -1,6 +1,6 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** May 31, 2026 (session 2)
-**Current stable tag:** v4.3-stable
+**Last updated:** May 31, 2026 (session 3)
+**Current stable tag:** v4.4-stable
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -84,6 +84,18 @@
 - [x] #39 Sitemap submitted to Google Search Console
         → https://texasgridintel.com/sitemap.xml submitted successfully
         → Google will crawl within 24–48 hours
+- [x] #40 Add account settings page (/account)
+        → Change password form with validation
+        → Shows user name and email
+        → Settings gear icon added to Navbar (desktop + mobile)
+- [x] #41 Add forgot password flow
+        → "Forgot password?" link on login page
+        → Sends Supabase reset email with redirectTo texasgridintel.com/reset-password
+        → /reset-password page handles new password entry + redirects to dashboard
+- [x] #42 Fix Supabase URL configuration
+        → Site URL updated to https://texasgridintel.com
+        → Redirect URL https://texasgridintel.com/reset-password added
+- [x] #43 Rebrand login page: TX Energy Risk → Texas Grid Intel
 
 ---
 
@@ -98,7 +110,7 @@
         → ALERT_FROM_EMAIL still using temporary address — update once txenergyrisk.com/texasgridintel.com email is configured in Resend
         → Switch to alerts@texasgridintel.com
 
-- [ ] #40 Apollo Basic plan upgrade ($49/mo)
+- [ ] #44 Apollo Basic plan upgrade ($49/mo)
         → Required to unlock prospecting search API
         → APOLLO_API_KEY is set in Railway, just needs paid plan
 
@@ -183,6 +195,7 @@
 - v4.1-stable — Trading industries + job titles + lead scoring
 - v4.2-stable — Domain migration to texasgridintel.com + full SEO + footer rebrand
 - v4.3-stable — Google Search Console verified + sitemap submitted
+- v4.4-stable — Account settings, forgot/reset password, login rebrand
 
 ---
 
