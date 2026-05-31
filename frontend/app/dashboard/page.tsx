@@ -636,8 +636,8 @@ export default function DashboardPage() {
                 confidence={signals.confidence}
               />
 
-              {/* 2b. Henry Hub compact — top-level signal */}
-              <HenryHubWidget data={signals.henry_hub} compact />
+              {/* 2b. Henry Hub — full widget in Executive Mode */}
+              <HenryHubWidget data={signals.henry_hub} />
 
               {/* 3. Risk Score + ERCOT Price */}
               <RiskScore
@@ -751,10 +751,10 @@ export default function DashboardPage() {
                     panelGlow={riskGlow}
                     earlyWarnings={riskModel?.earlyWarningSignals}
                   />
-                  <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
-
                   {/* Henry Hub — top-level gas price signal */}
                   <HenryHubWidget data={signals.henry_hub} />
+
+                  <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
                   {/* 2. RISK ATTRIBUTION — why is the score X? */}
                   <SignalContributors
@@ -853,7 +853,6 @@ export default function DashboardPage() {
                     gasToPower={signals.gas_to_power_impact}
                     panelGlow={gasGlow}
                   />
-                  <HenryHubWidget data={signals.henry_hub} />
                   {signalsReady && <RiskHistoryChart location={location} />}
 
                   <DataSources sources={signals.data_sources} computedAt={signals.computed_at} />
