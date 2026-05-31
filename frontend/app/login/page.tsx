@@ -10,7 +10,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const isSignup     = searchParams.get("signup") === "true";
 
-  const [mode,     setMode]     = useState<"signin" | "signup">(isSignup ? "signup" : "signin");
+  const [mode,     setMode]     = useState<"signin" | "signup" | "forgot">(isSignup ? "signup" : "signin");
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [name,     setName]     = useState("");
@@ -32,7 +32,13 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      if (mode === "signup") {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) throw error;
+        setSuccess("Check your email for a password reset link.");
+      } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -63,30 +69,34 @@ function LoginForm() {
       </Link>
 
       <div className="card-glass border border-white/8 w-full max-w-md p-8">
-        {/* Mode toggle */}
-        <div className="flex rounded-xl bg-white/5 p-1 mb-8">
-          {(["signin", "signup"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(""); setSuccess(""); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                mode === m
-                  ? "bg-orange-500 text-white shadow"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {m === "signin" ? "Sign In" : "Create Account"}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle — hide on forgot */}
+        {mode !== "forgot" && (
+          <div className="flex rounded-xl bg-white/5 p-1 mb-8">
+            {(["signin", "signup"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setError(""); setSuccess(""); }}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  mode === m
+                    ? "bg-orange-500 text-white shadow"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                {m === "signin" ? "Sign In" : "Create Account"}
+              </button>
+            ))}
+          </div>
+        )}
 
         <h1 className="text-xl font-black text-white mb-1">
-          {mode === "signin" ? "Welcome back" : "Get started free"}
+          {mode === "signin" ? "Welcome back" : mode === "signup" ? "Get started free" : "Reset your password"}
         </h1>
         <p className="text-sm text-gray-400 mb-6">
           {mode === "signin"
             ? "Sign in to your energy risk dashboard."
-            : "Monitor Texas energy risk conditions — free tier available."}
+            : mode === "signup"
+            ? "Monitor Texas energy risk conditions — free tier available."
+            : "Enter your email and we'll send you a reset link."}
         </p>
 
         {error && (
@@ -150,14 +160,36 @@ function LoginForm() {
             </div>
           </div>
 
+          {mode === "signin" && (
+            <div className="flex justify-end -mt-1">
+              <button
+                type="button"
+                onClick={() => { setMode("forgot"); setError(""); setSuccess(""); }}
+                className="text-xs text-gray-500 hover:text-orange-400 transition-colors"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
             className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm mt-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mode === "signin" ? "Sign In" : "Create Free Account"}
+            {mode === "signin" ? "Sign In" : mode === "signup" ? "Create Free Account" : "Send Reset Link"}
           </button>
+
+          {mode === "forgot" && (
+            <button
+              type="button"
+              onClick={() => { setMode("signin"); setError(""); setSuccess(""); }}
+              className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors mt-1"
+            >
+              ← Back to sign in
+            </button>
+          )}
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-600">
