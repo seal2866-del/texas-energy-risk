@@ -58,6 +58,9 @@ async def _search_apollo(req: SearchRequest) -> list[dict]:
         "Operations Manager", "Plant Manager", "Energy Manager",
         "Procurement Manager", "Facilities Manager", "VP Operations",
         "Director of Operations", "COO", "Energy Director",
+        "Energy Trader", "Gas Trader", "Power Trader", "Risk Manager",
+        "Market Analyst", "Director of Energy Trading", "VP Energy Trading",
+        "Portfolio Manager", "Hedging Manager",
     ]
 
     payload: dict = {
@@ -139,7 +142,18 @@ ENERGY_INTENSIVE_INDUSTRIES = [
     "oil", "gas", "energy", "petrochemical", "chemical", "refining",
     "manufacturing", "industrial", "mining", "data center", "semiconductor",
     "utilities", "pipeline", "midstream", "upstream", "downstream",
+    "energy trading", "natural gas trading", "power marketing",
+    "power generation", "energy procurement",
 ]
+
+# Bonus scores for high-value trading/marketing industries (applied on top of base intensity)
+TRADING_INDUSTRY_BONUS: dict[str, int] = {
+    "energy trading": 20,
+    "natural gas trading": 20,
+    "power marketing": 18,
+    "energy procurement": 18,
+    "power generation": 15,
+}
 
 TEXAS_ENERGY_CITIES = [
     "houston", "midland", "odessa", "corpus christi", "beaumont",
@@ -161,7 +175,7 @@ def _score_lead(prospect: dict) -> dict:
     elif emp >= 50:    score_size = 10
     elif emp >= 10:    score_size = 5
 
-    # Energy intensity by industry (0-35)
+    # Energy intensity by industry (0-35 base + trading bonus)
     industry = (prospect.get("industry") or "").lower()
     company  = (prospect.get("company_name") or "").lower()
     combined = f"{industry} {company}"
@@ -175,6 +189,11 @@ def _score_lead(prospect: dict) -> dict:
             if kw in combined:
                 score_intensity = 20
                 break
+    # Apply trading/marketing industry bonus
+    for ind_kw, bonus in TRADING_INDUSTRY_BONUS.items():
+        if ind_kw in industry:
+            score_intensity = min(35, score_intensity + bonus)
+            break
 
     # Texas energy hub location (0-25)
     city  = (prospect.get("city")  or "").lower()
@@ -188,10 +207,16 @@ def _score_lead(prospect: dict) -> dict:
 
     # Operational title relevance (0-15)
     title = (prospect.get("contact_title") or "").lower()
-    for kw in ["operations", "energy", "plant", "facilities", "procurement", "coo", "director"]:
+    # Trading/risk titles get full score
+    for kw in ["trader", "trading", "risk manager", "hedging", "portfolio manager", "market analyst", "power marketing"]:
         if kw in title:
             score_operational = 15
             break
+    if score_operational == 0:
+        for kw in ["operations", "energy", "plant", "facilities", "procurement", "coo", "director"]:
+            if kw in title:
+                score_operational = 15
+                break
     if score_operational == 0:
         for kw in ["manager", "vp", "president", "officer"]:
             if kw in title:

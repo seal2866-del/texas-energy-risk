@@ -6,8 +6,8 @@ import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://texas-energy-risk-production.up.railway.app";
 
-const INDUSTRIES = ["Oil & Gas","Manufacturing","Chemical","Petrochemical","Data Centers","Mining","Utilities","Midstream","Refining","Industrial","Construction","Agriculture"];
-const TITLES     = ["Operations Manager","Plant Manager","Energy Manager","Procurement Manager","Facilities Manager","VP Operations","Director of Operations","COO","Energy Director","CFO"];
+const INDUSTRIES = ["Oil & Gas","Manufacturing","Chemical","Petrochemical","Data Centers","Mining","Utilities","Midstream","Refining","Industrial","Construction","Agriculture","Energy Trading","Natural Gas Trading","Power Marketing","Power Generation","Energy Procurement"];
+const TITLES     = ["Operations Manager","Plant Manager","Energy Manager","Procurement Manager","Facilities Manager","VP Operations","Director of Operations","COO","Energy Director","CFO","Energy Trader","Gas Trader","Power Trader","Risk Manager","Market Analyst","Director of Energy Trading","VP Energy Trading","Portfolio Manager","Hedging Manager"];
 const TX_CITIES  = ["Houston, TX","Dallas, TX","Austin, TX","San Antonio, TX","Midland, TX","Odessa, TX","Corpus Christi, TX","Lubbock, TX","Beaumont, TX","Port Arthur, TX"];
 
 const PIPELINE_STATUSES = ["new","newsletter_added","newsletter_sent","opened","clicked","demo_requested","qualified","opportunity","customer","closed_lost"];
