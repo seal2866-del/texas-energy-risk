@@ -483,6 +483,9 @@ HENRY_HUB_ELEVATED  = 6.00   # $4.00–$6.00 = Elevated
 def _get_henry_hub_cache() -> Optional[Dict]:
     entry = _HENRY_HUB_CACHE.get("latest")
     if entry and datetime.now(timezone.utc).timestamp() < entry["expires"]:
+        # Never serve mock data from cache — force re-fetch if source was mock
+        if entry["data"].get("source") == "mock":
+            return None
         return entry["data"]
     return None
 
