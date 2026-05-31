@@ -41,6 +41,7 @@ import WatchToday from "@/components/widgets/WatchToday";
 import NextReview from "@/components/widgets/NextReview";
 import CostImpact from "@/components/widgets/CostImpact";
 import OperationalCostImpact from "@/components/widgets/OperationalCostImpact";
+import ScenarioModelingPanel from "@/components/widgets/ScenarioModelingPanel";
 import WhyRiskIsLow from "@/components/widgets/WhyRiskIsLow";
 import ScenarioAnalysis from "@/components/widgets/ScenarioAnalysis";
 import RootCauseEngine from "@/components/widgets/RootCauseEngine";
@@ -648,6 +649,15 @@ export default function DashboardPage() {
                 riskScore={signals.risk_score ?? "low"}
               />
 
+              {/* 2d. Scenario Modeling */}
+              <ScenarioModelingPanel
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
+                henryHub={signals.henry_hub?.price ?? 3.00}
+                tempHigh={forecasts[0]?.temp_high_f ?? 85}
+                demandLevel={signals.demand_pressure?.level ?? "low"}
+                riskScore={signals.risk_score ?? "low"}
+              />
+
               {/* 3. Risk Score + ERCOT Price */}
               <RiskScore
                 score={signals.risk_score}
@@ -767,6 +777,15 @@ export default function DashboardPage() {
                   <OperationalCostImpact
                     ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
                     henryHub={signals.henry_hub?.price ?? 3.00}
+                    demandLevel={signals.demand_pressure?.level ?? "low"}
+                    riskScore={signals.risk_score ?? "low"}
+                  />
+
+                  {/* Scenario Modeling */}
+                  <ScenarioModelingPanel
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
+                    henryHub={signals.henry_hub?.price ?? 3.00}
+                    tempHigh={forecasts[0]?.temp_high_f ?? 85}
                     demandLevel={signals.demand_pressure?.level ?? "low"}
                     riskScore={signals.risk_score ?? "low"}
                   />
