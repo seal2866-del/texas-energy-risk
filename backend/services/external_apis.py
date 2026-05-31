@@ -516,6 +516,14 @@ def _henry_hub_watch_threshold(price: float) -> float:
 
 
 def _mock_henry_hub() -> Dict[str, Any]:
+    import random
+    base = 2.85
+    history = []
+    for i in range(10):
+        price = round(base + random.uniform(-0.15, 0.15), 3)
+        from datetime import timedelta
+        date = (datetime.now(timezone.utc) - timedelta(days=9 - i)).strftime("%Y-%m-%d")
+        history.append({"date": date, "price": price})
     return {
         "price":             2.85,
         "daily_change_pct":  -0.35,
@@ -524,6 +532,7 @@ def _mock_henry_hub() -> Dict[str, Any]:
         "watch_threshold":   HENRY_HUB_NORMAL,
         "unit":              "$/MMBtu",
         "report_date":       datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "history":           history,
         "source":            "mock",
     }
 
@@ -550,7 +559,7 @@ async def fetch_henry_hub_price() -> Dict[str, Any]:
             r = await client.get(EIA_V1_URL, params={
                 "api_key":   api_key,
                 "series_id": EIA_HENRY_HUB_V1_SERIES,
-                "num":       "10",   # last 10 days to compute weekly change
+                "num":       "14",   # last 14 days for chart history + weekly change
             })
             body   = r.json()
             series = body.get("series", [{}])[0]
@@ -563,6 +572,8 @@ async def fetch_henry_hub_price() -> Dict[str, Any]:
                     current_price  = valid[0][1]
                     prev_day_price = valid[1][1]
                     weekly_price   = valid[min(6, len(valid)-1)][1]  # ~5 trading days ago
+                    # Build history oldest-first for charting
+                    history = [{"date": d, "price": round(p, 3)} for d, p in reversed(valid[:10])]
 
                     daily_chg  = ((current_price - prev_day_price) / prev_day_price) * 100 if prev_day_price else 0
                     weekly_chg = ((current_price - weekly_price)   / weekly_price)   * 100 if weekly_price else 0
@@ -575,10 +586,11 @@ async def fetch_henry_hub_price() -> Dict[str, Any]:
                         "watch_threshold":   _henry_hub_watch_threshold(current_price),
                         "unit":              "$/MMBtu",
                         "report_date":       valid[0][0],
+                        "history":           history,
                         "source":            "eia_v1",
                     }
-                    logger.warning("[EIA HH] OK: price=%.3f daily=%.2f%% weekly=%.2f%%",
-                                   current_price, daily_chg, weekly_chg)
+                    logger.warning("[EIA HH] OK: price=%.3f daily=%.2f%% weekly=%.2f%% history=%d pts",
+                                   current_price, daily_chg, weekly_chg, len(history))
                     _set_henry_hub_cache(result)
                     return result
         except Exception as exc:
