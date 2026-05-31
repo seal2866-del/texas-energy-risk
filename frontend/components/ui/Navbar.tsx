@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Menu, X, Bell, LogOut } from "lucide-react";
+import { Menu, X, Bell, LogOut, Settings } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +81,9 @@ export default function Navbar() {
                 <Link href="/alerts" className="relative p-2 text-gray-400 hover:text-white transition-colors">
                   <Bell className="w-5 h-5" />
                 </Link>
+                <Link href="/account" className="p-2 text-gray-400 hover:text-white transition-colors" title="Account Settings">
+                  <Settings className="w-5 h-5" />
+                </Link>
                 <button
                   onClick={handleSignOut}
                   className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
@@ -128,9 +131,14 @@ export default function Navbar() {
             </Link>
           ))}
           {user ? (
-            <button onClick={handleSignOut} className="block text-sm text-gray-400 hover:text-white">
-              Sign out
-            </button>
+            <>
+              <Link href="/account" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>
+                Account Settings
+              </Link>
+              <button onClick={handleSignOut} className="block text-sm text-gray-400 hover:text-white">
+                Sign out
+              </button>
+            </>
           ) : (
             <Link href="/login" className="block text-sm text-orange-400 font-semibold">
               Sign in / Sign up
