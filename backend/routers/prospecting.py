@@ -428,3 +428,281 @@ async def export_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ---------------------------------------------------------------------------
+# CRM — PIPELINE ACTIONS
+# ---------------------------------------------------------------------------
+
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+FRONTEND_URL   = os.getenv("FRONTEND_URL", "https://texas-energy-risk.vercel.app")
+
+PIPELINE_STATUSES = [
+    "new", "newsletter_added", "newsletter_sent", "opened", "clicked",
+    "demo_requested", "qualified", "opportunity", "customer", "closed_lost",
+]
+
+STATUS_COLORS = {
+    "new":              "#64748b",
+    "newsletter_added": "#3b82f6",
+    "newsletter_sent":  "#8b5cf6",
+    "opened":           "#06b6d4",
+    "clicked":          "#10b981",
+    "demo_requested":   "#f59e0b",
+    "qualified":        "#f97316",
+    "opportunity":      "#ef4444",
+    "customer":         "#22c55e",
+    "closed_lost":      "#374151",
+}
+
+
+@router.post("/prospects/{prospect_id}/add-to-newsletter")
+async def add_to_newsletter(prospect_id: str):
+    """Add prospect to newsletter subscriber list via Resend."""
+    sb = get_supabase()
+    r  = sb.table("prospects").select("*").eq("id", prospect_id).single().execute()
+    if not r.data:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+
+    prospect = r.data
+    email    = prospect.get("contact_email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Prospect has no email address")
+
+    # Add to newsletter_subscribers table
+    try:
+        sb.table("newsletter_subscribers").insert({
+            "email":     email,
+            "company":   prospect.get("company_name"),
+            "title":     prospect.get("contact_title"),
+            "city":      prospect.get("city"),
+            "industry":  prospect.get("industry"),
+            "source":    "prospecting",
+            "segment":   f"{prospect.get('city', '')} {prospect.get('industry', '')}".strip(),
+            "status":    "active",
+        }).execute()
+    except Exception:
+        pass  # May already exist
+
+    # Also add to Resend contacts if API key available
+    resend_ok = False
+    if RESEND_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(
+                    "https://api.resend.com/contacts",
+                    headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "email":      email,
+                        "first_name": (prospect.get("contact_name") or "").split()[0],
+                        "last_name":  " ".join((prospect.get("contact_name") or "").split()[1:]),
+                        "unsubscribed": False,
+                    },
+                )
+            resend_ok = True
+        except Exception as e:
+            log.warning(f"[CRM] Resend contact add failed: {e}")
+
+    # Update prospect status
+    now = datetime.now(timezone.utc).isoformat()
+    sb.table("prospects").update({
+        "status":              "newsletter_added",
+        "newsletter_added_at": now,
+        "updated_at":          now,
+    }).eq("id", prospect_id).execute()
+
+    return {"status": "added", "resend_synced": resend_ok}
+
+
+@router.post("/prospects/{prospect_id}/request-demo")
+async def request_demo(prospect_id: str, notes: str = Body("", embed=True)):
+    """Mark prospect as demo requested."""
+    sb = get_supabase()
+    r  = sb.table("prospects").select("*").eq("id", prospect_id).single().execute()
+    if not r.data:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    sb.table("prospects").update({
+        "status":              "demo_requested",
+        "demo_requested_at":   now,
+        "updated_at":          now,
+    }).eq("id", prospect_id).execute()
+
+    # Log demo request
+    try:
+        sb.table("demo_requests").insert({
+            "prospect_id":   prospect_id,
+            "company_name":  r.data.get("company_name"),
+            "contact_name":  r.data.get("contact_name"),
+            "contact_email": r.data.get("contact_email"),
+            "notes":         notes,
+        }).execute()
+    except Exception as e:
+        log.warning(f"[CRM] Demo request log failed: {e}")
+
+    return {"status": "demo_requested"}
+
+
+# ---------------------------------------------------------------------------
+# CRM — AUDIENCES
+# ---------------------------------------------------------------------------
+
+class AudienceCreate(BaseModel):
+    name:        str
+    description: Optional[str] = None
+    filters:     Optional[dict] = None
+
+
+@router.post("/audiences")
+async def create_audience(body: AudienceCreate):
+    sb = get_supabase()
+    r  = sb.table("prospect_audiences").insert({
+        "name":        body.name,
+        "description": body.description,
+        "filters":     json.dumps(body.filters or {}),
+    }).execute()
+    return r.data[0] if r.data else {}
+
+
+@router.get("/audiences")
+async def list_audiences():
+    sb   = get_supabase()
+    r    = sb.table("prospect_audiences").select("*").order("created_at", desc=True).execute()
+    auds = r.data or []
+    # Enrich with member counts
+    for aud in auds:
+        mc = sb.table("prospect_audience_members").select("id", count="exact").eq("audience_id", aud["id"]).execute()
+        aud["member_count"] = mc.count or 0
+    return auds
+
+
+@router.post("/audiences/{audience_id}/add-prospect/{prospect_id}")
+async def add_to_audience(audience_id: str, prospect_id: str):
+    sb = get_supabase()
+    try:
+        sb.table("prospect_audience_members").insert({
+            "audience_id": audience_id,
+            "prospect_id": prospect_id,
+        }).execute()
+    except Exception:
+        pass  # Already a member
+    return {"status": "added"}
+
+
+@router.post("/audiences/{audience_id}/push-to-resend")
+async def push_audience_to_resend(audience_id: str):
+    """Push all audience members to Resend contacts."""
+    if not RESEND_API_KEY:
+        raise HTTPException(status_code=503, detail="RESEND_API_KEY not configured")
+
+    sb      = get_supabase()
+    members = sb.table("prospect_audience_members").select(
+        "prospect_id"
+    ).eq("audience_id", audience_id).execute().data or []
+
+    synced  = 0
+    failed  = 0
+    for m in members:
+        p = sb.table("prospects").select("*").eq("id", m["prospect_id"]).single().execute()
+        if not p.data or not p.data.get("contact_email"):
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(
+                    "https://api.resend.com/contacts",
+                    headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "email":        p.data["contact_email"],
+                        "first_name":   (p.data.get("contact_name") or "").split()[0],
+                        "last_name":    " ".join((p.data.get("contact_name") or "").split()[1:]),
+                        "unsubscribed": False,
+                    },
+                )
+            synced += 1
+        except Exception:
+            failed += 1
+
+    return {"synced": synced, "failed": failed}
+
+
+@router.get("/audiences/{audience_id}/export")
+async def export_audience_csv(audience_id: str):
+    sb      = get_supabase()
+    members = sb.table("prospect_audience_members").select("prospect_id").eq("audience_id", audience_id).execute().data or []
+    rows    = []
+    for m in members:
+        p = sb.table("prospects").select("*").eq("id", m["prospect_id"]).single().execute()
+        if p.data:
+            rows.append(p.data)
+
+    output = io.StringIO()
+    fields = ["company_name", "contact_name", "contact_title", "contact_email",
+              "contact_linkedin", "city", "state", "industry", "employee_count",
+              "lead_score", "priority", "status"]
+    writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    output.seek(0)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=audience_{audience_id[:8]}.csv"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# CRM — CONVERSION ANALYTICS
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics")
+async def conversion_analytics():
+    """Full funnel conversion metrics."""
+    sb   = get_supabase()
+    rows = sb.table("prospects").select(
+        "status, priority, industry, state, lead_score, created_at"
+    ).execute().data or []
+
+    total      = len(rows)
+    newsletter = sum(1 for r in rows if r["status"] in ("newsletter_added","newsletter_sent","opened","clicked","demo_requested","qualified","opportunity","customer"))
+    opened     = sum(1 for r in rows if r["status"] in ("opened","clicked","demo_requested","qualified","opportunity","customer"))
+    clicked    = sum(1 for r in rows if r["status"] in ("clicked","demo_requested","qualified","opportunity","customer"))
+    demos      = sum(1 for r in rows if r["status"] in ("demo_requested","qualified","opportunity","customer"))
+    qualified  = sum(1 for r in rows if r["status"] in ("qualified","opportunity","customer"))
+    customers  = sum(1 for r in rows if r["status"] == "customer")
+
+    by_industry: dict[str, int] = {}
+    by_region:   dict[str, int] = {}
+    for r in rows:
+        ind = r.get("industry") or "Unknown"
+        reg = r.get("state")    or "Unknown"
+        by_industry[ind] = by_industry.get(ind, 0) + 1
+        by_region[reg]   = by_region.get(reg, 0)   + 1
+
+    top_prospects = sorted(rows, key=lambda x: x.get("lead_score", 0) or 0, reverse=True)[:5]
+
+    demo_rows = sb.table("demo_requests").select("*").order("requested_at", desc=True).limit(10).execute().data or []
+
+    return {
+        "funnel": {
+            "total":            total,
+            "newsletter_added": newsletter,
+            "opened":           opened,
+            "clicked":          clicked,
+            "demo_requested":   demos,
+            "qualified":        qualified,
+            "customers":        customers,
+        },
+        "rates": {
+            "newsletter_rate": round(newsletter / total * 100, 1) if total else 0,
+            "open_rate":       round(opened    / newsletter * 100, 1) if newsletter else 0,
+            "click_rate":      round(clicked   / newsletter * 100, 1) if newsletter else 0,
+            "demo_rate":       round(demos     / total * 100, 1) if total else 0,
+            "conversion_rate": round(customers / total * 100, 1) if total else 0,
+        },
+        "by_industry": dict(sorted(by_industry.items(), key=lambda x: -x[1])[:8]),
+        "by_region":   dict(sorted(by_region.items(),   key=lambda x: -x[1])[:8]),
+        "top_prospects": top_prospects,
+        "recent_demos":  demo_rows,
+    }
