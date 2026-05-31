@@ -557,79 +557,81 @@ async def fetch_henry_hub_price() -> Dict[str, Any]:
         return result
 
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-        # Strategy 1: EIA v1 API — most reliable for Henry Hub daily spot price
+
+        def _build_result(valid_pts: list, source: str) -> dict:
+            current_price  = valid_pts[0][1]
+            prev_day_price = valid_pts[1][1]
+            weekly_price   = valid_pts[min(5, len(valid_pts)-1)][1]
+            daily_chg  = ((current_price - prev_day_price) / prev_day_price) * 100 if prev_day_price else 0
+            weekly_chg = ((current_price - weekly_price)   / weekly_price)   * 100 if weekly_price else 0
+            history    = [{"date": d, "price": round(p, 3)} for d, p in reversed(valid_pts[:10])]
+            return {
+                "price":             round(current_price, 3),
+                "daily_change_pct":  round(daily_chg, 2),
+                "weekly_change_pct": round(weekly_chg, 2),
+                "market_state":      _henry_hub_market_state(current_price),
+                "watch_threshold":   _henry_hub_watch_threshold(current_price),
+                "unit":              "$/MMBtu",
+                "report_date":       valid_pts[0][0],
+                "history":           history,
+                "source":            source,
+            }
+
+        # Strategy 1: EIA v2 futures endpoint with RNGWHHD series filter — CONFIRMED WORKING
+        try:
+            params = (
+                f"api_key={api_key}&frequency=daily&data[]=value"
+                f"&facets[series][]=RNGWHHD"
+                f"&sort[0][column]=period&sort[0][direction]=desc&length=14"
+            )
+            r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/fut/data/?{params}")
+            rows = r.json().get("response", {}).get("data", [])
+            logger.warning("[EIA HH] v2_futures status=%d rows=%d", r.status_code, len(rows))
+            valid = [(row["period"], float(row["value"])) for row in rows
+                     if row.get("value") not in (None, "", "NA") and row.get("series") == "RNGWHHD"]
+            if len(valid) >= 2:
+                result = _build_result(valid, "eia_v2_futures")
+                logger.warning("[EIA HH] OK via v2_futures: price=%.3f history=%d pts",
+                               result["price"], len(result["history"]))
+                _set_henry_hub_cache(result)
+                return result
+        except Exception as exc:
+            logger.warning("[EIA HH] v2_futures failed: %s", exc)
+
+        # Strategy 2: EIA v2 spot endpoint
+        try:
+            params = (
+                f"api_key={api_key}&frequency=daily&data[]=value"
+                f"&facets[series][]=RNGWHHD&sort[0][column]=period&sort[0][direction]=desc&length=14"
+            )
+            r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
+            rows = r.json().get("response", {}).get("data", [])
+            logger.warning("[EIA HH] v2_spot status=%d rows=%d", r.status_code, len(rows))
+            valid = [(row["period"], float(row["value"])) for row in rows
+                     if row.get("value") not in (None, "", "NA")]
+            if len(valid) >= 2:
+                result = _build_result(valid, "eia_v2_spot")
+                _set_henry_hub_cache(result)
+                return result
+        except Exception as exc:
+            logger.warning("[EIA HH] v2_spot failed: %s", exc)
+
+        # Strategy 3: EIA v1 API (legacy)
         try:
             r = await client.get(EIA_V1_URL, params={
-                "api_key":   api_key,
-                "series_id": EIA_HENRY_HUB_V1_SERIES,
-                "num":       "14",   # last 14 days for chart history + weekly change
+                "api_key": api_key, "series_id": EIA_HENRY_HUB_V1_SERIES, "num": "14",
             })
             body   = r.json()
             series = body.get("series", [{}])[0]
             data   = series.get("data", [])
             logger.warning("[EIA HH] v1 status=%d points=%d", r.status_code, len(data))
-            if len(data) >= 2:
-                # data comes as [[date, value], ...] newest first
-                valid = [(d[0], float(d[1])) for d in data if d[1] not in (None, "", "NA")]
-                if len(valid) >= 2:
-                    current_price  = valid[0][1]
-                    prev_day_price = valid[1][1]
-                    weekly_price   = valid[min(6, len(valid)-1)][1]  # ~5 trading days ago
-                    # Build history oldest-first for charting
-                    history = [{"date": d, "price": round(p, 3)} for d, p in reversed(valid[:10])]
-
-                    daily_chg  = ((current_price - prev_day_price) / prev_day_price) * 100 if prev_day_price else 0
-                    weekly_chg = ((current_price - weekly_price)   / weekly_price)   * 100 if weekly_price else 0
-
-                    result = {
-                        "price":             round(current_price, 3),
-                        "daily_change_pct":  round(daily_chg, 2),
-                        "weekly_change_pct": round(weekly_chg, 2),
-                        "market_state":      _henry_hub_market_state(current_price),
-                        "watch_threshold":   _henry_hub_watch_threshold(current_price),
-                        "unit":              "$/MMBtu",
-                        "report_date":       valid[0][0],
-                        "history":           history,
-                        "source":            "eia_v1",
-                    }
-                    logger.warning("[EIA HH] OK: price=%.3f daily=%.2f%% weekly=%.2f%% history=%d pts",
-                                   current_price, daily_chg, weekly_chg, len(history))
-                    _set_henry_hub_cache(result)
-                    return result
-        except Exception as exc:
-            logger.warning("[EIA HH] v1 failed: %s", exc)
-
-        # Strategy 2: EIA v2 natural gas futures/spot API
-        try:
-            params = (
-                f"api_key={api_key}&frequency=daily&data[]=value"
-                f"&facets[series][]=RNGWHHD&sort[0][column]=period&sort[0][direction]=desc&length=10"
-            )
-            r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
-            rows = r.json().get("response", {}).get("data", [])
-            logger.warning("[EIA HH] v2 spot status=%d rows=%d", r.status_code, len(rows))
-            valid = [(row["period"], float(row["value"])) for row in rows
-                     if row.get("value") not in (None, "", "NA")]
+            valid = [(d[0], float(d[1])) for d in data if d[1] not in (None, "", "NA")]
             if len(valid) >= 2:
-                current_price  = valid[0][1]
-                prev_day_price = valid[1][1]
-                weekly_price   = valid[min(5, len(valid)-1)][1]
-                daily_chg  = ((current_price - prev_day_price) / prev_day_price) * 100 if prev_day_price else 0
-                weekly_chg = ((current_price - weekly_price)   / weekly_price)   * 100 if weekly_price else 0
-                result = {
-                    "price":             round(current_price, 3),
-                    "daily_change_pct":  round(daily_chg, 2),
-                    "weekly_change_pct": round(weekly_chg, 2),
-                    "market_state":      _henry_hub_market_state(current_price),
-                    "watch_threshold":   _henry_hub_watch_threshold(current_price),
-                    "unit":              "$/MMBtu",
-                    "report_date":       valid[0][0],
-                    "source":            "eia_v2_spot",
-                }
+                result = _build_result(valid, "eia_v1")
                 _set_henry_hub_cache(result)
                 return result
         except Exception as exc:
-            logger.warning("[EIA HH] v2 spot failed: %s", exc)
+            logger.warning("[EIA HH] v1 failed: %s", exc)
 
     logger.warning("[EIA HH] All strategies failed — returning mock")
     result = _mock_henry_hub()
