@@ -2547,11 +2547,152 @@ def _compute_operational_exposure(
     }
 
 
+# ── Henry Hub signal detector ──────────────────────────────────────────────────
+
+HENRY_HUB_NORMAL   = 3.00
+HENRY_HUB_WATCH    = 4.00
+HENRY_HUB_ELEVATED = 6.00
+
+def check_henry_hub(henry_hub_data: Optional[Dict]) -> Dict[str, Any]:
+    """
+    Evaluate Henry Hub natural gas spot price as a standalone risk signal.
+    Thresholds: < $3 Normal | $3-$4 Watch | $4-$6 Elevated | > $6 Critical
+    """
+    if not henry_hub_data or henry_hub_data.get("price") is None:
+        return _signal(
+            "henry_hub", "HENRY_HUB", False, "low", None,
+            "Awaiting Henry Hub Data", None, HENRY_HUB_WATCH,
+            "Short-term (0-6h): monitoring · Near-term (6-24h): monitoring · Outlook (24-48h): monitoring",
+            "Henry Hub price data unavailable.",
+            "Henry Hub signal will activate once EIA price data loads.",
+        )
+
+    price        = float(henry_hub_data.get("price", 0))
+    daily_chg    = henry_hub_data.get("daily_change_pct", 0) or 0
+    weekly_chg   = henry_hub_data.get("weekly_change_pct", 0) or 0
+    market_state = henry_hub_data.get("market_state", "normal")
+    report_date  = henry_hub_data.get("report_date", "")
+
+    daily_str  = f"{'+' if daily_chg >= 0 else ''}{daily_chg:.1f}%"
+    weekly_str = f"{'+' if weekly_chg >= 0 else ''}{weekly_chg:.1f}%"
+
+    if price > HENRY_HUB_ELEVATED:
+        return _signal(
+            "henry_hub", "HENRY_HUB", True, "high", None,
+            "Henry Hub Critical — Gas Cost Elevated",
+            price, HENRY_HUB_ELEVATED,
+            "Short-term (0-6h): critical gas price conditions · Near-term (6-24h): generation cost pressure elevated · Outlook (24-48h): fuel cost sensitivity high",
+            (
+                f"Henry Hub at ${price:.3f}/MMBtu ({daily_str} daily, {weekly_str} weekly). "
+                f"Prices above ${HENRY_HUB_ELEVATED:.2f}/MMBtu reflect critical gas cost conditions, "
+                "significantly increasing fuel cost for gas-fired generation across Texas."
+            ),
+            "Critical Henry Hub pricing may materially elevate gas-fired generation costs, "
+            "increasing ERCOT pricing sensitivity and operational fuel cost exposure.",
+        )
+
+    if price >= HENRY_HUB_WATCH:
+        return _signal(
+            "henry_hub", "HENRY_HUB", True, "medium", None,
+            "Henry Hub Elevated — Gas Cost Watch",
+            price, HENRY_HUB_WATCH,
+            "Short-term (0-6h): elevated gas cost conditions · Near-term (6-24h): monitor for further movement · Outlook (24-48h): fuel sensitivity above baseline",
+            (
+                f"Henry Hub at ${price:.3f}/MMBtu ({daily_str} daily, {weekly_str} weekly). "
+                f"Prices in the ${HENRY_HUB_WATCH:.2f}–${HENRY_HUB_ELEVATED:.2f}/MMBtu range reflect elevated "
+                "fuel cost conditions for gas-fired generation."
+            ),
+            "Elevated Henry Hub pricing may increase operational fuel cost sensitivity, "
+            "particularly during high-demand intervals when gas-fired generation is at peak dispatch.",
+        )
+
+    if price >= HENRY_HUB_NORMAL:
+        return _signal(
+            "henry_hub", "HENRY_HUB", False, "low", None,
+            "Henry Hub Watch Level",
+            price, HENRY_HUB_NORMAL,
+            "Short-term (0-6h): watch level · Near-term (6-24h): monitor for movement · Outlook (24-48h): stable if unchanged",
+            (
+                f"Henry Hub at ${price:.3f}/MMBtu ({daily_str} daily, {weekly_str} weekly). "
+                f"Prices in the ${HENRY_HUB_NORMAL:.2f}–${HENRY_HUB_WATCH:.2f}/MMBtu range are at watch level — "
+                "above normal baseline but not yet in elevated territory."
+            ),
+            "Henry Hub at watch level. Monitor for further price movement that could elevate gas-fired generation costs.",
+        )
+
+    return _signal(
+        "henry_hub", "HENRY_HUB", False, "low", None,
+        "Henry Hub Normal", price, HENRY_HUB_NORMAL,
+        "Short-term (0-6h): normal · Near-term (6-24h): stable · Outlook (24-48h): no fuel cost pressure",
+        (
+            f"Henry Hub at ${price:.3f}/MMBtu ({daily_str} daily, {weekly_str} weekly). "
+            f"Prices below ${HENRY_HUB_NORMAL:.2f}/MMBtu reflect normal gas cost conditions "
+            "for gas-fired generation."
+        ),
+        "Henry Hub pricing within normal range. No fuel-side cost pressure on ERCOT generation detected.",
+    )
+
+
+def _compute_henry_hub_exposure(
+    henry_hub_data:  Optional[Dict],
+    henry_hub_sig:   Dict,
+    demand_pressure: Dict,
+    supply_pressure: Dict,
+) -> Dict[str, Any]:
+    """
+    Henry Hub contribution to cost/operational exposure.
+    Combines price level, trend, and demand context.
+    """
+    if not henry_hub_data:
+        return {"level": "low", "price": None, "contribution": "unavailable",
+                "description": "Henry Hub data unavailable."}
+
+    price      = float(henry_hub_data.get("price", 0) or 0)
+    daily_chg  = float(henry_hub_data.get("daily_change_pct", 0) or 0)
+    weekly_chg = float(henry_hub_data.get("weekly_change_pct", 0) or 0)
+    market_state = henry_hub_data.get("market_state", "normal")
+    triggered  = henry_hub_sig.get("triggered", False)
+    demand_lvl = demand_pressure.get("level", "low")
+    supply_lvl = supply_pressure.get("level", "low")
+
+    # High: critical price OR elevated + high demand OR rapidly rising
+    if market_state == "critical" or (market_state == "elevated" and demand_lvl == "high") or (triggered and weekly_chg > 15):
+        level = "high"
+        desc  = (
+            f"Henry Hub at ${price:.3f}/MMBtu with {'+' if weekly_chg >= 0 else ''}{weekly_chg:.1f}% weekly change. "
+            "Gas cost conditions are materially elevated, increasing fuel cost exposure for operations "
+            "with natural gas or electricity cost exposure."
+        )
+    elif market_state in ("elevated", "watch") or (triggered and demand_lvl in ("medium", "high")):
+        level = "medium"
+        desc  = (
+            f"Henry Hub at ${price:.3f}/MMBtu ({'+' if daily_chg >= 0 else ''}{daily_chg:.1f}% daily). "
+            "Gas cost conditions are above normal, contributing to moderate operational cost sensitivity."
+        )
+    else:
+        level = "low"
+        desc  = (
+            f"Henry Hub at ${price:.3f}/MMBtu — within normal range. "
+            "Gas fuel costs are not materially contributing to operational exposure at current levels."
+        )
+
+    return {
+        "level":        level,
+        "price":        price,
+        "daily_chg":    daily_chg,
+        "weekly_chg":   weekly_chg,
+        "market_state": market_state,
+        "contribution": level,
+        "description":  desc,
+    }
+
+
 def run_all_signals(
-    prices:      List[Dict],
-    forecasts:   List[Dict],
-    gas_records: List[Dict],
-    location:    str = "Houston",
+    prices:          List[Dict],
+    forecasts:       List[Dict],
+    gas_records:     List[Dict],
+    location:        str = "Houston",
+    henry_hub_data:  Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """
     Run all signal checks and return a unified response dict.
@@ -2598,12 +2739,13 @@ def run_all_signals(
             except Exception as _ve:
                 logger.warning("[VERIFY] Verification error: %s", _ve)
 
-        # ── Run the three individual signal checks ────────────────────────────
-        price_sig   = check_price_volatility(prices)
-        weather_sig = check_weather_demand(forecasts)
-        gas_sig     = check_gas_supply(gas_records)
+        # ── Run the four individual signal checks ─────────────────────────────
+        price_sig      = check_price_volatility(prices)
+        weather_sig    = check_weather_demand(forecasts)
+        gas_sig        = check_gas_supply(gas_records)
+        henry_hub_sig  = check_henry_hub(henry_hub_data)
 
-        all_sigs = [price_sig, weather_sig, gas_sig]
+        all_sigs = [price_sig, weather_sig, gas_sig, henry_hub_sig]
 
         # ── Core risk score ───────────────────────────────────────────────────
         risk_score, active_count = compute_risk_score(all_sigs)
@@ -2618,7 +2760,18 @@ def run_all_signals(
         supply_pressure    = _compute_supply_pressure(gas_sig, gas_records)
         market_reaction    = _compute_market_reaction(price_sig)
         gas_to_power       = _compute_gas_to_power_impact(gas_sig, weather_sig, gas_records)
+        henry_hub_exposure = _compute_henry_hub_exposure(henry_hub_data, henry_hub_sig, demand_pressure, supply_pressure)
         events             = _detect_events(prices, forecasts, gas_records, data_sources)
+
+        # ── Boost supply_pressure if Henry Hub is elevated ────────────────────
+        if henry_hub_sig.get("triggered") and supply_pressure.get("level") == "low":
+            hh_price = float((henry_hub_data or {}).get("price", 0) or 0)
+            supply_pressure = dict(supply_pressure)
+            supply_pressure["level"] = "medium"
+            supply_pressure["explanation"] = (
+                supply_pressure.get("explanation", "") +
+                f" Henry Hub at ${hh_price:.3f}/MMBtu is contributing to elevated gas cost conditions."
+            )
 
         # ── Raw metric values for narrative engine ────────────────────────────
         price_val   = float((price_sig   or {}).get("value") or 0)
@@ -2654,6 +2807,7 @@ def run_all_signals(
             "price_volatility": price_sig,
             "weather_demand":   weather_sig,
             "gas_supply":       gas_sig,
+            "henry_hub":        henry_hub_sig,
         }
         signal_drivers = []
         for sig_type, sig in sig_map.items():
@@ -2777,10 +2931,14 @@ def run_all_signals(
             "risk_trend":                     risk_trend,
             "gas_power_correlation":          gas_power_correlation,
             "interval_intelligence":          interval_intelligence,
+            "henry_hub":              henry_hub_data,
+            "henry_hub_signal":       henry_hub_sig,
+            "henry_hub_exposure":     henry_hub_exposure,
             "signals": {
                 "price_volatility": price_sig,
                 "weather_demand":   weather_sig,
                 "gas_supply":       gas_sig,
+                "henry_hub":        henry_hub_sig,
             },
             "summary":    summary,
             "disclaimer": (

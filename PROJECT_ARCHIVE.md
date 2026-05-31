@@ -120,8 +120,8 @@
 
 1. **Stripe test mode (#6)** → verify Pro/Business checkout end-to-end
 2. **Alert email test (#7)** → set low threshold, confirm email fires, update to alerts@texasgridintel.com in Resend
-3. **Apollo Basic plan (#40)** → upgrade to unlock prospecting search API
-4. **Search Console** → check back in 24–48hrs to confirm pages discovered
+3. **Apollo Basic plan (#44)** → upgrade to unlock prospecting search API
+4. **Search Console** → check pages discovered (submitted May 31)
 
 ---
 

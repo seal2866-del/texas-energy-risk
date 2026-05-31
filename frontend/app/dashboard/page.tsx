@@ -58,6 +58,7 @@ import PredictiveOutlook from "@/components/widgets/PredictiveOutlook";
 import OperationalExposure from "@/components/widgets/OperationalExposure";
 import RiskModelDebug from "@/components/widgets/RiskModelDebug";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
+import HenryHubWidget from "@/components/widgets/HenryHubWidget";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
 import { supabase } from "@/lib/supabase";
@@ -109,10 +110,14 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
   cost_impact:       { level: "low", label: "Loading", description: "" },
   market_condition:  { label: "Loading...", description: "" },
   alert_severity:    { level: "informational", label: "Loading", description: "" },
+  henry_hub:          null,
+  henry_hub_signal:   null,
+  henry_hub_exposure: null,
   signals: {
     price_volatility: EMPTY_SIGNAL,
     weather_demand:   EMPTY_SIGNAL,
     gas_supply:       EMPTY_SIGNAL,
+    henry_hub:        EMPTY_SIGNAL,
   },
   signal_alignment: { label: "None", score: 0, description: "" },
   what_changed:          [],
@@ -631,6 +636,9 @@ export default function DashboardPage() {
                 confidence={signals.confidence}
               />
 
+              {/* 2b. Henry Hub compact — top-level signal */}
+              <HenryHubWidget data={(signals as any).henry_hub} compact />
+
               {/* 3. Risk Score + ERCOT Price */}
               <RiskScore
                 score={signals.risk_score}
@@ -745,6 +753,9 @@ export default function DashboardPage() {
                   />
                   <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
+                  {/* Henry Hub — top-level gas price signal */}
+                  <HenryHubWidget data={(signals as any).henry_hub} />
+
                   {/* 2. RISK ATTRIBUTION — why is the score X? */}
                   <SignalContributors
                     demandPressure={signals.demand_pressure}
@@ -842,6 +853,7 @@ export default function DashboardPage() {
                     gasToPower={signals.gas_to_power_impact}
                     panelGlow={gasGlow}
                   />
+                  <HenryHubWidget data={(signals as any).henry_hub} />
                   {signalsReady && <RiskHistoryChart location={location} />}
 
                   <DataSources sources={signals.data_sources} computedAt={signals.computed_at} />

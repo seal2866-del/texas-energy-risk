@@ -10,7 +10,7 @@ import os
 import asyncio
 import logging
 from fastapi import APIRouter, Query, Header
-from services.external_apis import fetch_ercot_prices, fetch_weather_forecast, fetch_gas_data
+from services.external_apis import fetch_ercot_prices, fetch_weather_forecast, fetch_gas_data, fetch_henry_hub_price
 from services.signal_engine import run_all_signals
 from services.supabase_client import get_supabase
 
@@ -69,15 +69,17 @@ async def get_signals(
 ):
     logger.warning("[SIGNALS] Request received for location=%s", location)
     try:
-        prices, forecasts, gas_data = await asyncio.gather(
+        prices, forecasts, gas_data, henry_hub_data = await asyncio.gather(
             fetch_ercot_prices(hours=4),
             fetch_weather_forecast(location=location, days=3),
             fetch_gas_data(weeks=4),
+            fetch_henry_hub_price(),
         )
-        logger.warning("[SIGNALS] Data fetched: prices=%d forecasts=%d gas=%d",
-                       len(prices), len(forecasts), len(gas_data))
+        logger.warning("[SIGNALS] Data fetched: prices=%d forecasts=%d gas=%d henry_hub=%.3f",
+                       len(prices), len(forecasts), len(gas_data),
+                       henry_hub_data.get("price", 0) if henry_hub_data else 0)
 
-        result = run_all_signals(prices, forecasts, gas_data, location=location)
+        result = run_all_signals(prices, forecasts, gas_data, location=location, henry_hub_data=henry_hub_data)
 
         logger.warning("[SIGNALS] Signal engine done: risk=%s data_valid=%s",
                        result.get("risk_score"), result.get("data_valid"))

@@ -463,6 +463,165 @@ def _transform_noaa(data: dict, location: str, days: int) -> List[Dict[str, Any]
     return results
 
 
+# ── Henry Hub Natural Gas Price ───────────────────────────────────────────────
+# EIA v2 API: Henry Hub natural gas spot price (daily).
+# Series: NG.RNGWHHD.D — Henry Hub Natural Gas Spot Price (Dollars per Million Btu)
+
+EIA_HENRY_HUB_URL = "https://api.eia.gov/v2/natural-gas/pri/fut/data/"
+EIA_HENRY_HUB_V1_SERIES = "NG.RNGWHHD.D"   # Henry Hub Natural Gas Spot Price, Daily
+
+_HENRY_HUB_CACHE: Dict[str, Any] = {}
+_HENRY_HUB_TTL = 4 * 3600  # 4 hours — EIA daily data
+
+# Henry Hub thresholds
+HENRY_HUB_NORMAL    = 3.00   # < $3.00 = Normal
+HENRY_HUB_WATCH     = 4.00   # $3.00–$4.00 = Watch
+HENRY_HUB_ELEVATED  = 6.00   # $4.00–$6.00 = Elevated
+                              # > $6.00 = Critical
+
+
+def _get_henry_hub_cache() -> Optional[Dict]:
+    entry = _HENRY_HUB_CACHE.get("latest")
+    if entry and datetime.now(timezone.utc).timestamp() < entry["expires"]:
+        return entry["data"]
+    return None
+
+
+def _set_henry_hub_cache(data: Dict):
+    _HENRY_HUB_CACHE["latest"] = {
+        "data":    data,
+        "expires": datetime.now(timezone.utc).timestamp() + _HENRY_HUB_TTL,
+    }
+
+
+def _henry_hub_market_state(price: float) -> str:
+    if price < HENRY_HUB_NORMAL:
+        return "normal"
+    elif price < HENRY_HUB_WATCH:
+        return "watch"
+    elif price < HENRY_HUB_ELEVATED:
+        return "elevated"
+    return "critical"
+
+
+def _henry_hub_watch_threshold(price: float) -> float:
+    """Return the next threshold price to watch."""
+    if price < HENRY_HUB_NORMAL:
+        return HENRY_HUB_NORMAL
+    elif price < HENRY_HUB_WATCH:
+        return HENRY_HUB_WATCH
+    elif price < HENRY_HUB_ELEVATED:
+        return HENRY_HUB_ELEVATED
+    return HENRY_HUB_ELEVATED
+
+
+def _mock_henry_hub() -> Dict[str, Any]:
+    return {
+        "price":             2.85,
+        "daily_change_pct":  -0.35,
+        "weekly_change_pct": 1.05,
+        "market_state":      "normal",
+        "watch_threshold":   HENRY_HUB_NORMAL,
+        "unit":              "$/MMBtu",
+        "report_date":       datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "source":            "mock",
+    }
+
+
+async def fetch_henry_hub_price() -> Dict[str, Any]:
+    """
+    Fetch Henry Hub natural gas spot price from EIA.
+    Returns current price, daily/weekly % change, market state, and threshold.
+    Cached for 4 hours. Falls back to mock if EIA key not set or all attempts fail.
+    """
+    cached = _get_henry_hub_cache()
+    if cached:
+        return cached
+
+    api_key = os.getenv("EIA_API_KEY", "")
+    if not api_key:
+        result = _mock_henry_hub()
+        _set_henry_hub_cache(result)
+        return result
+
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        # Strategy 1: EIA v1 API — most reliable for Henry Hub daily spot price
+        try:
+            r = await client.get(EIA_V1_URL, params={
+                "api_key":   api_key,
+                "series_id": EIA_HENRY_HUB_V1_SERIES,
+                "num":       "10",   # last 10 days to compute weekly change
+            })
+            body   = r.json()
+            series = body.get("series", [{}])[0]
+            data   = series.get("data", [])
+            logger.warning("[EIA HH] v1 status=%d points=%d", r.status_code, len(data))
+            if len(data) >= 2:
+                # data comes as [[date, value], ...] newest first
+                valid = [(d[0], float(d[1])) for d in data if d[1] not in (None, "", "NA")]
+                if len(valid) >= 2:
+                    current_price  = valid[0][1]
+                    prev_day_price = valid[1][1]
+                    weekly_price   = valid[min(6, len(valid)-1)][1]  # ~5 trading days ago
+
+                    daily_chg  = ((current_price - prev_day_price) / prev_day_price) * 100 if prev_day_price else 0
+                    weekly_chg = ((current_price - weekly_price)   / weekly_price)   * 100 if weekly_price else 0
+
+                    result = {
+                        "price":             round(current_price, 3),
+                        "daily_change_pct":  round(daily_chg, 2),
+                        "weekly_change_pct": round(weekly_chg, 2),
+                        "market_state":      _henry_hub_market_state(current_price),
+                        "watch_threshold":   _henry_hub_watch_threshold(current_price),
+                        "unit":              "$/MMBtu",
+                        "report_date":       valid[0][0],
+                        "source":            "eia_v1",
+                    }
+                    logger.warning("[EIA HH] OK: price=%.3f daily=%.2f%% weekly=%.2f%%",
+                                   current_price, daily_chg, weekly_chg)
+                    _set_henry_hub_cache(result)
+                    return result
+        except Exception as exc:
+            logger.warning("[EIA HH] v1 failed: %s", exc)
+
+        # Strategy 2: EIA v2 natural gas futures/spot API
+        try:
+            params = (
+                f"api_key={api_key}&frequency=daily&data[]=value"
+                f"&facets[series][]=RNGWHHD&sort[0][column]=period&sort[0][direction]=desc&length=10"
+            )
+            r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
+            rows = r.json().get("response", {}).get("data", [])
+            logger.warning("[EIA HH] v2 spot status=%d rows=%d", r.status_code, len(rows))
+            valid = [(row["period"], float(row["value"])) for row in rows
+                     if row.get("value") not in (None, "", "NA")]
+            if len(valid) >= 2:
+                current_price  = valid[0][1]
+                prev_day_price = valid[1][1]
+                weekly_price   = valid[min(5, len(valid)-1)][1]
+                daily_chg  = ((current_price - prev_day_price) / prev_day_price) * 100 if prev_day_price else 0
+                weekly_chg = ((current_price - weekly_price)   / weekly_price)   * 100 if weekly_price else 0
+                result = {
+                    "price":             round(current_price, 3),
+                    "daily_change_pct":  round(daily_chg, 2),
+                    "weekly_change_pct": round(weekly_chg, 2),
+                    "market_state":      _henry_hub_market_state(current_price),
+                    "watch_threshold":   _henry_hub_watch_threshold(current_price),
+                    "unit":              "$/MMBtu",
+                    "report_date":       valid[0][0],
+                    "source":            "eia_v2_spot",
+                }
+                _set_henry_hub_cache(result)
+                return result
+        except Exception as exc:
+            logger.warning("[EIA HH] v2 spot failed: %s", exc)
+
+    logger.warning("[EIA HH] All strategies failed — returning mock")
+    result = _mock_henry_hub()
+    _set_henry_hub_cache(result)
+    return result
+
+
 # ── EIA Natural Gas Storage ────────────────────────────────────────────────────
 # EIA v2 API: weekly Lower-48 underground storage (working gas).
 # Strategy:
