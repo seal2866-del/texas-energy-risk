@@ -54,37 +54,49 @@ async def _search_apollo(req: SearchRequest) -> list[dict]:
     if not APOLLO_API_KEY:
         raise HTTPException(status_code=503, detail="APOLLO_API_KEY not configured")
 
-    payload = {
-        "api_key":              APOLLO_API_KEY,
-        "page":                 req.page,
-        "per_page":             req.per_page,
-        "person_locations":     req.locations,
-        "person_titles":        req.titles or [
-            "Operations Manager", "Plant Manager", "Energy Manager",
-            "Procurement Manager", "Facilities Manager", "VP Operations",
-            "Director Operations", "COO", "Energy Director",
-        ],
-        "organization_industry_tag_ids": [],
+    default_titles = req.titles or [
+        "Operations Manager", "Plant Manager", "Energy Manager",
+        "Procurement Manager", "Facilities Manager", "VP Operations",
+        "Director of Operations", "COO", "Energy Director",
+    ]
+
+    payload: dict = {
+        "page":     req.page,
+        "per_page": req.per_page,
     }
 
-    if req.employee_min or req.employee_max:
-        payload["organization_num_employees_ranges"] = [
-            f"{req.employee_min or 1},{req.employee_max or 10000}"
-        ]
+    # Location — Apollo uses city/state strings in person_locations
+    if req.locations:
+        payload["person_locations"] = req.locations
 
+    # Titles
+    if default_titles:
+        payload["person_titles"] = default_titles
+
+    # Industries
     if req.industries:
         payload["q_organization_industries"] = req.industries
+
+    # Employee count range
+    if req.employee_min or req.employee_max:
+        lo = req.employee_min or 1
+        hi = req.employee_max or 100000
+        payload["organization_num_employees_ranges"] = [f"{lo},{hi}"]
 
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(
             f"{APOLLO_BASE}/mixed_people/search",
             json=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type":  "application/json",
+                "Cache-Control": "no-cache",
+                "X-Api-Key":     APOLLO_API_KEY,
+            },
         )
 
-    if r.status_code != 200:
-        log.error(f"[APOLLO] Search failed: {r.status_code} {r.text[:200]}")
-        raise HTTPException(status_code=502, detail=f"Apollo API error: {r.status_code}")
+    if r.status_code not in (200, 201):
+        log.error(f"[APOLLO] Search failed: {r.status_code} {r.text[:500]}")
+        raise HTTPException(status_code=502, detail=f"Apollo API error: {r.status_code} — {r.text[:200]}")
 
     data = r.json()
     return data.get("people", [])
