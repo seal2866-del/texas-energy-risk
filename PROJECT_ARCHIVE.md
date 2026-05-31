@@ -1,6 +1,6 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** May 31, 2026
-**Current stable tag:** v4.2-stable
+**Last updated:** May 31, 2026 (session 2)
+**Current stable tag:** v4.3-stable
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -78,6 +78,12 @@
 - [x] #37 Rebrand footer: TX Energy Risk → Texas Grid Intel
         → © Texas Grid Intel. All rights reserved.
         → support@txenergyrisk.com → support@texasgridintel.com
+- [x] #38 Google Search Console verified (HTML tag method)
+        → Verification token added to layout.tsx
+        → Property: https://texasgridintel.com (URL prefix)
+- [x] #39 Sitemap submitted to Google Search Console
+        → https://texasgridintel.com/sitemap.xml submitted successfully
+        → Google will crawl within 24–48 hours
 
 ---
 
@@ -92,12 +98,7 @@
         → ALERT_FROM_EMAIL still using temporary address — update once txenergyrisk.com/texasgridintel.com email is configured in Resend
         → Switch to alerts@texasgridintel.com
 
-- [ ] #38 Google Search Console verification
-        → Property: texasgridintel.com
-        → DNS TXT method attempted — awaiting propagation (retry in 1-2 hrs)
-        → Alternative: use HTML tag method, add token to layout.tsx verification field
-
-- [ ] #39 Apollo Basic plan upgrade ($49/mo)
+- [ ] #40 Apollo Basic plan upgrade ($49/mo)
         → Required to unlock prospecting search API
         → APOLLO_API_KEY is set in Railway, just needs paid plan
 
@@ -105,10 +106,10 @@
 
 ## NEXT SESSION PRIORITIES
 
-1. **Google Search Console** → retry DNS verification or switch to HTML tag method
-2. **Stripe test mode (#6)** → verify Pro/Business checkout end-to-end
-3. **Alert email test (#7)** → set low threshold, confirm email fires to texasgridintel.com address
-4. **Apollo Basic plan (#39)** → upgrade to unlock prospecting search
+1. **Stripe test mode (#6)** → verify Pro/Business checkout end-to-end
+2. **Alert email test (#7)** → set low threshold, confirm email fires, update to alerts@texasgridintel.com in Resend
+3. **Apollo Basic plan (#40)** → upgrade to unlock prospecting search API
+4. **Search Console** → check back in 24–48hrs to confirm pages discovered
 
 ---
 
@@ -181,6 +182,7 @@
 - v4.0-stable — Supabase grants, CRM complete
 - v4.1-stable — Trading industries + job titles + lead scoring
 - v4.2-stable — Domain migration to texasgridintel.com + full SEO + footer rebrand
+- v4.3-stable — Google Search Console verified + sitemap submitted
 
 ---
 
