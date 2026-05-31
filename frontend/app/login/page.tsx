@@ -59,7 +59,7 @@ function LoginForm() {
         <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
           <Zap className="w-5 h-5 text-orange-400" />
         </div>
-        <span className="font-bold text-white text-lg">TX Energy Risk</span>
+        <span className="font-bold text-white text-lg">Texas Grid Intel</span>
       </Link>
 
       <div className="card-glass border border-white/8 w-full max-w-md p-8">
