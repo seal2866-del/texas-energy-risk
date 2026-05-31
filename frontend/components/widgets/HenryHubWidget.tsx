@@ -1,19 +1,8 @@
 "use client";
 import { TrendingUp, TrendingDown, Minus, Flame } from "lucide-react";
 
-interface PricePoint { date: string; price: number; }
-
-interface HenryHubData {
-  price:             number;
-  daily_change_pct:  number;
-  weekly_change_pct: number;
-  market_state:      "normal" | "watch" | "elevated" | "critical";
-  watch_threshold:   number;
-  unit:              string;
-  report_date:       string;
-  history?:          PricePoint[];
-  source:            string;
-}
+import { type HenryHubData } from "@/lib/api";
+type PricePoint = { date: string; price: number };
 
 interface Props {
   data?: HenryHubData | null;
@@ -173,7 +162,7 @@ export default function HenryHubWidget({ data, compact = false }: Props) {
         <div className="flex items-center gap-2">
           <Flame className={`w-4 h-4 ${cfg.color}`} />
           <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Henry Hub</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Henry Hub <span className="text-gray-600 normal-case">· Daily EIA</span></p>
             <p className={`text-sm font-black ${cfg.color}`}>
               ${data.price.toFixed(3)}
               <span className="text-[10px] font-normal text-gray-500 ml-0.5">/MMBtu</span>
@@ -201,12 +190,17 @@ export default function HenryHubWidget({ data, compact = false }: Props) {
             </div>
             <div>
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Henry Hub</p>
-              <p className="text-[10px] text-gray-600">Natural Gas Spot Price · EIA</p>
+              <p className="text-[10px] text-gray-600">Natural Gas Spot Price</p>
             </div>
           </div>
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
-            {cfg.label}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-semibold px-2 py-0.5 rounded bg-gray-800 border border-white/10 text-gray-500 uppercase tracking-wide">
+              Daily EIA · Not Live
+            </span>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
+              {cfg.label}
+            </span>
+          </div>
         </div>
 
         {/* BIG price number */}
@@ -214,7 +208,14 @@ export default function HenryHubWidget({ data, compact = false }: Props) {
           <p className={`text-5xl font-black tracking-tight ${cfg.color}`}>
             ${data.price.toFixed(3)}
           </p>
-          <p className="text-sm text-gray-500 mt-0.5">per MMBtu · {data.report_date}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-gray-500">per MMBtu</p>
+            <span className="text-[10px] text-gray-600">·</span>
+            <p className="text-[11px] text-gray-500">EIA published {data.report_date}</p>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-600 border border-white/8">
+              End-of-day · Updated daily
+            </span>
+          </div>
         </div>
 
         {/* Change row */}

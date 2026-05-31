@@ -110,9 +110,9 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
   cost_impact:       { level: "low", label: "Loading", description: "" },
   market_condition:  { label: "Loading...", description: "" },
   alert_severity:    { level: "informational", label: "Loading", description: "" },
-  henry_hub:          null,
-  henry_hub_signal:   null,
-  henry_hub_exposure: null,
+  henry_hub:          undefined,
+  henry_hub_signal:   undefined,
+  henry_hub_exposure: undefined,
   signals: {
     price_volatility: EMPTY_SIGNAL,
     weather_demand:   EMPTY_SIGNAL,
@@ -637,7 +637,7 @@ export default function DashboardPage() {
               />
 
               {/* 2b. Henry Hub compact — top-level signal */}
-              <HenryHubWidget data={(signals as any).henry_hub} compact />
+              <HenryHubWidget data={signals.henry_hub} compact />
 
               {/* 3. Risk Score + ERCOT Price */}
               <RiskScore
@@ -754,7 +754,7 @@ export default function DashboardPage() {
                   <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
                   {/* Henry Hub — top-level gas price signal */}
-                  <HenryHubWidget data={(signals as any).henry_hub} />
+                  <HenryHubWidget data={signals.henry_hub} />
 
                   {/* 2. RISK ATTRIBUTION — why is the score X? */}
                   <SignalContributors
@@ -853,7 +853,7 @@ export default function DashboardPage() {
                     gasToPower={signals.gas_to_power_impact}
                     panelGlow={gasGlow}
                   />
-                  <HenryHubWidget data={(signals as any).henry_hub} />
+                  <HenryHubWidget data={signals.henry_hub} />
                   {signalsReady && <RiskHistoryChart location={location} />}
 
                   <DataSources sources={signals.data_sources} computedAt={signals.computed_at} />

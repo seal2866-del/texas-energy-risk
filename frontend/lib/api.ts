@@ -191,8 +191,24 @@ export interface SignalsResponse {
   risk_trend?:            RiskTrend;
   gas_power_correlation?: GasPowerCorrelation;
   interval_intelligence?: IntervalIntelligence;
+  // Henry Hub natural gas price signal
+  henry_hub?:          HenryHubData;
+  henry_hub_signal?:   Signal;
+  henry_hub_exposure?: { level: string; price: number; daily_chg: number; weekly_chg: number; market_state: string; description: string; };
   summary:    string;
   disclaimer: string;
+}
+
+export interface HenryHubData {
+  price:             number;
+  daily_change_pct:  number;
+  weekly_change_pct: number;
+  market_state:      "normal" | "watch" | "elevated" | "critical";
+  watch_threshold:   number;
+  unit:              string;
+  report_date:       string;
+  history?:          { date: string; price: number }[];
+  source:            string;
 }
 
 export interface ERCOTPrice {
