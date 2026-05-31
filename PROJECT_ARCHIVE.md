@@ -1,6 +1,6 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** May 31, 2026 (session 5)
-**Current stable tag:** v4.6-stable
+**Last updated:** May 31, 2026 (session 6)
+**Current stable tag:** v4.7-stable
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -142,6 +142,20 @@
         → Uplift warning when conditions add cost above baseline
         → Clearly labeled estimates — not financial advice
 - [x] #56 Wire into Executive + Analyst Mode dashboards
+
+### Scenario Modeling Panel — v4.7
+- [x] #57 Build ScenarioModelingPanel widget
+        → 6 scenarios: Current, HH+25%, HH+50%, ERCOT $50, ERCOT $100, Temp >100°F
+        → Each scenario computes: Small/Midstream/Large facility daily costs
+        → Risk level (low/medium/high), escalation probability %, operational exposure
+        → Current → Forecast → Impact 3-column layout per scenario
+        → Escalation probability bar (color-coded green/amber/red)
+        → % delta vs current conditions per facility
+        → Warning banner for medium/high risk scenarios
+        → Collapsible accordion — click to expand/collapse each scenario
+        → Fully reactive to live ERCOT price, Henry Hub, temp, demand level
+- [x] #58 Wire into Executive + Analyst Mode dashboards
+        → Positioned after Operational Cost Impact card in both modes
         → Positioned after Henry Hub widget in both modes
         → Passes live ERCOT price, Henry Hub price, demand level, risk score
         → Debug endpoint confirmed v2_futures works: $3.10/MMBtu
@@ -255,6 +269,7 @@
 - v4.4-stable — Account settings, forgot/reset password, login rebrand
 - v4.5-stable — Henry Hub: live EIA price, 10-day chart, signal engine integration, ERCOT font match
 - v4.6-stable — Operational Cost Impact card (Small/Midstream/Large facility estimates)
+- v4.7-stable — Scenario Modeling panel (6 stress scenarios, cost/risk/escalation per facility)
 
 ---
 
