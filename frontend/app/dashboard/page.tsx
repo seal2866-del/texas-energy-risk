@@ -40,6 +40,7 @@ import ExecutiveKPIRow from "@/components/widgets/ExecutiveKPIRow";
 import WatchToday from "@/components/widgets/WatchToday";
 import NextReview from "@/components/widgets/NextReview";
 import CostImpact from "@/components/widgets/CostImpact";
+import OperationalCostImpact from "@/components/widgets/OperationalCostImpact";
 import WhyRiskIsLow from "@/components/widgets/WhyRiskIsLow";
 import ScenarioAnalysis from "@/components/widgets/ScenarioAnalysis";
 import RootCauseEngine from "@/components/widgets/RootCauseEngine";
@@ -639,6 +640,14 @@ export default function DashboardPage() {
               {/* 2b. Henry Hub — full widget in Executive Mode */}
               <HenryHubWidget data={signals.henry_hub} />
 
+              {/* 2c. Operational Cost Impact */}
+              <OperationalCostImpact
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
+                henryHub={signals.henry_hub?.price ?? 3.00}
+                demandLevel={signals.demand_pressure?.level ?? "low"}
+                riskScore={signals.risk_score ?? "low"}
+              />
+
               {/* 3. Risk Score + ERCOT Price */}
               <RiskScore
                 score={signals.risk_score}
@@ -753,6 +762,14 @@ export default function DashboardPage() {
                   />
                   {/* Henry Hub — top-level gas price signal */}
                   <HenryHubWidget data={signals.henry_hub} />
+
+                  {/* Operational Cost Impact */}
+                  <OperationalCostImpact
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
+                    henryHub={signals.henry_hub?.price ?? 3.00}
+                    demandLevel={signals.demand_pressure?.level ?? "low"}
+                    riskScore={signals.risk_score ?? "low"}
+                  />
 
                   <ERCOTPriceMonitor prices={prices} loading={!signalsReady} priceBehavior={riskModel?.priceBehavior ?? null} />
 
