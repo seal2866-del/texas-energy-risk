@@ -128,6 +128,8 @@
         → Analyst Mode: full widget above ERCOT Price Monitor
         → Removed duplicate from bottom of Analyst panel
 - [x] #52 Fix EIA fetcher to use confirmed v2 futures endpoint
+- [x] #53 Match ERCOT price font to Henry Hub (text-5xl font-black tracking-tight)
+- [x] #54 Move Henry Hub to top of Executive + Analyst Mode (full widget, no compact)
         → Debug endpoint confirmed v2_futures works: $3.10/MMBtu
         → Strategy 1 now hits confirmed working endpoint first
         → Mock data never cached (re-fetches until real data available)
@@ -237,7 +239,7 @@
 - v4.2-stable — Domain migration to texasgridintel.com + full SEO + footer rebrand
 - v4.3-stable — Google Search Console verified + sitemap submitted
 - v4.4-stable — Account settings, forgot/reset password, login rebrand
-- v4.5-stable — Henry Hub: live EIA price, 10-day chart, signal engine integration
+- v4.5-stable — Henry Hub: live EIA price, 10-day chart, signal engine integration, ERCOT font match
 
 ---
 
