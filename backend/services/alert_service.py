@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 ALERT_FROM     = os.getenv("ALERT_FROM_EMAIL", "onboarding@resend.dev")
 RESEND_URL     = "https://api.resend.com/emails"
-DASHBOARD_URL  = "https://texas-energy-risk.vercel.app/dashboard"
-ALERTS_URL     = "https://texas-energy-risk.vercel.app/alerts"
+DASHBOARD_URL  = "https://texasgridintel.com/dashboard"
+ALERTS_URL     = "https://texasgridintel.com/alerts"
 
 # ── Twilio / Slack ────────────────────────────────────────────
 TWILIO_SID   = os.getenv("TWILIO_ACCOUNT_SID", "")

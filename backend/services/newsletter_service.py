@@ -763,12 +763,12 @@ Escalation:  {content.get("escalation_triggers", "")}
 Outlook:     {content.get("outlook_note", "")}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-View live conditions: https://texas-energy-risk.vercel.app/dashboard
+View live conditions: https://texasgridintel.com/dashboard
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 TX Energy Risk provides informational operational intelligence only.
 Not investment, trading, financial, or procurement advice.
-To unsubscribe: https://texas-energy-risk.vercel.app/unsubscribe
+To unsubscribe: https://texasgridintel.com/unsubscribe
 """
 
 

@@ -75,7 +75,7 @@ export default function Footer() {
           <FooterSection title="Legal & Info" links={[
             { label: "Disclaimer & Terms", href: "/terms" },
             { label: "Data Usage Policy",  href: "/terms#data" },
-            { label: "Contact",            href: "mailto:support@txenergyrisk.com" },
+            { label: "Contact",            href: "mailto:support@texasgridintel.com" },
             { label: "Status",             href: "/terms#status" },
           ]} />
         </div>
@@ -93,7 +93,7 @@ export default function Footer() {
 
         {/* ── Bottom bar ────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-gray-600">
-          <p>© {new Date().getFullYear()} TX Energy Risk. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Texas Grid Intel. All rights reserved.</p>
           <p className="leading-relaxed text-right max-w-md">
             Data provided for informational purposes only. Not investment, trading, financial, legal,
             or procurement advice. ERCOT, NOAA, and EIA data subject to source terms of use.

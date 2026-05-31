@@ -171,6 +171,8 @@ app = FastAPI(
 # ── CORS ──────────────────────────────────────────────────────
 origins = [
     FRONTEND_URL,
+    "https://texasgridintel.com",
+    "https://www.texasgridintel.com",
     "https://texas-energy-risk.vercel.app",
     "https://texas-energy-risk-production.up.railway.app",
 ]
