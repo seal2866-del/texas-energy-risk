@@ -168,27 +168,27 @@ export default function LandingPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-teal-400" />
               </span>
-              Continuous ERCOT Monitoring · Texas Operations
+              Live ERCOT Price Intelligence · Texas Energy Risk
             </div>
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6 drop-shadow-xl max-w-5xl mx-auto">
-              Energy Risk Intelligence<br className="hidden sm:block" />
-              <span className="text-orange-400">for Texas Operations</span>
+              Real-Time ERCOT Energy Risk<br className="hidden sm:block" />
+              <span className="text-orange-400">Intelligence for Texas Operations</span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
-              Know when rising energy costs, weather-driven demand, or gas supply pressures
-              require operational attention — before they impact operations and planning.
+              Monitor ERCOT power prices, Texas weather demand risk, and Henry Hub natural gas conditions
+              before they spike your energy costs. Email and SMS alerts the moment risk changes.
             </p>
 
             {/* Trust indicators */}
             <div className="flex flex-wrap items-center justify-center gap-6 mb-10">
               {[
-                "Detect escalation conditions earlier",
-                "Reduce energy cost surprises",
-                "Monitor Texas exposure in real time",
+                "ERCOT prices updated every 5 minutes",
+                "Houston, Dallas, Austin + 5 more cities",
+                "Email & SMS alerts on risk change",
               ].map((item) => (
                 <div key={item} className="flex items-center gap-2 text-sm text-gray-300">
                   <span className="text-green-400 font-bold">✓</span>
