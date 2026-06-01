@@ -1,5 +1,6 @@
 "use client";
-import { Database, CheckCircle2, AlertTriangle, XCircle, Clock, ShieldCheck } from "lucide-react";
+import { useEffect } from "react";
+import { Database, CheckCircle2, AlertTriangle, XCircle, Clock, ShieldCheck, BadgeCheck } from "lucide-react";
 import type { DataSources as DataSourcesType } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +93,30 @@ function formatPrice(p: number): string {
   return p < 0 ? `-$${Math.abs(p).toFixed(2)}` : `$${p.toFixed(2)}`;
 }
 
+/** Format a UTC ISO string as HH:MM with correct CDT/CST label */
+function fmtCT(isoStr: string | null | undefined): string {
+  if (!isoStr) return "—";
+  try {
+    return new Date(isoStr).toLocaleTimeString("en-US", {
+      timeZone: "America/Chicago",
+      hour:     "2-digit",
+      minute:   "2-digit",
+      timeZoneName: "short",
+    });
+  } catch { return "—"; }
+}
+
+/** Compute age in minutes between two ISO strings */
+function ageBetween(olderIso: string | null | undefined, newerIso: string | null | undefined): string {
+  if (!olderIso || !newerIso) return "—";
+  try {
+    const diff = (new Date(newerIso).getTime() - new Date(olderIso).getTime()) / 60000;
+    if (diff < 0) return "—";
+    if (diff < 1) return "< 1 min";
+    return `${Math.round(diff)} min`;
+  } catch { return "—"; }
+}
+
 function ConfidenceBar({ pct }: { pct: number }) {
   const color = pct >= 90 ? "bg-green-400" : pct >= 75 ? "bg-amber-400" : pct >= 55 ? "bg-orange-400" : "bg-red-400";
   return (
@@ -106,14 +131,94 @@ function ConfidenceBar({ pct }: { pct: number }) {
   );
 }
 
+/** ERCOT source verification badge */
+function ErcotVerificationBadge({ src }: { src: DataSourcesType["ercot"] }) {
+  const price      = src.price_mwh ?? src.last_valid_price;
+  const cdrTs      = src.cdr_updated;    // CDR "Last Updated" string (CDT local, raw from HTML)
+  const retrievedAt = src.retrieved_at; // UTC ISO — when our server fetched it
+  const ageMin     = src.age_minutes;
+
+  if (price == null) return null;
+
+  // retrieved_at is UTC ISO; cdr_updated is a raw CDR string ("06/01/2026 06:48:00 CT")
+  // We show retrieved_at as formatted CT, and cdr_updated as-is since it's already CT
+  const retrievedStr = fmtCT(retrievedAt);
+  // Try to parse cdr_updated as a date; fall back to raw string
+  let sourceTs = cdrTs ?? "—";
+  if (cdrTs) {
+    try {
+      const d = new Date(cdrTs);
+      if (!isNaN(d.getTime())) {
+        sourceTs = d.toLocaleTimeString("en-US", {
+          timeZone: "America/Chicago",
+          hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+        });
+      }
+    } catch { /* keep raw */ }
+  }
+
+  const ageStr = ageMin !== null ? (ageMin < 1 ? "< 1 min" : `${Math.round(ageMin)} min`) : "—";
+
+  return (
+    <div className="mt-2 rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2 space-y-1">
+      <div className="flex items-center gap-1.5 mb-1">
+        <BadgeCheck className="w-3 h-3 text-green-400" />
+        <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest">ERCOT Verified</span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+        <span className="text-gray-500">Price</span>
+        <span className="text-white font-mono font-semibold">{formatPrice(price)}/MWh</span>
+        {sourceTs !== "—" && (
+          <>
+            <span className="text-gray-500">Source timestamp</span>
+            <span className="text-gray-300 font-mono">{sourceTs}</span>
+          </>
+        )}
+        {retrievedStr !== "—" && (
+          <>
+            <span className="text-gray-500">Retrieved</span>
+            <span className="text-gray-300 font-mono">{retrievedStr}</span>
+          </>
+        )}
+        <span className="text-gray-500">Age</span>
+        <span className="text-gray-300 font-mono">{ageStr}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DataSources({ sources, computedAt }: Props) {
+  // ── Console logging for browser-side ERCOT validation ──────────────────────
+  useEffect(() => {
+    if (!sources?.ercot) return;
+    const ercot = sources.ercot;
+    console.log(
+      "[ERCOT DATA SOURCE AUDIT]\n" +
+      `  status:        ${ercot.status}\n` +
+      `  price_mwh:     ${ercot.price_mwh ?? ercot.last_valid_price}\n` +
+      `  cdr_updated:   ${ercot.cdr_updated ?? "—"}\n` +
+      `  retrieved_at:  ${ercot.retrieved_at ?? "—"}\n` +
+      `  age_minutes:   ${ercot.age_minutes}\n` +
+      `  verification:  ${ercot.verification_status ?? "—"}\n` +
+      `  reason:        ${ercot.verification_reason ?? "—"}\n` +
+      `  source:        ${ercot.source ?? "—"}`,
+      ercot,
+    );
+  }, [sources]);
+
   const anyIssue = Object.values(sources).some(s => {
     const age = s.age_minutes;
     return age === null || age >= 5;
   });
 
+  // Dynamic timezone label — "CDT" May–Nov, "CST" Nov–Mar
   const computedTime = computedAt
-    ? new Date(computedAt).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit" })
+    ? new Date(computedAt).toLocaleTimeString("en-US", {
+        timeZone: "America/Chicago",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      })
     : "—";
 
   return (
@@ -126,12 +231,12 @@ export default function DataSources({ sources, computedAt }: Props) {
           <Database className={cn("w-4 h-4", anyIssue ? "text-amber-400" : "text-gray-500")} />
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Data Sources</p>
-            <p className="text-xs text-gray-500 mt-0.5">Feed health & reliability</p>
+            <p className="text-xs text-gray-500 mt-0.5">Feed health &amp; reliability</p>
           </div>
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-500">
           <Clock className="w-3 h-3" />
-          {computedTime} CDT
+          {computedTime}
         </div>
       </div>
 
@@ -146,12 +251,10 @@ export default function DataSources({ sources, computedAt }: Props) {
                 ? "unavailable"
                 : ageStatus(src.age_minutes);
 
-          const confidence = computeConfidence(displayStatus, src.age_minutes);
-          const latency    = computeLatency(src.age_minutes, meta.latencyBase);
-          const freshness  = formatFreshness(src.age_minutes);
-          const lastVerified = src.age_minutes !== null
-            ? formatAge(src.age_minutes)
-            : "—";
+          const confidence  = computeConfidence(displayStatus, src.age_minutes);
+          const latency     = computeLatency(src.age_minutes, meta.latencyBase);
+          const freshness   = formatFreshness(src.age_minutes);
+          const lastVerified = src.age_minutes !== null ? formatAge(src.age_minutes) : "—";
 
           const hasVerifDetail = key === "ercot" && (src.last_valid_price != null || src.verification_reason);
 
@@ -187,25 +290,15 @@ export default function DataSources({ sources, computedAt }: Props) {
                 <ConfidenceBar pct={confidence} />
               </div>
 
-              {/* ERCOT verification detail */}
-              {hasVerifDetail && (
-                <div className="mt-1.5 pl-2 border-l border-white/10 space-y-0.5">
-                  {src.last_valid_price != null && (
-                    <p className="text-xs text-gray-500">
-                      Last valid:{" "}
-                      <span className={cn(
-                        "font-semibold",
-                        src.price_range === "extreme"  ? "text-red-400" :
-                        src.price_range === "elevated" ? "text-amber-400" :
-                        "text-gray-300"
-                      )}>
-                        {formatPrice(src.last_valid_price)}/MWh
-                      </span>
-                    </p>
-                  )}
-                  {src.verification_reason && (
-                    <p className="text-xs text-gray-500 italic">{src.verification_reason}</p>
-                  )}
+              {/* ERCOT verification badge */}
+              {key === "ercot" && displayStatus !== "unavailable" && (
+                <ErcotVerificationBadge src={sources.ercot} />
+              )}
+
+              {/* ERCOT reason text */}
+              {hasVerifDetail && src.verification_reason && (
+                <div className="mt-1.5 pl-2 border-l border-white/10">
+                  <p className="text-xs text-gray-500 italic">{src.verification_reason}</p>
                 </div>
               )}
             </div>

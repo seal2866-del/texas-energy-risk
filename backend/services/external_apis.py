@@ -257,14 +257,20 @@ async def fetch_ercot_prices(
             return _get_cached_prices(settlement_point)
 
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        cdr_ts_raw = _parse_ercot_timestamp(last_ok_response.text) if last_ok_response else now.isoformat()
         record = {
-            "timestamp":        now.isoformat(),
+            "timestamp":        now.isoformat(),   # our server time (UTC ISO)
+            "retrieved_at":     now.isoformat(),   # explicit alias for badge display
             "settlement_point": settlement_point,
             "price_mwh":        live_price,
             "price_type":       "real_time",
             "source":           "ercot_cdr",
-            "cdr_updated":      _parse_ercot_timestamp(last_ok_response.text) if last_ok_response else now.isoformat(),
+            "cdr_updated":      cdr_ts_raw,        # "Last Updated" string from CDR page
         }
+        logger.warning(
+            "[ERCOT RECORD] price=%.2f cdr_updated=%r retrieved_at=%s",
+            live_price, cdr_ts_raw, now.isoformat(),
+        )
         added = _cache_price(record)
         cached = _get_cached_prices(settlement_point)
 
@@ -798,16 +804,4 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
                         _set_gas_cache(weeks, parsed)
                         return parsed
             except Exception as exc:
-                logger.warning("[EIA] v1 series=%s error: %s", series_id, exc)
-
-    logger.warning("[EIA] All EIA attempts failed — falling back to mock data")
-    result = mock_data.mock_gas_data(weeks)
-    _set_gas_cache(weeks, result)
-    return result
-
-
-def _safe_float(val) -> float:
-    try:
-        return float(val or 0)
-    except (TypeError, ValueError):
-        return 0.0
+                logger.warning("[E

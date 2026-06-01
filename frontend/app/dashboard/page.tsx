@@ -119,7 +119,6 @@ const PLACEHOLDER_SIGNALS: SignalsResponse = {
     price_volatility: EMPTY_SIGNAL,
     weather_demand:   EMPTY_SIGNAL,
     gas_supply:       EMPTY_SIGNAL,
-    henry_hub:        EMPTY_SIGNAL,
   },
   signal_alignment: { label: "None", score: 0, description: "" },
   what_changed:          [],
@@ -170,7 +169,7 @@ function SystemActivity({ signalsReady }: { signalsReady: boolean }) {
 function CollapsibleAnalystNotes({ reasoning, aiLoading, aiError, computedAt, confidence, signals, location }: {
   reasoning: AIReasoningResponse | null;
   aiLoading: boolean;
-  aiError: string;
+  aiError: boolean;
   computedAt: string;
   confidence: number | null;
   signals: SignalsResponse;
@@ -208,7 +207,7 @@ function CollapsibleAnalystNotes({ reasoning, aiLoading, aiError, computedAt, co
 function CollapsibleAI({ reasoning, aiLoading, aiError, computedAt, confidence }: {
   reasoning: AIReasoningResponse | null;
   aiLoading: boolean;
-  aiError: string;
+  aiError: boolean;
   computedAt: string;
   confidence: number | null;
 }) {
@@ -357,9 +356,23 @@ export default function DashboardPage() {
         getGasData(8),
       ]);
       if (sigData.status === "fulfilled") {
-        setSignals(sigData.value);
+        const sig = sigData.value;
+        setSignals(sig);
         setSignalsReady(true);
         setSignalsError(false);
+        // ── Raw ERCOT validation log ─────────────────────────────────────────
+        const ercotSrc = sig.data_sources?.ercot;
+        console.log(
+          "[ERCOT RAW SIGNALS RESPONSE]\n" +
+          `  risk_score:    ${sig.risk_score}\n` +
+          `  computed_at:   ${sig.computed_at}\n` +
+          `  ercot.status:  ${ercotSrc?.status}\n` +
+          `  ercot.price:   ${ercotSrc?.price_mwh ?? ercotSrc?.last_valid_price}\n` +
+          `  ercot.cdr_upd: ${ercotSrc?.cdr_updated ?? "—"}\n` +
+          `  ercot.ret_at:  ${ercotSrc?.retrieved_at ?? "—"}\n` +
+          `  ercot.age_min: ${ercotSrc?.age_minutes}`,
+          { data_sources: sig.data_sources, ercot_verification: sig.ercot_verification },
+        );
       } else {
         setSignalsError(true);
         console.warn("[Dashboard] signals fetch failed:", sigData.reason);
@@ -689,7 +702,7 @@ export default function DashboardPage() {
               <EscalationMeter
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
-                escalationProbability={signals.escalation_probability}
+                escalationProbability={signals.escalation_probability?.pct}
                 activeSignals={signals.active_signals}
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
                 temperature={forecasts[0]?.temp_high_f ?? undefined}
@@ -807,7 +820,7 @@ export default function DashboardPage() {
                     currentPrice={prices[prices.length - 1]?.price_mwh ?? 0}
                     currentHH={gasLatest?.henry_hub_price ?? 0}
                     currentRisk={signals.risk_score}
-                    escalationPct={signals.escalation_probability ?? 10}
+                    escalationPct={signals.escalation_probability?.pct ?? 10}
                   />
 
                   {/* 4. ESCALATION DRIVERS — what could change the score */}

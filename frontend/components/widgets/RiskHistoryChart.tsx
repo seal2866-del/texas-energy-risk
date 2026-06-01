@@ -69,7 +69,11 @@ export default function RiskHistoryChart({ location }: Props) {
     getSignalHistory(location, hours)
       .then((res) => {
         if (!res.snapshots?.length) { setEmpty(true); setData([]); return; }
-        const mapped = res.snapshots.map((s) => ({
+        // Sort chronologically — Supabase orders by computed_at but enforce client-side too
+        const sorted = [...res.snapshots].sort(
+          (a, b) => new Date(a.computed_at).getTime() - new Date(b.computed_at).getTime()
+        );
+        const mapped = sorted.map((s) => ({
           ...s,
           displayTime: new Date(s.computed_at).toLocaleString("en-US", {
             timeZone:  "America/Chicago",

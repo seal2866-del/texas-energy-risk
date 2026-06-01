@@ -39,6 +39,10 @@ export interface DataSourceStatus {
   verification_reason?:  string;
   last_valid_price?:     number | null;
   price_range?:          "normal" | "elevated" | "extreme";
+  // ERCOT source provenance fields for verification badge
+  price_mwh?:            number | null;    // current CDR price
+  cdr_updated?:          string | null;    // "Last Updated" string from CDR page (CDT local time)
+  retrieved_at?:         string | null;    // UTC ISO — when our server fetched it
 }
 
 export interface ErcotVerification {
