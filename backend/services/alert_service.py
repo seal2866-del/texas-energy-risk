@@ -569,6 +569,10 @@ async def _send_sms(to_phone: str, body: str) -> bool:
     auth_user   = TWILIO_API_KEY_SID  if use_api_key else TWILIO_SID
     auth_pass   = TWILIO_API_KEY_SEC  if use_api_key else TWILIO_TOKEN
 
+    # Auto-normalize to E.164 — add + if missing (e.g. "18325736665" → "+18325736665")
+    if to_phone and not to_phone.startswith("+"):
+        to_phone = "+" + to_phone
+
     if not all([TWILIO_SID, auth_pass, TWILIO_FROM, to_phone]):
         logger.debug("[SMS] Twilio not configured or no phone number")
         return False
