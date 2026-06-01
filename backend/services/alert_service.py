@@ -22,9 +22,6 @@ DASHBOARD_URL  = "https://texasgridintel.com/dashboard"
 ALERTS_URL     = "https://texasgridintel.com/alerts"
 
 # ── Twilio / Slack ────────────────────────────────────────────
-# Supports both master Auth Token AND API Key (recommended for production).
-# API Key usage: set TWILIO_API_KEY_SID (SK...) + TWILIO_API_KEY_SECRET.
-# If API Key vars are set they take priority over TWILIO_AUTH_TOKEN.
 TWILIO_SID          = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_TOKEN        = os.getenv("TWILIO_AUTH_TOKEN", "")       # master token fallback
 TWILIO_API_KEY_SID  = os.getenv("TWILIO_API_KEY_SID", "")     # SK... API Key SID
@@ -564,23 +561,21 @@ async def _send_email(to: str, subject: str, html: str) -> bool:
 
 async def _send_sms(to_phone: str, body: str) -> bool:
     """Send SMS via Twilio REST API (no SDK required)."""
-    # Resolve auth: API Key pair takes priority over master Auth Token
+    # API Key pair takes priority over master Auth Token
     use_api_key = bool(TWILIO_API_KEY_SID and TWILIO_API_KEY_SEC)
     auth_user   = TWILIO_API_KEY_SID  if use_api_key else TWILIO_SID
     auth_pass   = TWILIO_API_KEY_SEC  if use_api_key else TWILIO_TOKEN
 
-    # Normalize both numbers: strip spaces, add + if missing
+    # Normalize both numbers to E.164 (strip spaces, dashes, add + if missing)
     def _e164(n: str) -> str:
         n = n.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-        if n and not n.startswith("+"):
-            n = "+" + n
-        return n
+        return ("+" + n) if (n and not n.startswith("+")) else n
 
     to_phone    = _e164(to_phone)
     from_number = _e164(TWILIO_FROM)
 
-    logger.warning("[SMS] Attempting send: from=%s to=%s auth=%s",
-                   from_number, to_phone[-4:].rjust(len(to_phone), "*"),
+    logger.warning("[SMS] Attempting: from=%s to=%s auth=%s",
+                   from_number, to_phone[-4:].rjust(len(to_phone),"*"),
                    "api_key" if use_api_key else "auth_token")
 
     if not all([TWILIO_SID, auth_pass, from_number, to_phone]):
@@ -594,7 +589,6 @@ async def _send_sms(to_phone: str, body: str) -> bool:
                 data={"From": from_number, "To": to_phone, "Body": body},
                 auth=(auth_user, auth_pass),
             )
-        logger.info("[SMS] auth_method=%s", "api_key" if use_api_key else "auth_token")
         if r.status_code == 201:
             logger.info("[SMS] Sent to %s", to_phone[-4:].rjust(len(to_phone), "*"))
             return True
