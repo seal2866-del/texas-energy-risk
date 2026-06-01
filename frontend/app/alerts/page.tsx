@@ -165,8 +165,10 @@ export default function AlertsPage() {
   const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState<"logs" | "settings">("logs");
   const [expanded,    setExpanded]    = useState<string | null>(null);
-  const [testSending, setTestSending] = useState(false);
-  const [testResult,  setTestResult]  = useState<"sent" | "error" | null>(null);
+  const [testSending,    setTestSending]    = useState(false);
+  const [testResult,     setTestResult]     = useState<"sent" | "error" | null>(null);
+  const [smsSending,     setSmsSending]     = useState(false);
+  const [smsResult,      setSmsResult]      = useState<"sent" | "error" | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -226,6 +228,21 @@ export default function AlertsPage() {
       setTestResult(r.ok ? "sent" : "error");
     } catch { setTestResult("error"); }
     finally { setTestSending(false); }
+  };
+
+  const handleTestSms = async () => {
+    setSmsSending(true);
+    setSmsResult(null);
+    try {
+      const session = await supabase.auth.getSession();
+      const token   = session.data.session?.access_token;
+      const r = await fetch(`${BASE}/api/alerts/send-test-sms`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSmsResult(r.ok ? "sent" : "error");
+    } catch { setSmsResult("error"); }
+    finally { setSmsSending(false); }
   };
 
   const set = useCallback(<K extends keyof typeof DEFAULT_PREFS>(
@@ -572,7 +589,17 @@ export default function AlertsPage() {
                       Send test email
                     </button>
                     {testResult === "sent"  && <span className="text-xs text-green-400">Test email sent!</span>}
-                    {testResult === "error" && <span className="text-xs text-red-400">Send failed — check Resend key.</span>}
+                    {testResult === "error" && <span className="text-xs text-red-400">Email failed — check Resend key.</span>}
+                    <button
+                      onClick={handleTestSms}
+                      disabled={smsSending || !prefs.sms_enabled || !prefs.sms_phone}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-gray-300 transition-all disabled:opacity-50"
+                    >
+                      {smsSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      Send test SMS
+                    </button>
+                    {smsResult === "sent"  && <span className="text-xs text-green-400">Test SMS sent!</span>}
+                    {smsResult === "error" && <span className="text-xs text-red-400">SMS failed — check Twilio vars.</span>}
                   </div>
                 )}
               </div>
@@ -778,21 +805,9 @@ export default function AlertsPage() {
                       placeholder="Enter email (leave blank to use account email)"
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
                     />
-                    <p className="text-xs text-gray-600">
-                      If left blank, the digest is sent to your account email.
-                    </p>
+                    <p className="text-xs text-gray-600">If left blank, the digest is sent to your account email.</p>
                   </div>
                 )}
-              </div>
-
-              {/* Compliance */}
-              <div className="px-4 py-3 rounded-xl bg-white/3 border border-white/5 flex items-start gap-2">
-                <Info className="w-3.5 h-3.5 text-gray-600 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  TX Energy Risk provides informational analytics and market intelligence only.
-                  These alerts do not constitute investment, trading, financial, legal, or procurement advice.
-                  Users are responsible for their own decisions.
-                </p>
               </div>
 
               {/* Save */}
