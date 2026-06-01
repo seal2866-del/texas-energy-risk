@@ -22,9 +22,14 @@ DASHBOARD_URL  = "https://texasgridintel.com/dashboard"
 ALERTS_URL     = "https://texasgridintel.com/alerts"
 
 # ── Twilio / Slack ────────────────────────────────────────────
-TWILIO_SID   = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_FROM  = os.getenv("TWILIO_FROM_NUMBER", "")
+# Supports both master Auth Token AND API Key (recommended for production).
+# API Key usage: set TWILIO_API_KEY_SID (SK...) + TWILIO_API_KEY_SECRET.
+# If API Key vars are set they take priority over TWILIO_AUTH_TOKEN.
+TWILIO_SID          = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_TOKEN        = os.getenv("TWILIO_AUTH_TOKEN", "")       # master token fallback
+TWILIO_API_KEY_SID  = os.getenv("TWILIO_API_KEY_SID", "")     # SK... API Key SID
+TWILIO_API_KEY_SEC  = os.getenv("TWILIO_API_KEY_SECRET", "")  # API Key Secret
+TWILIO_FROM         = os.getenv("TWILIO_FROM_NUMBER", "")
 
 COMPLIANCE = (
     "TX Energy Risk provides informational analytics and market intelligence only. "
@@ -559,7 +564,12 @@ async def _send_email(to: str, subject: str, html: str) -> bool:
 
 async def _send_sms(to_phone: str, body: str) -> bool:
     """Send SMS via Twilio REST API (no SDK required)."""
-    if not all([TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM, to_phone]):
+    # Resolve auth: API Key pair takes priority over master Auth Token
+    use_api_key = bool(TWILIO_API_KEY_SID and TWILIO_API_KEY_SEC)
+    auth_user   = TWILIO_API_KEY_SID  if use_api_key else TWILIO_SID
+    auth_pass   = TWILIO_API_KEY_SEC  if use_api_key else TWILIO_TOKEN
+
+    if not all([TWILIO_SID, auth_pass, TWILIO_FROM, to_phone]):
         logger.debug("[SMS] Twilio not configured or no phone number")
         return False
     try:
@@ -568,8 +578,9 @@ async def _send_sms(to_phone: str, body: str) -> bool:
             r = await client.post(
                 url,
                 data={"From": TWILIO_FROM, "To": to_phone, "Body": body},
-                auth=(TWILIO_SID, TWILIO_TOKEN),
+                auth=(auth_user, auth_pass),
             )
+        logger.info("[SMS] auth_method=%s", "api_key" if use_api_key else "auth_token")
         if r.status_code == 201:
             logger.info("[SMS] Sent to %s", to_phone[-4:].rjust(len(to_phone), "*"))
             return True
@@ -938,21 +949,4 @@ async def send_daily_summary(
     if not ok:
         return
 
-    computed_str = datetime.now(timezone.utc).strftime("%b %d, %Y")
-    html     = _build_daily_summary_email(signals_data, city, computed_str)
-    subject  = _subject("daily_summary")
-    delivered = False
-
-    if prefs.get("email_alerts", True):
-        delivered = await _send_email(to_email, subject, html)
-
-    risk_level = signals_data.get("risk_score", "low")
-    log_alert(
-        user_id=user_id, risk_level=risk_level, confidence=signals_data.get("confidence"),
-        primary_driver=signals_data.get("primary_driver", ""), city=city,
-        ercot_price=None, weather_temp=None, gas_storage=None,
-        message=signals_data.get("summary", ""),
-        alert_type="daily_summary",
-        delivery_status="sent" if delivered else "failed",
-        delivered_email=delivered,
-    )
+    co
