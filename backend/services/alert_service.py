@@ -949,4 +949,21 @@ async def send_daily_summary(
     if not ok:
         return
 
-    co
+    computed_str = datetime.now(timezone.utc).strftime("%b %d, %Y")
+    html     = _build_daily_summary_email(signals_data, city, computed_str)
+    subject  = _subject("daily_summary")
+    delivered = False
+
+    if prefs.get("email_alerts", True):
+        delivered = await _send_email(to_email, subject, html)
+
+    risk_level = signals_data.get("risk_score", "low")
+    log_alert(
+        user_id=user_id, risk_level=risk_level, confidence=signals_data.get("confidence"),
+        primary_driver=signals_data.get("primary_driver", ""), city=city,
+        ercot_price=None, weather_temp=None, gas_storage=None,
+        message=signals_data.get("summary", ""),
+        alert_type="daily_summary",
+        delivery_status="sent" if delivered else "failed",
+        delivered_email=delivered,
+    )
