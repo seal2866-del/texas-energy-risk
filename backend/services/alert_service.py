@@ -569,11 +569,21 @@ async def _send_sms(to_phone: str, body: str) -> bool:
     auth_user   = TWILIO_API_KEY_SID  if use_api_key else TWILIO_SID
     auth_pass   = TWILIO_API_KEY_SEC  if use_api_key else TWILIO_TOKEN
 
-    # Auto-normalize to E.164 — add + if missing (e.g. "18325736665" → "+18325736665")
-    if to_phone and not to_phone.startswith("+"):
-        to_phone = "+" + to_phone
+    # Normalize both numbers: strip spaces, add + if missing
+    def _e164(n: str) -> str:
+        n = n.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+        if n and not n.startswith("+"):
+            n = "+" + n
+        return n
 
-    if not all([TWILIO_SID, auth_pass, TWILIO_FROM, to_phone]):
+    to_phone    = _e164(to_phone)
+    from_number = _e164(TWILIO_FROM)
+
+    logger.warning("[SMS] Attempting send: from=%s to=%s auth=%s",
+                   from_number, to_phone[-4:].rjust(len(to_phone), "*"),
+                   "api_key" if use_api_key else "auth_token")
+
+    if not all([TWILIO_SID, auth_pass, from_number, to_phone]):
         logger.debug("[SMS] Twilio not configured or no phone number")
         return False
     try:
@@ -581,7 +591,7 @@ async def _send_sms(to_phone: str, body: str) -> bool:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(
                 url,
-                data={"From": TWILIO_FROM, "To": to_phone, "Body": body},
+                data={"From": from_number, "To": to_phone, "Body": body},
                 auth=(auth_user, auth_pass),
             )
         logger.info("[SMS] auth_method=%s", "api_key" if use_api_key else "auth_token")
