@@ -1,6 +1,6 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** May 31, 2026 (session 6)
-**Current stable tag:** v4.7-stable
+**Last updated:** June 1, 2026 (session 7 — end of day)
+**Current stable tag:** v4.9-stable
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -308,28 +308,12 @@ Apollo → Prospect → Audience → Resend → Newsletter → Demo → Customer
 
 ---
 
-## SEO FILES (added v4.2)
-- frontend/app/layout.tsx — global metadata, OG, Twitter, JSON-LD structured data
-- frontend/app/sitemap.ts — dynamic sitemap.xml
-- frontend/app/robots.ts — robots.txt
-- frontend/app/opengraph-image.tsx — auto-generated OG image (1200x630)
-- frontend/app/pricing/layout.tsx — pricing page metadata
-- frontend/app/dashboard/layout.tsx — dashboard metadata (noindex)
-- frontend/app/terms/layout.tsx — terms page metadata
+## SESSION 7 — June 1, 2026 (Data Source Audit + Predictive Intelligence)
 
----
-
-## SUPABASE TABLES
-- users
-- subscriptions
-- signal_snapshots
-- alert_preferences
-- alert_logs
-- newsletter_subscribers
-- newsletter_issues
-- newsletter_sends
-- report_deliveries
-- prospects
-- prospect_audiences
-- prospect_audience_members
-- demo_requests
+### Phase 9 — Predictive Intelligence Engine (completed)
+- [x] `frontend/lib/riskTrajectory.ts` — OLS slope, acceleration, volatility index, trajectory labels
+- [x] `frontend/lib/stateTransitionEngine.ts` — state transition analysis, instability score, loop/failure detection
+- [x] `frontend/lib/patternMemory.ts` — fingerprint similarity matching, top-N historical pattern lookup
+- [x] `frontend/lib/predictiveOutlook.ts` — 3-horizon forecast (0-6h, 6-24h, 24-48h) + executive layer
+- [x] `frontend/components/widgets/PredictiveOutlook.tsx` — 3-horizon cards + exec summary panel
+- [x] `frontend/components/widgets/R
