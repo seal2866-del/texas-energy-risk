@@ -32,10 +32,12 @@ export default function Navbar() {
         { href: "/map",       label: "Grid Map" },
         { href: "/analytics", label: "Analytics" },
         { href: "/alerts",    label: "Alerts" },
+        { href: "/docs",      label: "Help" },
         { href: "/pricing",   label: "Upgrade" },
       ]
     : [
         { href: "/pricing", label: "Pricing" },
+        { href: "/docs",    label: "Help Center" },
         { href: "/terms",   label: "Disclaimer" },
       ];
 
@@ -140,8 +142,7 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <Link href="/login" className="block text-sm text-orange-400 font-semibold">
-              Sign in / Sign up
+            <Link href="/login" className="block text-sm text-orange-400 font-semibold">Sign in / Sign up
             </Link>
           )}
         </div>
