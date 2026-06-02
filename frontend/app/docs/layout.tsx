@@ -32,9 +32,9 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div className="px-5 py-5 border-b border-white/5">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-orange-400" />
-            <span className="text-sm font-bold text-white uppercase tracking-widest">Help Center</span>
+            <span className="text-sm font-bold text-white uppercase tracking-widest">Operational Intelligence Library</span>
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">TX Energy Risk Documentation</p>
+          <p className="text-[11px] text-gray-500 mt-1">25 Articles · 8 Guides · Weekly Brief</p>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
           {NAV.map(({ href, label, icon: Icon }) => {
