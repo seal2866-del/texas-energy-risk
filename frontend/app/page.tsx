@@ -172,16 +172,21 @@ export default function LandingPage() {
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6 drop-shadow-xl max-w-5xl mx-auto">
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-4 drop-shadow-xl max-w-5xl mx-auto">
               Detect Texas Energy Risk<br className="hidden sm:block" />
               <span className="text-orange-400">Before It Hits Your Operations</span>
             </h1>
 
+            {/* Credibility line */}
+            <p className="text-sm sm:text-base text-gray-500 max-w-xl mx-auto mb-6 font-medium tracking-wide drop-shadow-md">
+              Operational risk intelligence for energy traders, procurement managers,
+              industrial operators, and Texas energy teams.
+            </p>
+
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
-              Real-time ERCOT price intelligence, weather demand signals, and Henry Hub gas tracking —
-              unified into one early warning system for Texas energy teams.
-              Email and SMS alerts the moment conditions change.
+              Monitor developing ERCOT, weather, and natural gas conditions before they
+              become operational constraints — with email and SMS alerts the moment risk changes.
             </p>
 
             {/* Trust indicators */}
@@ -527,7 +532,7 @@ export default function LandingPage() {
         <section className="max-w-3xl mx-auto px-4 pb-16 text-center">
           <p className="text-xs text-gray-700 leading-relaxed">
             Informational analytics only. Not investment, trading, financial, or procurement advice.
-            Data sourced from ERCOT, NOAA, and EIA public feeds. Risk indicators are probabilistic
+            Data sourced from ERCOT, NOAA, and EIA public feeds. All signals are informational only and do not constitute investment, trading,
             and do not guarantee any market outcome. Consult qualified advisors before making
             energy procurement or operational decisions.
           </p>
