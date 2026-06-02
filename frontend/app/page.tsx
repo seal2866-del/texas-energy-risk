@@ -168,7 +168,7 @@ export default function LandingPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-teal-400" />
               </span>
-              Live ERCOT Price Intelligence · Texas Energy Risk
+              Texas Energy Early Warning Intelligence
             </div>
 
             {/* Headline */}
@@ -184,9 +184,15 @@ export default function LandingPage() {
             </p>
 
             {/* Subheadline */}
-            <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
+            <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-5 leading-relaxed drop-shadow-md">
               Monitor developing ERCOT, weather, and natural gas conditions before they
               become operational constraints — with email and SMS alerts the moment risk changes.
+            </p>
+
+            {/* Credibility statement */}
+            <p className="text-sm text-gray-500 max-w-xl mx-auto mb-8 leading-relaxed drop-shadow-md">
+              Continuously analyzes ERCOT, NOAA, and EIA data streams to identify emerging
+              operational, weather, supply, and market risks before conditions escalate.
             </p>
 
             {/* Trust indicators */}
@@ -207,12 +213,12 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/login?signup=true"
                 className="flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-base transition-all shadow-lg shadow-orange-500/30">
-                Start Monitoring
+                Get Early Warning Alerts
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link href="/dashboard"
                 className="flex items-center gap-2 px-8 py-4 rounded-xl backdrop-blur-sm bg-white/8 hover:bg-white/15 border border-white/20 text-white font-semibold text-base transition-all">
-                View Live Conditions
+                View Today&apos;s Risk Outlook
               </Link>
             </div>
 
@@ -517,7 +523,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/login?signup=true"
                 className="flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-all shadow-lg shadow-orange-500/25">
-                Start Monitoring
+                Start Free Monitoring
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link href="/pricing"

@@ -1,6 +1,7 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 1, 2026 (session 7 — end of day)
+**Last updated:** June 2, 2026 (session 7 — homepage copy v2)
 **Current stable tag:** v4.9-stable
+**Next session:** Friday — CRM focus
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -315,5 +316,4 @@ Apollo → Prospect → Audience → Resend → Newsletter → Demo → Customer
 - [x] `frontend/lib/stateTransitionEngine.ts` — state transition analysis, instability score, loop/failure detection
 - [x] `frontend/lib/patternMemory.ts` — fingerprint similarity matching, top-N historical pattern lookup
 - [x] `frontend/lib/predictiveOutlook.ts` — 3-horizon forecast (0-6h, 6-24h, 24-48h) + executive layer
-- [x] `frontend/components/widgets/PredictiveOutlook.tsx` — 3-horizon cards + exec summary panel
-- [x] `frontend/components/widgets/R
+- [x] `frontend/components/widgets/PredictiveOutlook.tsx` — 3-horizon cards + exec summa
