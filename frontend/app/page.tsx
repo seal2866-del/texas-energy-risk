@@ -173,14 +173,15 @@ export default function LandingPage() {
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white leading-tight mb-6 drop-shadow-xl max-w-5xl mx-auto">
-              Real-Time ERCOT Energy Risk<br className="hidden sm:block" />
-              <span className="text-orange-400">Intelligence for Texas Operations</span>
+              Detect Texas Energy Risk<br className="hidden sm:block" />
+              <span className="text-orange-400">Before It Hits Your Operations</span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow-md">
-              Monitor ERCOT power prices, Texas weather demand risk, and Henry Hub natural gas conditions
-              before they spike your energy costs. Email and SMS alerts the moment risk changes.
+              Real-time ERCOT price intelligence, weather demand signals, and Henry Hub gas tracking —
+              unified into one early warning system for Texas energy teams.
+              Email and SMS alerts the moment conditions change.
             </p>
 
             {/* Trust indicators */}
