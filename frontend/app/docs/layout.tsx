@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Navbar from "@/components/ui/Navbar";
-import { BookOpen, ChevronRight, Menu, X, Home, LayoutDashboard, Map, BarChart2, Bell, FileText, CheckSquare, HelpCircle, Shield } from "lucide-react";
+import { BookOpen, ChevronRight, Menu, Home, LayoutDashboard, Map, BarChart2, Bell, FileText, CheckSquare, HelpCircle, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const COMPLIANCE = "TX Energy Risk provides operational intelligence and situational awareness only. The platform does not provide investment, trading, procurement, legal, engineering, or financial advice. Users remain responsible for all operational and business decisions.";
@@ -26,8 +26,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     <>
       {open && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={onClose} />}
       <aside className={cn(
-        "fixed top-0 left-0 h-full w-72 bg-[#060c1a] border-r border-white/8 z-40 flex flex-col transition-transform duration-300",
-        "pt-16",
+        "fixed top-0 left-0 h-full w-72 bg-[#060c1a] border-r border-white/8 z-40 flex flex-col transition-transform duration-300 pt-16",
         open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}>
         <div className="px-5 py-5 border-b border-white/5">
