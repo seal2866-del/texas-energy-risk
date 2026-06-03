@@ -94,7 +94,6 @@ async def _search_apollo(req: SearchRequest) -> list[dict]:
                 "Content-Type":  "application/json",
                 "Cache-Control": "no-cache",
                 "X-Api-Key":     APOLLO_API_KEY,
-                "Authorization": f"Bearer {APOLLO_API_KEY}",
             },
         )
 
