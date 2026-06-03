@@ -225,3 +225,35 @@ async def send_test_alert(authorization: str = Header(default="")):
     if delivered:
         return {"status": "sent", "email": user.email}
     raise HTTPException(status_code=500, detail="Failed to send test email")
+
+
+@router.post("/send-test-sms")
+async def send_test_sms(authorization: str = Header(default="")):
+    """Sends a test SMS to verify Twilio delivery (Pro only)."""
+    user = _get_user(authorization)
+    sb   = get_supabase()
+    sub = _safe_execute(
+        sb.table("subscriptions").select("plan, status").eq("user_id", user.id).limit(1),
+        "check_subscription_sms",
+    )
+    sub_data = (sub.data[0] if sub and sub.data else {})
+    is_pro = (
+        sub_data.get("plan") in ("pro", "business", "enterprise")
+        and sub_data.get("status") in ("active", "trialing")
+    )
+    if not is_pro:
+        raise HTTPException(status_code=403, detail="Pro subscription required")
+    prefs = _safe_execute(
+        sb.table("alert_preferences").select("sms_phone, sms_enabled").eq("user_id", user.id).limit(1),
+        "get_prefs_sms",
+    )
+    prefs_data = prefs.data[0] if prefs and prefs.data else {}
+    sms_phone = prefs_data.get("sms_phone", "")
+    if not sms_phone:
+        raise HTTPException(status_code=400, detail="No SMS phone number configured")
+    from services.alert_service import _send_sms
+    body = "TX Energy Risk TEST: SMS alerts are active. texasgridintel.com"
+    delivered = await _send_sms(sms_phone, body)
+    if delivered:
+        return {"status": "sent", "phone": f"***{sms_phone[-4:]}"}
+    raise HTTPException(status_code=500, detail="SMS delivery failed — check TWILIO vars in Railway")
