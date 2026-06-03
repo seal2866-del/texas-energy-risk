@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Search, Download, Zap, RefreshCw, Loader2, Trash2, ChevronDown, ChevronUp, Mail, Calendar, Users, BarChart2, Plus, ArrowRight } from "lucide-react";
+import { Search, Download, Zap, RefreshCw, Loader2, Trash2, ChevronDown, ChevronUp, Mail, Calendar, Users, BarChart2, Plus, ArrowRight, Linkedin } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Link from "next/link";
 
@@ -338,6 +338,15 @@ export default function ProspectingPage() {
                                 <Mail className="w-3 h-3" /> Newsletter
                               </button>
                             )}
+
+                            {/* LinkedIn button */}
+                            <a
+                              href={p.contact_linkedin || `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((p.contact_name || '') + ' ' + (p.company_name || ''))}`}
+                              target="_blank" rel="noreferrer"
+                              title="Find on LinkedIn"
+                              className="flex items-center gap-1 px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 rounded-lg text-[10px] text-blue-300 font-semibold transition-all">
+                              <Linkedin className="w-3 h-3" /> LinkedIn
+                            </a>
 
                             {/* Request Demo */}
                             {!["demo_requested","qualified","opportunity","customer"].includes(p.status) && (
