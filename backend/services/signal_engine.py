@@ -110,18 +110,9 @@ def _assess_data_sources(
             logger.warning("[SOURCE_STATUS] parse error for %s ts=%r: %s", source_label, ts_raw, exc)
             return {"status": "unavailable", "last_updated": None, "age_minutes": None}
 
-    ercot_status = _source_status(prices,      "timestamp",  15,    "ercot_cdr")
-    # NOAA: use fetched_at (server-side fetch time), NOT forecast_time
-    # forecast_time is a FUTURE period start — (now - future_time) gives negative latency
-    noaa_status  = _source_status(forecasts,   "fetched_at", 60,   "noaa")
-    eia_status   = _source_status(gas_records, "report_date", 21600, "eia")  # EIA weekly — 15 days
-
-    # Enrich ERCOT status: expose CDR source timestamp + server retrieval time for badge
-    if prices and ercot_status.get("status") != "unavailable":
-        latest_p = prices[-1]
-        ercot_status["cdr_updated"]  = latest_p.get("cdr_updated")   # CDR "Last Updated" string
-        ercot_status["retrieved_at"] = latest_p.get("retrieved_at")  # UTC ISO server fetch time
-        ercot_status["price_mwh"]    = latest_p.get("price_mwh")
+    ercot_status = _source_status(prices,      "timestamp",    15,    "ercot_cdr")
+    noaa_status  = _source_status(forecasts,   "forecast_time", 60,   "noaa")
+    eia_status   = _source_status(gas_records, "report_date",   21600, "eia")  # EIA weekly — allow up to 15 days
 
     return {
         "ercot": ercot_status,
@@ -2946,4 +2937,18 @@ def run_all_signals(
             "signals": {
                 "price_volatility": price_sig,
                 "weather_demand":   weather_sig,
-  
+                "gas_supply":       gas_sig,
+                "henry_hub":        henry_hub_sig,
+            },
+            "summary":    summary,
+            "disclaimer": (
+                "TX Energy Risk provides informational analytics and market intelligence only. "
+                "This does not constitute investment, trading, financial, legal, or procurement advice. "
+                "Users are responsible for their own decisions."
+            ),
+        }
+
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return _failsafe_response()
