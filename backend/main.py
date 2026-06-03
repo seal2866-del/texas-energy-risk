@@ -19,7 +19,18 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron      import CronTrigger
 
 from routers import ercot, weather, gas, signals, alerts, stripe_webhooks, stripe_checkout, ai_reasoning, export
-from routers import digest, grid, history, chatbot, newsletter, prospecting
+from routers import digest, grid, history
+
+# Optional routers — loaded with try/except so a failure doesn't crash the whole app
+_optional_routers = []
+for _mod_name in ["chatbot", "newsletter", "prospecting"]:
+    try:
+        import importlib as _il
+        _mod = _il.import_module(f"routers.{_mod_name}")
+        _optional_routers.append(_mod)
+    except Exception as _e:
+        import logging as _log
+        _log.getLogger(__name__).warning("[STARTUP] Optional router '%s' failed to load: %s", _mod_name, _e)
 
 load_dotenv()
 
@@ -200,9 +211,8 @@ app.include_router(export.router)
 app.include_router(digest.router)
 app.include_router(grid.router)
 app.include_router(history.router)
-app.include_router(chatbot.router)
-app.include_router(newsletter.router)
-app.include_router(prospecting.router)
+for _opt in _optional_routers:
+    app.include_router(_opt.router)
 
 
 # ── Health check ──────────────────────────────────────────────
@@ -214,18 +224,4 @@ async def health():
         "status":        "ok",
         "service":       "texas-energy-risk-api",
         "version":       "1.0.0",
-        "ercot_cache":   cache,
-        "ercot_enabled": os.getenv("ERCOT_API_ENABLED", "false"),
-    }
-
-
-@app.get("/")
-async def root():
-    return {
-        "service":    "Texas Energy Risk Alert Platform API",
-        "version":    "1.0.0",
-        "disclaimer": (
-            "All signals and data are for informational purposes only. "
-            "Not investment, trading, or procurement advice."
-        ),
-    }
+        "ercot_cache":  
