@@ -5,7 +5,6 @@ TX Energy Risk AI Assistant — RAG + Claude with strict compliance guardrails.
 import os, logging, json, uuid, re
 from typing import List, Optional, Dict
 from datetime import datetime, timezone
-import anthropic
 from services.supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -181,7 +180,8 @@ async def chat(
         confident = False
     else:
         try:
-            client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
+            import anthropic as _anthropic
+            client = _anthropic.Anthropic(api_key=ANTHROPIC_KEY)
             r = client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=400,
