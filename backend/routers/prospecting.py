@@ -88,12 +88,13 @@ async def _search_apollo(req: SearchRequest) -> list[dict]:
 
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(
-            f"{APOLLO_BASE}/mixed_people/search",
+            f"{APOLLO_BASE}/mixed_people/api_search",
             json=payload,
             headers={
                 "Content-Type":  "application/json",
                 "Cache-Control": "no-cache",
                 "X-Api-Key":     APOLLO_API_KEY,
+                "Authorization": f"Bearer {APOLLO_API_KEY}",
             },
         )
 
