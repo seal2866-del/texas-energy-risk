@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Script from "next/script";
+import ChatWidget from "@/components/chatbot/ChatWidget";
 
 const SITE_URL = "https://texasgridintel.com";
 const SITE_NAME = "Texas Grid Intel";
@@ -203,6 +204,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen text-white antialiased">
         {children}
+        <ChatWidget />
       </body>
     </html>
   );
