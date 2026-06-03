@@ -62,8 +62,6 @@ export default function ProspectingPage() {
   const [revealing,    setRevealing]    = useState<string | null>(null);
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [selected,     setSelected]     = useState<Set<string>>(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [expanded,     setExpanded]     = useState<string | null>(null);
   const [msg,          setMsg]          = useState("");
 
@@ -149,26 +147,6 @@ export default function ProspectingPage() {
       }
     } catch { setMsg("Reveal failed — check connection."); }
     setRevealing(null);
-  };
-
-  const toggleSelect = (id: string) =>
-    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-
-  const selectAll = () =>
-    setSelected(prospects.length === selected.size ? new Set() : new Set(prospects.map(p => p.id)));
-
-  const bulkDelete = async () => {
-    if (!selected.size) return;
-    if (!confirm(`Delete ${selected.size} prospects?`)) return;
-    setBulkDeleting(true);
-    await Promise.all([...selected].map(id =>
-      fetch(`${API}/api/prospecting/prospects/${id}`, { method: "DELETE" })
-    ));
-    setProspects(prev => prev.filter(p => !selected.has(p.id)));
-    setSelected(new Set());
-    setBulkDeleting(false);
-    setMsg(`Deleted ${selected.size} prospects`);
-    await fetchAll();
   };
 
   const toggleSelect = (id: string) =>
@@ -350,19 +328,7 @@ export default function ProspectingPage() {
               {tab === "prospects" && (
                 <>
                   {/* Filter bar */}
-                  <div className="flex gap-2 flex-wrap mb-3 items-center">
-                    <input type="checkbox"
-                      checked={prospects.length > 0 && selected.size === prospects.length}
-                      onChange={selectAll}
-                      title="Select all"
-                      className="w-3.5 h-3.5 cursor-pointer accent-orange-500" />
-                    {selected.size > 0 && (
-                      <button onClick={bulkDelete} disabled={bulkDeleting}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-xs text-red-400 font-semibold transition-all disabled:opacity-50">
-                        {bulkDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                        Delete {selected.size}
-                      </button>
-                    )}
+                  <div className="flex gap-2 flex-wrap mb-3">
                     <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
                       className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-300 focus:outline-none">
                       <option value="">All priorities</option>
@@ -378,8 +344,7 @@ export default function ProspectingPage() {
                     <p className="text-xs text-gray-500 self-center ml-auto">{prospects.length} prospects</p>
                     <input type="checkbox"
                       checked={prospects.length > 0 && selected.size === prospects.length}
-                      onChange={selectAll}
-                      title="Select / deselect all"
+                      onChange={selectAll} title="Select / deselect all"
                       className="w-3.5 h-3.5 cursor-pointer accent-orange-500" />
                     <span className="text-xs text-gray-400">All</span>
                     {selected.size > 0 && (
@@ -403,8 +368,6 @@ export default function ProspectingPage() {
                       <div key={p.id} className="card-glass border border-white/8 rounded-2xl overflow-hidden">
                         <div className="p-3 flex items-start gap-3">
                           <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)}
-                        className="w-3.5 h-3.5 mt-1 cursor-pointer accent-orange-500 flex-shrink-0" />
-                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)}
                         className="w-3.5 h-3.5 mt-1 cursor-pointer accent-orange-500 flex-shrink-0" />
                       <ScoreCircle score={p.lead_score} />
                           <div className="flex-1 min-w-0">
