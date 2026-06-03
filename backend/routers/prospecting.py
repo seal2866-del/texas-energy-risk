@@ -733,3 +733,60 @@ async def conversion_analytics():
         "top_prospects": top_prospects,
         "recent_demos":  demo_rows,
     }
+
+
+# ---------------------------------------------------------------------------
+# REVEAL EMAIL  (1 Apollo credit per call)
+# ---------------------------------------------------------------------------
+
+@router.post("/{prospect_id}/reveal-email")
+async def reveal_email(prospect_id: str):
+    """Uses Apollo to reveal email for a prospect. Costs 1 credit."""
+    if not APOLLO_API_KEY:
+        raise HTTPException(status_code=503, detail="APOLLO_API_KEY not configured")
+
+    sb = get_supabase()
+    r  = sb.table("prospects").select("*").eq("id", prospect_id).single().execute()
+    if not r.data:
+        raise HTTPException(status_code=404, detail="Prospect not found")
+    p = r.data
+
+    if p.get("contact_email"):
+        return {"email": p["contact_email"], "source": "cached", "credits_used": 0}
+
+    apollo_id = p.get("apollo_person_id")
+    if not apollo_id:
+        raise HTTPException(status_code=400, detail="No Apollo person ID")
+
+    headers = {"X-Api-Key": APOLLO_API_KEY, "Content-Type": "application/json"}
+    email = None
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{APOLLO_BASE}/people/{apollo_id}/reveal",
+            headers=headers,
+            json={},
+        )
+        if resp.status_code == 200:
+            person = resp.json().get("person", {})
+            email  = person.get("email")
+
+        if not email:
+            resp2 = await client.post(
+                f"{APOLLO_BASE}/people/match",
+                headers=headers,
+                json={"id": apollo_id, "reveal_personal_emails": True, "reveal_phone_number": False},
+            )
+            if resp2.status_code == 200:
+                person = resp2.json().get("person", {})
+                email  = person.get("email")
+
+    if email:
+        sb.table("prospects").update({
+            "contact_email": email,
+            "updated_at":    datetime.now(timezone.utc).isoformat(),
+        }).eq("id", prospect_id).execute()
+        return {"email": email, "source": "apollo", "credits_used": 1}
+
+    return {"email": None, "source": "apollo", "credits_used": 1,
+            "message": "Apollo has no email on file for this contact"}

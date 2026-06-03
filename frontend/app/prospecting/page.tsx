@@ -59,6 +59,7 @@ export default function ProspectingPage() {
   const [loading,      setLoading]      = useState(false);
   const [enriching,    setEnriching]    = useState<string | null>(null);
   const [actioning,    setActioning]    = useState<string | null>(null);
+  const [revealing,    setRevealing]    = useState<string | null>(null);
   const [expanded,     setExpanded]     = useState<string | null>(null);
   const [msg,          setMsg]          = useState("");
 
@@ -129,6 +130,21 @@ export default function ProspectingPage() {
     setMsg("Demo request logged ✓");
     await fetchAll();
     setActioning(null);
+  };
+
+  const revealEmail = async (id: string) => {
+    setRevealing(id);
+    try {
+      const r = await fetch(`${API}/api/prospecting/prospects/${id}/reveal-email`, { method: "POST" });
+      const data = await r.json();
+      if (data.email) {
+        setMsg(`Email revealed: ${data.email} ${data.credits_used ? "(1 credit used)" : "(cached)"}`);
+        setProspects(prev => prev.map(p => p.id === id ? { ...p, contact_email: data.email } : p));
+      } else {
+        setMsg("Apollo has no email for this contact.");
+      }
+    } catch { setMsg("Reveal failed — check connection."); }
+    setRevealing(null);
   };
 
   const updateStatus = async (id: string, status: string) => {
@@ -348,7 +364,17 @@ export default function ProspectingPage() {
                               <Linkedin className="w-3 h-3" /> LinkedIn
                             </a>
 
-                            {/* Request Demo */}
+                            {/* Reveal Email */}
+                            {!p.contact_email && (
+                              <button onClick={() => revealEmail(p.id)} disabled={revealing === p.id}
+                                title="Reveal email from Apollo (1 credit)"
+                                className="flex items-center gap-1 px-2 py-1 bg-green-500/15 hover:bg-green-500/25 border border-green-500/20 rounded-lg text-[10px] text-green-300 font-semibold transition-all disabled:opacity-50">
+                                {revealing === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+                                {revealing === p.id ? "..." : "Get Email"}
+                              </button>
+                            )}
+
+                            {/* Request Demo */}}
                             {!["demo_requested","qualified","opportunity","customer"].includes(p.status) && (
                               <button onClick={() => requestDemo(p.id)} disabled={actioning === p.id}
                                 title="Request Demo"
