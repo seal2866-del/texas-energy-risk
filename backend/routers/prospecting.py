@@ -64,8 +64,10 @@ async def _search_apollo(req: SearchRequest) -> list[dict]:
     ]
 
     payload: dict = {
-        "page":     req.page,
-        "per_page": req.per_page,
+        "page":                   req.page,
+        "per_page":               req.per_page,
+        "reveal_personal_emails": True,
+        "reveal_phone_number":    False,
     }
 
     # Location — Apollo uses city/state strings in person_locations
