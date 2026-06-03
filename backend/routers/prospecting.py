@@ -66,10 +66,12 @@ async def _search_apollo(req: SearchRequest) -> list[dict]:
     ]
 
     payload: dict = {
-        "page":                   req.page,
-        "per_page":               req.per_page,
-        "reveal_personal_emails": True,
-        "reveal_phone_number":    False,
+        "page":                      req.page,
+        "per_page":                  req.per_page,
+        "reveal_personal_emails":    True,
+        "reveal_phone_number":       False,
+        # Only return contacts with verified emails — these always have full names
+        "contact_email_status_cd":   ["verified", "likely to engage"],
     }
 
     # Location — Apollo uses city/state strings in person_locations
@@ -811,6 +813,11 @@ async def reveal_email(prospect_id: str):
                     if person.get("id") and not apollo_id:
                         sb.table("prospects").update({"apollo_person_id": person["id"]}).eq("id", prospect_id).execute()
 
+    if email:
+        sb.table("prospects").update({
+            "contact_email": email,
+            "updated_at":    datetime.now(timezone.utc).isoformat(),
+        }).eq("id", prospect_id).execute()
     if email:
         sb.table("prospects").update({
             "contact_email": email,
