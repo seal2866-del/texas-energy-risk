@@ -224,4 +224,18 @@ async def health():
         "status":        "ok",
         "service":       "texas-energy-risk-api",
         "version":       "1.0.0",
-        "ercot_cache":  
+        "ercot_cache": cache,
+        "ercot_enabled": os.getenv("ERCOT_API_ENABLED", "false"),
+    }
+
+
+@app.get("/")
+async def root():
+    return {
+        "service":    "Texas Energy Risk Alert Platform API",
+        "version":    "1.0.0",
+        "disclaimer": (
+            "All signals and data are for informational purposes only. "
+            "Not investment, trading, or procurement advice."
+        ),
+    }
