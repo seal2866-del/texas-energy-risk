@@ -754,24 +754,25 @@ async def reveal_email(prospect_id: str):
     if p.get("contact_email"):
         return {"email": p["contact_email"], "source": "cached", "credits_used": 0}
 
-    apollo_id = p.get("apollo_person_id")
-    if not apollo_id:
-        raise HTTPException(status_code=400, detail="No Apollo person ID")
-
     headers = {"X-Api-Key": APOLLO_API_KEY, "Content-Type": "application/json"}
     email = None
 
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            f"{APOLLO_BASE}/people/{apollo_id}/reveal",
-            headers=headers,
-            json={},
-        )
-        if resp.status_code == 200:
-            person = resp.json().get("person", {})
-            email  = person.get("email")
+        apollo_id = p.get("apollo_person_id")
 
-        if not email:
+        # Strategy 1: ID-based reveal (fastest)
+        if apollo_id:
+            resp = await client.post(
+                f"{APOLLO_BASE}/people/{apollo_id}/reveal",
+                headers=headers,
+                json={},
+            )
+            if resp.status_code == 200:
+                person = resp.json().get("person", {})
+                email  = person.get("email")
+
+        # Strategy 2: people/match by ID with reveal flag
+        if not email and apollo_id:
             resp2 = await client.post(
                 f"{APOLLO_BASE}/people/match",
                 headers=headers,
@@ -780,6 +781,33 @@ async def reveal_email(prospect_id: str):
             if resp2.status_code == 200:
                 person = resp2.json().get("person", {})
                 email  = person.get("email")
+
+        # Strategy 3: match by name + company (works even without stored ID)
+        if not email:
+            name    = p.get("contact_name", "")
+            company = p.get("company_name", "")
+            domain  = p.get("website", "")
+            if name and (company or domain):
+                match_payload = {
+                    "name":                   name,
+                    "reveal_personal_emails": True,
+                    "reveal_phone_number":    False,
+                }
+                if domain:
+                    match_payload["domain"] = domain.replace("https://","").replace("http://","").rstrip("/")
+                if company:
+                    match_payload["organization_name"] = company
+                resp3 = await client.post(
+                    f"{APOLLO_BASE}/people/match",
+                    headers=headers,
+                    json=match_payload,
+                )
+                if resp3.status_code == 200:
+                    person = resp3.json().get("person", {})
+                    email  = person.get("email")
+                    # Also store the apollo_person_id if we didn't have it
+                    if person.get("id") and not apollo_id:
+                        sb.table("prospects").update({"apollo_person_id": person["id"]}).eq("id", prospect_id).execute()
 
     if email:
         sb.table("prospects").update({
