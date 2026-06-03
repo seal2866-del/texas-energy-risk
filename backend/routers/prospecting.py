@@ -55,12 +55,14 @@ async def _search_apollo(req: SearchRequest) -> list[dict]:
         raise HTTPException(status_code=503, detail="APOLLO_API_KEY not configured")
 
     default_titles = req.titles or [
-        "Operations Manager", "Plant Manager", "Energy Manager",
-        "Procurement Manager", "Facilities Manager", "VP Operations",
-        "Director of Operations", "COO", "Energy Director",
-        "Energy Trader", "Gas Trader", "Power Trader", "Risk Manager",
-        "Market Analyst", "Director of Energy Trading", "VP Energy Trading",
-        "Portfolio Manager", "Hedging Manager",
+        "Energy Manager", "Director of Energy", "VP Energy",
+        "Energy Procurement Manager", "Energy Trading Manager",
+        "Director of Energy Trading", "VP Energy Trading",
+        "Operations Manager", "VP Operations", "Director of Operations",
+        "Procurement Manager", "Chief Procurement Officer",
+        "Risk Manager", "Commodity Risk Manager",
+        "Portfolio Manager", "Energy Portfolio Manager",
+        "COO", "CFO", "CEO",
     ]
 
     payload: dict = {
