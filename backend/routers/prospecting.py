@@ -819,11 +819,18 @@ async def reveal_email(prospect_id: str):
             "updated_at":    datetime.now(timezone.utc).isoformat(),
         }).eq("id", prospect_id).execute()
     if email:
-        sb.table("prospects").update({
+        update_data: dict = {
             "contact_email": email,
             "updated_at":    datetime.now(timezone.utc).isoformat(),
-        }).eq("id", prospect_id).execute()
-        return {"email": email, "source": "apollo", "credits_used": 1}
+        }
+        # Also save full name if we only had a first name
+        full_name = f"{person.get('first_name','')} {person.get('last_name','')}".strip()
+        if full_name and " " in full_name and not p.get("contact_name","").count(" "):
+            update_data["contact_name"] = full_name
+        if person.get("linkedin_url") and not p.get("contact_linkedin"):
+            update_data["contact_linkedin"] = person["linkedin_url"]
+        sb.table("prospects").update(update_data).eq("id", prospect_id).execute()
+        return {"email": email, "full_name": full_name or None, "source": "apollo", "credits_used": 1}
 
     return {"email": None, "source": "apollo", "credits_used": 1,
             "message": "Apollo has no email on file for this contact"}
