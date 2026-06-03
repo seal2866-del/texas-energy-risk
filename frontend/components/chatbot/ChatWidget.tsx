@@ -109,9 +109,10 @@ export default function ChatWidget() {
         body: JSON.stringify({ message: text, session_token: sessionToken, history, page_context: window.location.pathname }),
       });
       const data = await r.json();
+      const responseText = data.response || (r.ok ? "I received your message but couldn't generate a response. Please try again." : "The AI assistant is warming up. Please try again in a moment.");
       setMessages(prev => [...prev, {
         id: Date.now().toString(), role: "assistant",
-        content: data.response, message_id: data.message_id, timestamp: new Date(),
+        content: responseText, message_id: data.message_id, timestamp: new Date(),
       }]);
       const newCount = msgCount + 1;
       setMsgCount(newCount);
