@@ -21,16 +21,20 @@ from apscheduler.triggers.cron      import CronTrigger
 from routers import ercot, weather, gas, signals, alerts, stripe_webhooks, stripe_checkout, ai_reasoning, export
 from routers import digest, grid, history
 
-# Optional routers — loaded with try/except so a failure doesn't crash the whole app
-_optional_routers = []
-for _mod_name in ["chatbot", "newsletter", "prospecting"]:
-    try:
-        import importlib as _il
-        _mod = _il.import_module(f"routers.{_mod_name}")
-        _optional_routers.append(_mod)
-    except Exception as _e:
-        import logging as _log
-        _log.getLogger(__name__).warning("[STARTUP] Optional router '%s' failed to load: %s", _mod_name, _e)
+try:
+    from routers import newsletter, prospecting
+    _has_newsletter = True
+except Exception:
+    _has_newsletter = False
+
+# Chatbot router loaded separately — disabled until startup crash is resolved
+_has_chatbot = False
+try:
+    from routers import chatbot as _chatbot_router
+    _has_chatbot = True
+except Exception as _chatbot_err:
+    import logging as _clog
+    _clog.getLogger(__name__).warning("[STARTUP] Chatbot router skipped: %s", _chatbot_err)
 
 load_dotenv()
 
@@ -211,8 +215,11 @@ app.include_router(export.router)
 app.include_router(digest.router)
 app.include_router(grid.router)
 app.include_router(history.router)
-for _opt in _optional_routers:
-    app.include_router(_opt.router)
+if _has_chatbot:
+    app.include_router(_chatbot_router.router)
+if _has_newsletter:
+    app.include_router(newsletter.router)
+    app.include_router(prospecting.router)
 
 
 # ── Health check ──────────────────────────────────────────────
