@@ -24,6 +24,13 @@ import ConfidenceBreakdown from "@/components/widgets/ConfidenceBreakdown";
 import CorrelationEngine from "@/components/widgets/CorrelationEngine";
 import SignalTimeline from "@/components/widgets/SignalTimeline";
 import RiskTrajectory from "@/components/widgets/RiskTrajectory";
+import DailyExecutiveBrief from "@/components/widgets/DailyExecutiveBrief";
+import ExecutiveRecommendations from "@/components/widgets/ExecutiveRecommendations";
+import FinancialImpactModel from "@/components/widgets/FinancialImpactModel";
+import ForecastHorizons from "@/components/widgets/ForecastHorizons";
+import CustomerWatchlist from "@/components/widgets/CustomerWatchlist";
+import AlertHistoryTimeline from "@/components/widgets/AlertHistoryTimeline";
+import AIChatAssistant from "@/components/widgets/AIChatAssistant";
 import RecommendedActions from "@/components/widgets/RecommendedActions";
 import OperationalConsiderations from "@/components/widgets/OperationalConsiderations";
 import MonitoringPriorities from "@/components/widgets/MonitoringPriorities";
@@ -480,6 +487,20 @@ export default function DashboardPage() {
       <div className={`atm-overlay ${atmClass}`} />
       <GridPulseBackground />
       <Navbar />
+      {/* AI Chat Assistant — floating */}
+      {signalsReady && (
+        <AIChatAssistant
+          riskScore={signals.risk_score}
+          riskDirection={signals.risk_direction}
+          ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+          temperature={forecasts[0]?.temp_high_f ?? undefined}
+          henryHub={gasLatest?.henry_hub_price ?? undefined}
+          demandPressure={signals.demand_pressure}
+          supplyPressure={signals.supply_pressure}
+          escalationProbability={signals.escalation_probability}
+        />
+      )}
+
       <main className="pt-28 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
@@ -731,6 +752,63 @@ export default function DashboardPage() {
                 temperature={forecasts[0]?.temp_high_f ?? undefined}
                 henryHub={gasLatest?.henry_hub_price ?? undefined}
               />
+
+              {/* ── Daily Executive Brief ────────────────────────────── */}
+              <DailyExecutiveBrief
+                riskScore={signals.risk_score}
+                riskDirection={signals.risk_direction}
+                primaryDriver={signals.primary_driver_type || signals.primary_driver}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                computedAt={signals.computed_at}
+              />
+
+              {/* ── Executive Recommendations ─────────────────────────── */}
+              <ExecutiveRecommendations
+                riskScore={signals.risk_score}
+                riskDirection={signals.risk_direction}
+                escalationProbability={signals.escalation_probability}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                marketReaction={signals.market_reaction}
+                activeSignals={signals.active_signals}
+              />
+
+              {/* ── Financial Impact Model ────────────────────────────── */}
+              <FinancialImpactModel
+                riskScore={signals.risk_score}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                escalationProbability={signals.escalation_probability}
+                demandPressure={signals.demand_pressure}
+                marketReaction={signals.market_reaction}
+              />
+
+              {/* ── Forecast Horizons ─────────────────────────────────── */}
+              <ForecastHorizons
+                riskScore={signals.risk_score}
+                riskDirection={signals.risk_direction}
+                snapshots={snapshots}
+                timeHorizons={signals.time_horizons}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+              />
+
+              {/* ── Customer Watchlist + Alert History ───────────────── */}
+              <CustomerWatchlist
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                riskScore={signals.risk_score}
+              />
+              <AlertHistoryTimeline />
 
               {/* 6. Analyst Notes (formerly Executive Brief) — lower position */}
               <CollapsibleAnalystNotes
