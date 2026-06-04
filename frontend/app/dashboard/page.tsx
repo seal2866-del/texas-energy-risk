@@ -31,6 +31,9 @@ import ForecastHorizons from "@/components/widgets/ForecastHorizons";
 import CustomerWatchlist from "@/components/widgets/CustomerWatchlist";
 import AlertHistoryTimeline from "@/components/widgets/AlertHistoryTimeline";
 import AIChatAssistant from "@/components/widgets/AIChatAssistant";
+import AIExecutiveSummary from "@/components/widgets/AIExecutiveSummary";
+import WhatChangedYesterday from "@/components/widgets/WhatChangedYesterday";
+import TexasThreatCenter from "@/components/widgets/TexasThreatCenter";
 import RecommendedActions from "@/components/widgets/RecommendedActions";
 import OperationalConsiderations from "@/components/widgets/OperationalConsiderations";
 import MonitoringPriorities from "@/components/widgets/MonitoringPriorities";
@@ -639,14 +642,40 @@ export default function DashboardPage() {
             <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4${justRefreshed ? " card-refreshing" : ""}`}>
 
               {/* ═══════════════════════════════════════════════════════
-                  EXECUTIVE MODE — Answer 4 questions in 10 seconds:
+                  EXECUTIVE MODE — 5 questions in 30 seconds:
                   1. What is happening?
-                  2. Does it require action?
-                  3. What to monitor?
-                  4. When to check again?
+                  2. Why is it happening?
+                  3. What changed?
+                  4. What could happen next?
+                  5. What should I do?
               ═══════════════════════════════════════════════════════ */}
 
-              {/* 1. CURRENT RECOMMENDATION — dominant first element */}
+              {/* 1. AI EXECUTIVE SUMMARY — first thing executives see */}
+              <AIExecutiveSummary
+                riskScore={signals.risk_score}
+                riskDirection={signals.risk_direction}
+                primaryDriver={signals.primary_driver_type || signals.primary_driver}
+                confidence={signals.confidence}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                marketReaction={signals.market_reaction}
+                activeSignals={signals.active_signals}
+                computedAt={signals.computed_at}
+              />
+
+              {/* 2. WHAT CHANGED SINCE YESTERDAY */}
+              <WhatChangedYesterday
+                snapshots={snapshots}
+                currentPrice={prices[prices.length - 1]?.price_mwh ?? 0}
+                currentTemp={forecasts[0]?.temp_high_f ?? 0}
+                currentHH={gasLatest?.henry_hub_price ?? 0}
+                currentRisk={signals.risk_score}
+              />
+
+              {/* 3. CURRENT RECOMMENDATION */}
               <CurrentRecommendation
                 riskScore={signals.risk_score}
                 riskDirection={signals.risk_direction}
@@ -753,6 +782,18 @@ export default function DashboardPage() {
                 henryHub={gasLatest?.henry_hub_price ?? undefined}
               />
 
+              {/* ── Texas Threat Center ──────────────────────────────── */}
+              <TexasThreatCenter
+                riskScore={signals.risk_score}
+                temperature={forecasts[0]?.temp_high_f ?? undefined}
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? undefined}
+                henryHub={gasLatest?.henry_hub_price ?? undefined}
+                demandPressure={signals.demand_pressure}
+                supplyPressure={signals.supply_pressure}
+                marketReaction={signals.market_reaction}
+                riskDirection={signals.risk_direction}
+              />
+
               {/* ── Daily Executive Brief ────────────────────────────── */}
               <DailyExecutiveBrief
                 riskScore={signals.risk_score}
@@ -809,6 +850,23 @@ export default function DashboardPage() {
                 riskScore={signals.risk_score}
               />
               <AlertHistoryTimeline />
+
+              {/* ── Demo CTA ─────────────────────────────────────────── */}
+              <div className="card-glass border border-orange-500/20 bg-orange-500/5 rounded-2xl p-6 lg:col-span-2 text-center">
+                <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-2">Schedule Executive Demo</p>
+                <p className="text-sm font-bold text-white mb-2">See Texas Grid Intel in action for your operations team</p>
+                <p className="text-xs text-gray-400 mb-4 max-w-lg mx-auto">
+                  See how Texas Grid Intel helps identify ERCOT, weather, natural gas, and operational risks before they impact your business.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <a href="/pricing" className="flex items-center gap-2 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm transition-all shadow-lg shadow-orange-500/25">
+                    Request Demo
+                  </a>
+                  <a href="/login?signup=true" className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold text-sm transition-all">
+                    Subscribe to Texas Energy Risk Brief
+                  </a>
+                </div>
+              </div>
 
               {/* 6. Analyst Notes (formerly Executive Brief) — lower position */}
               <CollapsibleAnalystNotes
