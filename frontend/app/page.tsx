@@ -505,6 +505,49 @@ export default function LandingPage() {
           <NewsletterSignup />
         </section>
 
+        {/* ── FAQ Section ───────────────────────────────────────────────────── */}
+        <section className="border-t border-white/5 bg-[#050810]">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{ __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "FAQPage",
+                "mainEntity": [
+                  { "@type": "Question", "name": "What is ERCOT?", "acceptedAnswer": { "@type": "Answer", "text": "ERCOT (Electric Reliability Council of Texas) is the independent system operator that manages the flow of electric power to approximately 90 percent of Texas. ERCOT operates the competitive wholesale electricity market where prices are set in real time based on supply and demand balance." } },
+                  { "@type": "Question", "name": "What causes ERCOT price spikes?", "acceptedAnswer": { "@type": "Answer", "text": "ERCOT prices spike when electricity demand approaches or exceeds available generation capacity. This most commonly occurs during extreme summer heat events when cooling demand surges, during winter cold events when heating demand unexpectedly rises, or when generation capacity is reduced by equipment failures or fuel supply constraints." } },
+                  { "@type": "Question", "name": "How often is ERCOT data updated?", "acceptedAnswer": { "@type": "Answer", "text": "ERCOT updates real-time settlement point prices every 15 minutes. Texas Grid Intel monitors these updates continuously and reflects the latest pricing in the dashboard. Weather forecasts update every few hours from NOAA, and EIA natural gas storage data is published weekly." } },
+                  { "@type": "Question", "name": "Who uses Texas Grid Intel?", "acceptedAnswer": { "@type": "Answer", "text": "Texas Grid Intel is used by operations managers, energy procurement teams, facilities managers, plant operators, data center teams, oil and gas operators, midstream infrastructure companies, and industrial energy buyers who need real-time awareness of Texas energy market conditions." } },
+                  { "@type": "Question", "name": "How accurate are energy risk assessments?", "acceptedAnswer": { "@type": "Answer", "text": "Texas Grid Intel risk assessments are based on real-time data from ERCOT, NOAA, and EIA public feeds. The platform synthesizes these signals into operational risk indicators that reflect current conditions. All assessments are probabilistic and informational — not forecasts or guarantees of future market conditions." } },
+                  { "@type": "Question", "name": "How do energy alerts work?", "acceptedAnswer": { "@type": "Answer", "text": "Texas Grid Intel sends email alerts when monitored conditions change — for example, when risk level increases from Low to Medium, when ERCOT prices exceed your configured threshold, or when temperature forecasts indicate elevated demand pressure. Alerts are sent in real time and include current conditions, primary risk driver, and relevant market context." } },
+                ]
+              })}}
+            />
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-500/10 border border-gray-500/20 text-gray-400 text-xs font-semibold mb-5">
+                Frequently Asked Questions
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Common Questions</h2>
+              <p className="text-gray-400 max-w-xl mx-auto">Everything operations teams need to know about Texas energy risk monitoring.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { q: "What is ERCOT?", a: "ERCOT (Electric Reliability Council of Texas) manages the flow of electric power to approximately 90 percent of Texas. It operates the competitive wholesale electricity market where prices are set in real time based on supply and demand balance." },
+                { q: "What causes ERCOT price spikes?", a: "ERCOT prices spike when demand approaches available generation capacity — most commonly during extreme summer heat when cooling demand surges, or winter cold events when heating demand rises unexpectedly." },
+                { q: "How often is data updated?", a: "ERCOT prices update every 15 minutes. Texas Grid Intel monitors continuously. Weather forecasts update every few hours from NOAA, and EIA natural gas storage data is published weekly." },
+                { q: "Who uses Texas Grid Intel?", a: "Operations managers, energy procurement teams, plant operators, data center teams, oil and gas operators, midstream companies, and industrial energy buyers who need real-time Texas energy market awareness." },
+                { q: "How accurate are risk assessments?", a: "Assessments are based on real-time ERCOT, NOAA, and EIA data. They are probabilistic and informational — reflecting current conditions, not guarantees of future market outcomes." },
+                { q: "How do energy alerts work?", a: "Alerts fire when conditions change — risk level escalation, ERCOT prices crossing your threshold, or temperature forecasts indicating elevated demand pressure. Delivered in real time by email." },
+              ].map(({ q, a }) => (
+                <div key={q} className="p-5 rounded-xl bg-white/3 border border-white/6">
+                  <h3 className="text-sm font-bold text-white mb-2">{q}</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">{a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── Final CTA ─────────────────────────────────────────────────────── */}
         <section className="border-t border-white/5 bg-[#050810]">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
