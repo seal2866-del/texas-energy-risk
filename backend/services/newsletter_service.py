@@ -96,11 +96,10 @@ def _build_newsletter_prompt(
     risk        = current.get("risk_score", "low")
     ercot       = current.get("ercot_price", 0) or 0
     prior_ercot = prior.get("ercot_price", ercot) or ercot
-    price_delta = ercot - prior_ercot
     price_pct   = ((ercot - prior_ercot) / prior_ercot * 100) if prior_ercot > 0 else 0
 
-    scores     = [s.get("risk_score_numeric") or {"high": 7.5, "medium": 4.5}.get(s.get("risk_score", "low"), 2.0) for s in week_snapshots]
-    avg_score  = sum(scores) / len(scores) if scores else 2.0
+    scores    = [s.get("risk_score_numeric") or {"high": 7.5, "medium": 4.5}.get(s.get("risk_score", "low"), 2.0) for s in week_snapshots]
+    avg_score = sum(scores) / len(scores) if scores else 2.0
     peak_score = max(scores) if scores else 2.0
 
     trend = "Stable"
@@ -110,70 +109,84 @@ def _build_newsletter_prompt(
         if recent > older + 0.3:   trend = "Rising"
         elif recent < older - 0.3: trend = "Improving"
 
-    region_lines = "\n".join(
-        f"- {r}: {d.get('risk_score', 'unknown').upper()}"
-        for r, d in regional.items()
-    )
+    region_lines = "\n".join(f"- {r}: {d.get('risk_score', 'unknown').upper()}" for r, d in regional.items())
+    action_anchor = "Operational review recommended." if risk == "high" else "Enhanced monitoring recommended." if risk == "medium" else "No action required."
 
-    action_anchor = (
-        "Operational review recommended." if risk == "high" else
-        "Enhanced monitoring recommended." if risk == "medium" else
-        "No action required."
-    )
+    # Industry spotlight rotation by week number
+    industries = ["Midstream Operations", "Pipeline Operators", "Refineries", "Industrial Facilities", "Data Centers", "Energy Procurement"]
+    spotlight_industry = industries[datetime.now(timezone.utc).isocalendar()[1] % len(industries)]
 
-    return f"""You are the editorial writer for the Texas Energy Risk Brief — a weekly operational intelligence newsletter for energy executives, plant operations managers, procurement teams, and grid operators.
+    return f"""You are the editor of the Texas Energy Risk Brief — a weekly operational intelligence newsletter for midstream operators, pipeline operators, refineries, industrial facilities, energy managers, and procurement teams.
 
-PURPOSE: Write like a control room briefing. Direct. Operational. Answers: What is happening? Is action required? What could cost money? What changed? What to monitor?
+PURPOSE: Answer "What could affect my operation this week and what should I do about it?" Be direct, executive, and actionable.
 
-STRICT LANGUAGE RULES:
-- NEVER use: "interesting", "notable", "potentially", "might be worth watching", "could become important"
-- ALWAYS use: "No action required", "Monitor", "Escalate if", "Review", "Operational impact", "Cost exposure", "Trigger threshold"
-- No investment advice, trading recommendations, or procurement instructions
-- Tone: control room briefing, not analyst report
+STRICT RULES:
+- No investment, trading, financial, or procurement advice
+- Tone: control room briefing. Direct. 30-second readability.
+- NEVER: "interesting", "notable", "potentially", "might be worth"
+- ALWAYS: "No action required", "Monitor", "Watch", "Escalation threshold"
 
-Current Texas Conditions (Houston primary):
-- Risk Level: {risk.upper()} | Trend: {trend}
-- ERCOT: {_fmt_ercot(ercot)} | Prior week: {_fmt_ercot(prior_ercot)} | Change: {'+' if price_pct >= 0 else ''}{price_pct:.1f}%
+Current Texas Conditions:
+- Risk: {risk.upper()} | Trend: {trend}
+- ERCOT: {_fmt_ercot(ercot)} | Prior: {_fmt_ercot(prior_ercot)} | Change: {price_pct:+.1f}%
+- Weather Demand: {current.get("weather_demand_pressure", "low").upper()}
+- Gas Supply: {current.get("gas_supply_pressure", "low").upper()}
 - Week avg risk: {avg_score:.1f}/10 | Peak: {peak_score:.1f}/10
-- Weather Demand: {current.get('weather_demand_pressure', 'low').upper()}
-- Gas Supply: {current.get('gas_supply_pressure', 'low').upper()}
-- Gas Storage vs 5yr avg: {current.get('gas_storage_vs_avg', 'N/A')}%
 
-Regional Risk States:
-{region_lines}
+Regional: {region_lines}
+Industry Spotlight this week: {spotlight_industry}
+Anchor recommended_action: "{action_anchor}"
 
-Anchor your recommended_action as: "{action_anchor}"
-
-Return ONLY valid JSON — no markdown, no preamble:
+Return ONLY valid JSON:
 {{
-  "subject": "Texas Energy Risk Brief — [Week ending date]",
-  "preview_text": "90 chars max. Start with action status. E.g.: 'No action required. Texas conditions stable heading into the week.'",
-  "executive_summary": "2 sentences. Current operational posture only. Start with action status.",
-  "recommended_action": "{action_anchor}",
-  "action_reasons": ["3-4 bullet reasons why. Each under 10 words. Factual."],
-  "escalate_if": ["3 specific thresholds. E.g.: 'ERCOT exceeds $35/MWh'"],
-  "next_review_time": "Next review time. E.g.: '14:00 CDT'",
-  "cost_exposure_level": "Minimal / Moderate / Elevated",
-  "cost_exposure_desc": "One sentence. What cost exposure exists right now.",
-  "cost_watch_threshold": "E.g.: 'ERCOT > $35/MWh'",
-  "cost_elevated_threshold": "E.g.: 'ERCOT > $50/MWh'",
-  "cost_critical_threshold": "E.g.: 'ERCOT > $100/MWh'",
+  "subject": "Texas Energy Risk Brief — [current week, e.g. Week of June 9, 2026]",
+  "preview_text": "Under 90 chars. Start with risk level. E.g.: Low risk this week. ERCOT stable, no heat wave concerns for Texas operations.",
+  "exec_risk_level": "{risk.upper()}",
+  "exec_outlook": "One sentence. Current operating outlook.",
+  "exec_primary_driver": "One phrase. What is driving current conditions.",
+  "exec_recommendation": "{action_anchor}",
+  "exec_expected_outlook": "One sentence. What to expect in next 24-72 hours.",
+  "what_changed_ercot": "ERCOT: {_fmt_ercot(prior_ercot)} → {_fmt_ercot(ercot)} ({price_pct:+.1f}%)",
+  "what_changed_temp": "Temperature change this week. E.g.: 92°F → 97°F",
+  "what_changed_demand": "Demand change. E.g.: Moderate → Elevated",
+  "what_changed_gas": "Gas storage/Henry Hub change. E.g.: No material change",
+  "what_changed_risk": "Risk level change. E.g.: LOW → LOW",
+  "what_changed_explanation": "2 sentences. Why did conditions change this week?",
+  "ew_heat_risk": "Normal / Watching / Elevated",
+  "ew_demand_pressure": "Normal / Watching / Elevated",
+  "ew_gas_supply": "Normal / Watching / Elevated",
+  "ew_ercot_reserves": "Healthy / Watching / Tight",
+  "ew_grid_reliability": "Normal / Watching / Stressed",
+  "ew_escalation_pct": 15,
+  "ew_explanation": "2 sentences explaining early warning signals.",
+  "threat_heat_wave": "Low / Moderate / High",
+  "threat_cold_front": "Low / Moderate / High",
+  "threat_hurricane": "Low / Moderate / High",
+  "threat_congestion": "None / Moderate / High",
+  "threat_pipeline": "None / Moderate / High",
+  "threat_refinery": "None / Moderate / High",
+  "threat_ercot_notices": "None / Active",
+  "threat_grid_reliability": "Stable / Watch / Stressed",
+  "ercot_current": "{_fmt_ercot(ercot)}",
+  "ercot_24h": "Stable / Rising / Falling",
+  "ercot_72h": "Stable / Rising / Falling",
+  "ercot_risk": "{risk.capitalize()}",
+  "ercot_confidence": 72,
+  "ercot_comment": "One sentence. ERCOT outlook context.",
+  "recommendations": ["3-5 operational recommendations. Start each with a verb. No financial advice."],
+  "fin_current_price": "{_fmt_ercot(ercot)}",
+  "fin_elevated_price": "$75/MWh",
+  "fin_high_price": "$150/MWh",
+  "fin_explanation": "2 sentences. Potential cost exposure context. Informational only.",
+  "spotlight_industry": "{spotlight_industry}",
+  "spotlight_text": "2-3 sentences. Current conditions for this industry. Operational focus.",
   "risk_trend": "{trend}",
-  "risk_trend_desc": "One sentence describing the trend direction.",
-  "most_important_signal": "One operational signal. 2-3 sentences. Control room language.",
-  "most_important_signal_title": "Short title. E.g.: 'Afternoon Temperature Watch'",
-  "what_changed_ercot": "ERCOT: {_fmt_ercot(prior_ercot)} → {_fmt_ercot(ercot)} ({'+' if price_pct >= 0 else ''}{price_pct:.1f}%)",
-  "what_changed_weather": "Temperature outlook change this week vs prior week.",
-  "what_changed_gas": "Henry Hub / gas storage change this week vs prior.",
-  "what_changed_risk": "Risk score change this week vs prior.",
-  "outlook_0_6h": "0-6 hours outlook. One sentence.",
-  "outlook_6_24h": "6-24 hours outlook. One sentence.",
-  "outlook_24_48h": "24-48 hours outlook. One sentence.",
-  "outlook_48_72h": "48-72 hours outlook. One sentence.",
-  "confidence_pct": 55,
-  "confidence_reasons": ["3-4 reasons explaining confidence level. Analytical."],
-  "watch_items": ["3-5 specific operational watch items with thresholds."]
+  "confidence_pct": 72,
+  "watch_items": ["3-5 specific watch items with thresholds."]
 }}"""
+
+
+
 
 
 async def generate_newsletter_content(
@@ -274,473 +287,227 @@ def _fallback_content(current: dict, prior: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 def build_html_email(content: dict, current: dict, regional: dict[str, dict], issue_id: str) -> str:
-    """Build V3 HTML email — executive operational briefing format."""
-    risk        = current.get("risk_score", "low")
-    ercot_raw   = current.get("ercot_price")
-    ercot       = float(ercot_raw) if (ercot_raw and float(ercot_raw) > 0) else None
-    ercot_str   = _fmt_ercot(ercot)
-    risk_color  = "#ef4444" if risk == "high" else "#f59e0b" if risk == "medium" else "#10b981"
-    fe_url     = os.getenv("FRONTEND_URL", "https://texas-energy-risk.vercel.app")
+    """Build Newsletter V4 HTML — 9-section executive operational briefing."""
+    risk       = current.get("risk_score", "low")
+    ercot_raw  = current.get("ercot_price")
+    ercot      = float(ercot_raw) if (ercot_raw and float(ercot_raw) > 0) else None
+    ercot_str  = _fmt_ercot(ercot)
+    risk_color = "#ef4444" if risk == "high" else "#f59e0b" if risk == "medium" else "#10b981"
+    fe_url     = os.getenv("FRONTEND_URL", "https://texasgridintel.com")
     unsub_url  = f"{fe_url}/unsubscribe?token={{{{unsubscribe_token}}}}"
 
-    # Helper: color for risk score
-    def rc(score: str) -> str:
-        return "#ef4444" if score == "high" else "#f59e0b" if score == "medium" else "#10b981"
+    def ew_dot(level: str) -> str:
+        if level in ("Elevated", "Tight", "Stressed", "High", "Active"):
+            return "🔴"
+        if level in ("Watching", "Moderate", "Watch"):
+            return "🟡"
+        return "🟢"
 
-    # Action reasons bullets
-    action_reasons = content.get("action_reasons") or ["ERCOT pricing below escalation thresholds", "Weather conditions within seasonal norms", "Natural gas supply stable"]
-    reasons_html = "".join(f'<li style="margin:2px 0;font-size:12px;color:#94a3b8;">• {r}</li>' for r in action_reasons)
+    def threat_color(level: str) -> str:
+        if level in ("High", "Active", "Stressed"):
+            return "#ef4444"
+        if level in ("Moderate", "Watch", "Watching"):
+            return "#f59e0b"
+        return "#10b981"
 
-    # Escalate-if bullets
-    escalate_if = content.get("escalate_if") or ["ERCOT > $35/MWh", "Temperature > 95°F", "Henry Hub > $3.00/MMBtu"]
-    escalate_html = "".join(f'<li style="margin:2px 0;font-size:12px;color:#fbbf24;">• {e}</li>' for e in escalate_if)
+    # Early warning signals
+    ew_signals = [
+        (content.get("ew_heat_risk", "Normal"),        "Heat Risk"),
+        (content.get("ew_demand_pressure", "Normal"),  "Demand Pressure"),
+        (content.get("ew_gas_supply", "Normal"),       "Gas Supply"),
+        (content.get("ew_ercot_reserves", "Healthy"),  "ERCOT Reserves"),
+        (content.get("ew_grid_reliability", "Normal"), "Grid Reliability"),
+    ]
+    ew_html = "".join(f'''<tr><td style="padding:5px 0;border-bottom:1px solid #1e293b;font-size:13px;color:#e2e8f0;">{ew_dot(lvl)} {label}</td><td style="padding:5px 0;border-bottom:1px solid #1e293b;font-size:12px;font-weight:700;color:{threat_color(lvl)};text-align:right;">{lvl}</td></tr>''' for lvl, label in ew_signals)
 
-    # Watch items
-    watch_items = content.get("watch_items") or []
-    watch_html  = "".join(f'<tr><td style="padding:6px 0;border-bottom:1px solid #1e293b;font-size:12px;color:#94a3b8;">• {item}</td></tr>' for item in watch_items)
+    # Texas Threat Center
+    threats = [
+        ("Heat Wave",          content.get("threat_heat_wave", "Low")),
+        ("Cold Front",         content.get("threat_cold_front", "Low")),
+        ("Hurricane",          content.get("threat_hurricane", "Low")),
+        ("Transmission",       content.get("threat_congestion", "None")),
+        ("Pipeline Constraints", content.get("threat_pipeline", "None")),
+        ("Refinery Outages",   content.get("threat_refinery", "None")),
+        ("ERCOT Notices",      content.get("threat_ercot_notices", "None")),
+        ("Grid Reliability",   content.get("threat_grid_reliability", "Stable")),
+    ]
+    threat_html = "".join(f'''<tr><td style="padding:5px 0;border-bottom:1px solid #1e293b;font-size:12px;color:#94a3b8;">{name}</td><td style="padding:5px 0;border-bottom:1px solid #1e293b;font-size:12px;font-weight:700;color:{threat_color(level)};text-align:right;">{level}</td></tr>''' for name, level in threats)
 
     # What changed rows
     changes = [
-        ("ERCOT Price",             content.get("what_changed_ercot", "N/A")),
-        ("Temperature Outlook",     content.get("what_changed_weather", "N/A")),
-        ("Henry Hub / Gas",         content.get("what_changed_gas", "N/A")),
-        ("Risk Score",              content.get("what_changed_risk", "N/A")),
+        ("ERCOT Price",    content.get("what_changed_ercot", ercot_str)),
+        ("Temperature",    content.get("what_changed_temp", "Monitoring")),
+        ("Demand",         content.get("what_changed_demand", "Stable")),
+        ("Gas Storage",    content.get("what_changed_gas", "No material change")),
+        ("Risk Level",     content.get("what_changed_risk", f"{risk.upper()} → {risk.upper()}")),
     ]
-    changes_html = "".join(f'''
-      <tr>
-        <td style="padding:6px 8px;font-size:12px;color:#94a3b8;border-bottom:1px solid #1e293b;">{label}</td>
-        <td style="padding:6px 8px;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e293b;">{val}</td>
-      </tr>''' for label, val in changes)
+    changes_html = "".join(f'''<tr><td style="padding:6px 8px;font-size:12px;color:#94a3b8;border-bottom:1px solid #1e293b;">{label}</td><td style="padding:6px 8px;font-size:12px;font-weight:700;color:#e2e8f0;border-bottom:1px solid #1e293b;">{val}</td></tr>''' for label, val in changes)
 
-    # Escalation trigger dashboard
-    triggers = [
-        ("ERCOT > $35/MWh",        bool(ercot and ercot >= 35)),
-        ("Temperature > 95°F",      False),
-        ("Henry Hub > $3.00/MMBtu", False),
-        ("ERCOT Emergency Notice",  False),
-    ]
-    triggers_html = "".join(f'''
-      <tr>
-        <td style="padding:6px 8px;font-size:12px;color:#94a3b8;border-bottom:1px solid #1e293b;">{label}</td>
-        <td style="padding:6px 8px;font-size:11px;font-weight:700;color:{"#ef4444" if triggered else "#10b981"};border-bottom:1px solid #1e293b;">
-          {"⚠ TRIGGERED" if triggered else "✓ Normal"}
-        </td>
-      </tr>''' for label, triggered in triggers)
+    # Recommendations
+    recs = content.get("recommendations") or ["Continue standard monitoring cadence.", "Monitor afternoon ERCOT pricing (14:00-19:00 CDT).", "Review internal procedures if conditions escalate."]
+    recs_html = "".join(f'''<tr><td style="padding:5px 0;font-size:13px;color:#e2e8f0;">✔ {r}</td></tr>''' for r in recs)
 
-    # Operational outlook timeline
-    outlook_rows = [
-        ("0–6 Hours",   content.get("outlook_0_6h",  "No action required.")),
-        ("6–24 Hours",  content.get("outlook_6_24h", "Continue monitoring.")),
-        ("24–48 Hours", content.get("outlook_24_48h","Stable outlook.")),
-        ("48–72 Hours", content.get("outlook_48_72h","No significant risk expected.")),
-    ]
-    outlook_html = "".join(f'''
-      <tr>
-        <td style="padding:6px 8px;font-size:11px;font-weight:700;color:#64748b;border-bottom:1px solid #1e293b;white-space:nowrap;">{window}</td>
-        <td style="padding:6px 8px;font-size:12px;color:#94a3b8;border-bottom:1px solid #1e293b;">{desc}</td>
-      </tr>''' for window, desc in outlook_rows)
+    # Watch items
+    watch = content.get("watch_items") or []
+    watch_html = "".join(f'''<tr><td style="padding:5px 0;border-bottom:1px solid #1e293b;font-size:12px;color:#94a3b8;">• {item}</td></tr>''' for item in watch)
 
-    # Regional snapshot
-    region_rows = "".join(f'''
-      <td style="padding:8px 4px;text-align:center;width:12.5%;">
-        <div style="background:{rc(data.get("risk_score","low"))}22;border:1px solid {rc(data.get("risk_score","low"))}44;border-radius:6px;padding:6px 4px;">
-          <p style="margin:0;font-size:9px;color:#64748b;">{region.split()[0]}</p>
-          <p style="margin:2px 0 0;font-size:10px;font-weight:700;color:{rc(data.get("risk_score","low"))};">{(data.get("risk_score") or "N/A").upper()}</p>
-        </div>
-      </td>''' for region, data in regional.items())
-
-    # Confidence
-    conf_pct    = content.get("confidence_pct", 55)
-    conf_reasons = content.get("confidence_reasons") or ["Stable conditions provide fewer predictive signals", "Weather uncertainty increases beyond 24 hours", "No active risk drivers currently present"]
-    conf_html   = "".join(f'<li style="margin:2px 0;font-size:12px;color:#94a3b8;">• {r}</li>' for r in conf_reasons)
-
-    # Data reliability
-    reliability_rows = [
-        ("ERCOT Feed",    98),
-        ("NOAA Weather",  98),
-        ("Gas Storage",   96),
-    ]
-    reliability_html = "".join(f'''
-      <tr>
-        <td style="padding:4px 8px;font-size:12px;color:#94a3b8;">{label}</td>
-        <td style="padding:4px 8px;font-size:12px;font-weight:700;color:#10b981;">{pct}%</td>
-      </tr>''' for label, pct in reliability_rows)
-
-    trend       = content.get("risk_trend", "Stable")
-    trend_arrow = "↑" if trend == "Rising" else "↓" if trend == "Improving" else "→"
-    trend_color = "#ef4444" if trend == "Rising" else "#10b981" if trend == "Improving" else "#64748b"
-    cost_level  = content.get("cost_exposure_level", "Minimal")
-    cost_color  = "#ef4444" if cost_level == "Elevated" else "#f59e0b" if cost_level == "Moderate" else "#10b981"
+    ercot_conf = content.get("ercot_confidence", 72)
+    ew_esc_pct = content.get("ew_escalation_pct", 15)
 
     return f"""<!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{content.get("subject", "Texas Energy Risk Brief")}</title>
-</head>
-<body style="margin:0;padding:0;background:#0d1117;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;color:#e2e8f0;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0d1117;padding:24px 0;">
-<tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;">
-
-  <!-- HEADER -->
-  <tr><td style="background:#0f172a;border-radius:12px 12px 0 0;padding:24px 28px 20px;border-bottom:1px solid #1e293b;">
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td>
-        <p style="margin:0 0 2px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;">Texas Energy Risk Brief</p>
-        <p style="margin:0;font-size:18px;font-weight:900;color:#fff;">Weekly Operational Intelligence</p>
-        <p style="margin:3px 0 0;font-size:10px;color:#64748b;">ERCOT · Weather · Natural Gas · {datetime.now(timezone.utc).strftime("%B %d, %Y")}</p>
-      </td>
-      <td align="right" style="vertical-align:top;">
-        <span style="display:inline-block;padding:4px 10px;border-radius:6px;background:{risk_color}22;border:1px solid {risk_color}44;font-size:11px;font-weight:700;color:{risk_color};text-transform:uppercase;">
-          {risk.upper()} RISK &nbsp;{trend_arrow}
-        </span>
-      </td>
-    </tr></table>
-  </td></tr>
-
-  <!-- MAIN CTA BUTTON — prominent, right after header -->
-  <tr><td style="background:#0f172a;padding:16px 28px;border-bottom:1px solid #1e293b;text-align:center;">
-    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-      <tr>
-        <td style="border-radius:8px;background:#f97316;">
-          <a href="{fe_url}/dashboard"
-             style="display:inline-block;padding:12px 28px;border-radius:8px;background:#f97316;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;">
-            &#8594; View Live Texas Grid Conditions
-          </a>
-        </td>
-      </tr>
-    </table>
-    <p style="margin:8px 0 0;font-size:11px;color:#475569;">
-      <a href="{fe_url}/dashboard" style="color:#475569;text-decoration:underline;">texasgridintel.com/dashboard</a>
-      &nbsp;&nbsp;|&nbsp;&nbsp;
-      <a href="{fe_url}/alerts" style="color:#475569;text-decoration:underline;">Alert Settings</a>
-      &nbsp;&nbsp;|&nbsp;&nbsp;
-      <a href="{fe_url}/pricing" style="color:#475569;text-decoration:underline;">Upgrade Plan</a>
-    </p>
-  </td></tr>
-
-  <!-- EXECUTIVE SUMMARY -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 6px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Executive Summary</p>
-    <p style="margin:0;font-size:14px;color:#e2e8f0;line-height:1.6;">{content.get("executive_summary", "")}</p>
-    <p style="margin:10px 0 0;">
-      <a href="{fe_url}/dashboard" style="font-size:12px;color:#f97316;font-weight:600;text-decoration:underline;">View live conditions → texasgridintel.com/dashboard</a>
-    </p>
-  </td></tr>
-
-  <!-- EXECUTIVE DECISION BOX -->
-  <tr><td style="background:{risk_color}0d;border-left:3px solid {risk_color};padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 10px;font-size:10px;color:{risk_color};text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Executive Decision</p>
-    <p style="margin:0 0 8px;font-size:16px;font-weight:900;color:#fff;">{content.get("recommended_action", "No action required.")}</p>
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="vertical-align:top;width:50%;padding-right:12px;">
-        <p style="margin:0 0 4px;font-size:10px;color:#64748b;text-transform:uppercase;">Why:</p>
-        <ul style="margin:0;padding:0;list-style:none;">{reasons_html}</ul>
-      </td>
-      <td style="vertical-align:top;width:50%;">
-        <p style="margin:0 0 4px;font-size:10px;color:#f59e0b;text-transform:uppercase;">Escalate if:</p>
-        <ul style="margin:0 0 8px;padding:0;list-style:none;">{escalate_html}</ul>
-        <p style="margin:0;font-size:11px;color:#64748b;">Next review: <strong style="color:#e2e8f0;">{content.get("next_review_time","14:00 CDT")}</strong></p>
-      </td>
-    </tr></table>
-  </td></tr>
-
-  <!-- CURRENT CONDITIONS + TREND -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 12px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Current Conditions</p>
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="width:33%;padding-right:6px;">
-        <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
-          <tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;">Texas Risk</td></tr>
-          <tr><td style="font-size:18px;font-weight:900;color:{risk_color};">{risk.upper()}</td></tr>
-          <tr><td style="font-size:10px;color:{trend_color};">{trend_arrow} {trend}</td></tr>
-        </table>
-      </td>
-      <td style="width:33%;padding:0 3px;">
-        <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
-          <tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;">ERCOT Hub</td></tr>
-          <tr><td style="font-size:18px;font-weight:900;color:#f97316;">{ercot_str}</td></tr>
-          <tr><td style="font-size:10px;color:#64748b;">Houston Hub</td></tr>
-        </table>
-      </td>
-      <td style="width:33%;padding-left:6px;">
-        <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
-          <tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;">Cost Exposure</td></tr>
-          <tr><td style="font-size:18px;font-weight:900;color:{cost_color};">{cost_level}</td></tr>
-          <tr><td style="font-size:10px;color:#64748b;">{content.get("cost_exposure_desc","")[:40]}</td></tr>
-        </table>
-      </td>
-    </tr></table>
-  </td></tr>
-
-  <!-- ESTIMATED COST EXPOSURE -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 10px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Estimated Cost Exposure</p>
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="padding:6px 0;font-size:12px;color:#94a3b8;border-bottom:1px solid #1e293b;"><strong style="color:#e2e8f0;">Current Exposure:</strong> {cost_level}</td>
-      </tr>
-      <tr><td style="padding:6px 0;font-size:12px;color:#94a3b8;border-bottom:1px solid #1e293b;">{content.get("cost_exposure_desc","")}</td></tr>
-      <tr><td style="padding:6px 0;font-size:12px;color:#f59e0b;border-bottom:1px solid #1e293b;"><strong>Watch threshold:</strong> {content.get("cost_watch_threshold","ERCOT > $35/MWh")}</td></tr>
-      <tr><td style="padding:6px 0;font-size:12px;color:#f97316;border-bottom:1px solid #1e293b;"><strong>Elevated threshold:</strong> {content.get("cost_elevated_threshold","ERCOT > $50/MWh")}</td></tr>
-      <tr><td style="padding:6px 0;font-size:12px;color:#ef4444;"><strong>Critical threshold:</strong> {content.get("cost_critical_threshold","ERCOT > $100/MWh")}</td></tr>
-    </table>
-  </td></tr>
-
-  <!-- MOST IMPORTANT SIGNAL -->
-  <tr><td style="background:#1e293b;padding:20px 28px;border-bottom:1px solid #0f172a;border-left:3px solid #3b82f6;">
-    <p style="margin:0 0 6px;font-size:10px;color:#3b82f6;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Most Important Signal</p>
-    <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#e2e8f0;">{content.get("most_important_signal_title","Operational Awareness")}</p>
-    <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.6;">{content.get("most_important_signal","No elevated signals detected this week.")}</p>
-  </td></tr>
-
-  <!-- WHAT CHANGED -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 10px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">What Changed This Week</p>
-    <table width="100%" cellpadding="0" cellspacing="0">{changes_html}</table>
-  </td></tr>
-
-  <!-- ESCALATION TRIGGER DASHBOARD -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 10px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Escalation Watch</p>
-    <table width="100%" cellpadding="0" cellspacing="0">{triggers_html}</table>
-  </td></tr>
-
-  <!-- OPERATIONAL OUTLOOK TIMELINE -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 10px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Operational Outlook</p>
-    <table width="100%" cellpadding="0" cellspacing="0">{outlook_html}</table>
-  </td></tr>
-
-  <!-- REGIONAL SNAPSHOT -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 10px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Regional Snapshot</p>
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>{region_rows}</tr></table>
-  </td></tr>
-
-  <!-- MONITORING PRIORITIES -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 8px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">What to Monitor This Week</p>
-    <table width="100%" cellpadding="0" cellspacing="0">{watch_html}</table>
-    <p style="margin:12px 0 0;font-size:11px;color:#64748b;">
-      Set custom alert thresholds: <a href="{fe_url}/alerts" style="color:#f97316;text-decoration:none;font-weight:600;">texasgridintel.com/alerts</a>
-    </p>
-  </td></tr>
-
-  <!-- DATA RELIABILITY -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 10px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Data Reliability</p>
-    <table width="100%" cellpadding="0" cellspacing="0">
-      {reliability_html}
-      <tr>
-        <td style="padding:6px 8px;font-size:12px;font-weight:700;color:#e2e8f0;">Overall</td>
-        <td style="padding:6px 8px;font-size:12px;font-weight:700;color:#10b981;">Operationally Reliable</td>
-      </tr>
-    </table>
-  </td></tr>
-
-  <!-- CONFIDENCE -->
-  <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td>
-        <p style="margin:0 0 4px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Assessment Confidence</p>
-        <ul style="margin:4px 0 0;padding:0;list-style:none;">{conf_html}</ul>
-      </td>
-      <td align="right" style="vertical-align:top;">
-        <span style="font-size:22px;font-weight:900;color:#64748b;">{conf_pct}%</span>
-      </td>
-    </tr></table>
-  </td></tr>
-
-  <!-- PREMIUM CTA -->
-  <tr><td style="background:#1e293b;padding:24px 28px;border-bottom:1px solid #0f172a;text-align:center;">
-    <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#fff;">Need Real-Time Monitoring?</p>
-    <table cellpadding="0" cellspacing="0" style="margin:0 auto 14px;">
-      <tr>
-        <td style="padding:3px 16px;text-align:left;">
-          <p style="margin:0;font-size:12px;color:#94a3b8;">✓ Live ERCOT Tracking</p>
-          <p style="margin:2px 0 0;font-size:12px;color:#94a3b8;">✓ Alert Notifications</p>
-          <p style="margin:2px 0 0;font-size:12px;color:#94a3b8;">✓ Regional Monitoring</p>
-        </td>
-        <td style="padding:3px 16px;text-align:left;">
-          <p style="margin:0;font-size:12px;color:#94a3b8;">✓ Daily Operational Briefs</p>
-          <p style="margin:2px 0 0;font-size:12px;color:#94a3b8;">✓ Escalation Detection</p>
-          <p style="margin:2px 0 0;font-size:12px;color:#94a3b8;">✓ Executive Intelligence</p>
-        </td>
-      </tr>
-    </table>
-    <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
-      <td style="padding-right:8px;">
-        <a href="{fe_url}/dashboard" style="display:inline-block;padding:10px 22px;background:#f97316;border-radius:8px;font-size:13px;font-weight:700;color:#fff;text-decoration:none;">View Live Dashboard</a>
-      </td>
-      <td>
-        <a href="{fe_url}/pricing" style="display:inline-block;padding:10px 22px;background:#0f172a;border:1px solid #334155;border-radius:8px;font-size:13px;font-weight:600;color:#e2e8f0;text-decoration:none;">Request Enterprise Demo</a>
-      </td>
-    </tr></table>
-  </td></tr>
-
-  <!-- FOOTER -->
-  <tr><td style="background:#0a0f1a;border-radius:0 0 12px 12px;padding:18px 28px;text-align:center;">
-    <p style="margin:0 0 6px;font-size:10px;color:#334155;line-height:1.5;">
-      TX Energy Risk · Texas Energy Operations Intelligence<br>
-      You are receiving this because you subscribed to the Texas Energy Risk Brief.
-    </p>
-    <p style="margin:0 0 6px;font-size:10px;color:#1e293b;">TX Energy Risk · Houston, TX 77002</p>
-    <p style="margin:0 0 8px;font-size:10px;color:#475569;"><a href="{unsub_url}" style="color:#475569;">Unsubscribe</a></p>
-    <p style="margin:0;font-size:9px;color:#1e293b;line-height:1.5;">
-      TX Energy Risk provides informational operational intelligence only. This newsletter does not constitute
-      investment, trading, financial, legal, procurement, or operational advice. Users are responsible for their own decisions.
-      Data sourced from ERCOT, NOAA, and EIA public feeds.
-    </p>
-  </td></tr>
-
-</table>
-</td></tr>
-</table>
-</body>
-</html>"""
-
-    unsubscribe_url = f"{os.getenv('FRONTEND_URL', 'https://texas-energy-risk.vercel.app')}/unsubscribe?token={{{{unsubscribe_token}}}}"
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{content.get("subject", "Texas Energy Risk Brief")}</title>
-</head>
-<body style="margin:0;padding:0;background:#0d1117;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;color:#e2e8f0;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0d1117;padding:24px 0;">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>{content.get("subject","Texas Energy Risk Brief")}</title></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:20px 0;">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-  <!-- Header -->
-  <tr><td style="background:#0f172a;border-radius:12px 12px 0 0;padding:28px 32px;border-bottom:1px solid #1e293b;">
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td>
-          <p style="margin:0 0 2px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:2px;">Texas Energy Risk Brief</p>
-          <p style="margin:0;font-size:20px;font-weight:900;color:#fff;">Weekly Operational Intelligence</p>
-          <p style="margin:4px 0 0;font-size:11px;color:#64748b;">ERCOT Pricing · Weather Demand · Natural Gas Supply</p>
-        </td>
-        <td align="right">
-          <span style="display:inline-block;padding:4px 10px;border-radius:6px;background:{risk_color}22;border:1px solid {risk_color}44;font-size:11px;font-weight:700;color:{risk_color};text-transform:uppercase;letter-spacing:1px;">
-            {risk} RISK
-          </span>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
+<!-- HEADER -->
+<tr><td style="background:#0f172a;border-radius:12px 12px 0 0;padding:20px 28px;border-bottom:2px solid {risk_color};">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td><p style="margin:0 0 2px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;">Texas Grid Intel</p>
+        <p style="margin:0;font-size:20px;font-weight:900;color:#fff;">Texas Energy Risk Brief</p>
+        <p style="margin:3px 0 0;font-size:10px;color:#64748b;">Weekly Operational Intelligence · {datetime.now(timezone.utc).strftime("%B %d, %Y")}</p></td>
+    <td align="right" style="vertical-align:top;">
+      <span style="display:inline-block;padding:6px 14px;border-radius:6px;background:{risk_color}22;border:2px solid {risk_color};font-size:13px;font-weight:900;color:{risk_color};text-transform:uppercase;">{risk.upper()} RISK</span>
+    </td>
+  </tr></table>
+</td></tr>
 
-  <!-- Executive Summary -->
-  <tr><td style="background:#0f172a;padding:24px 32px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Executive Summary</p>
-    <p style="margin:0;font-size:14px;color:#e2e8f0;line-height:1.6;">{content.get("executive_summary", "")}</p>
-  </td></tr>
+<!-- MAIN CTA BUTTON -->
+<tr><td style="background:#0a0f1a;padding:12px 28px;text-align:center;">
+  <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
+    <td style="border-radius:6px;background:#f97316;padding:0;">
+      <a href="{fe_url}/dashboard" style="display:inline-block;padding:10px 24px;border-radius:6px;background:#f97316;font-size:13px;font-weight:700;color:#ffffff;text-decoration:none;">&#8594; View Live Dashboard</a>
+    </td>
+    <td style="padding-left:12px;">
+      <a href="{fe_url}/alerts" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#1e293b;border:1px solid #334155;font-size:12px;font-weight:600;color:#94a3b8;text-decoration:none;">Alert Settings</a>
+    </td>
+  </tr></table>
+</td></tr>
 
-  <!-- Current Conditions -->
-  <tr><td style="background:#0f172a;padding:24px 32px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 12px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Current Conditions</p>
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="width:50%;padding-right:8px;">
-          <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
-            <tr><td style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Texas Risk Level</td></tr>
-            <tr><td style="font-size:16px;font-weight:900;color:{risk_color};">{risk.upper()}</td></tr>
-          </table>
-        </td>
-        <td style="width:50%;padding-left:8px;">
-          <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
-            <tr><td style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">ERCOT Houston Hub</td></tr>
-            <tr><td style="font-size:16px;font-weight:900;color:#f97316;">{ercot_str}</td></tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
-      <tr>
-        <td style="padding:8px;background:#1e293b;border-radius:8px;font-size:12px;color:#94a3b8;">
-          <strong style="color:#e2e8f0;">Recommended Action:</strong> {content.get("recommended_action", "No action required.")}
-        </td>
-      </tr>
-    </table>
-  </td></tr>
+<!-- SECTION 1: EXECUTIVE SUMMARY -->
+<tr><td style="background:#0f172a;padding:24px 28px;border-bottom:3px solid {risk_color};">
+  <p style="margin:0 0 6px;font-size:10px;color:{risk_color};text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 1 · Executive Summary</p>
+  <p style="margin:0 0 16px;font-size:16px;color:#e2e8f0;line-height:1.6;">{content.get("exec_outlook", "Texas energy conditions are stable this week.")}</p>
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td style="width:50%;padding-right:8px;">
+        <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
+          <tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Risk Level</td></tr>
+          <tr><td style="font-size:22px;font-weight:900;color:{risk_color};">{risk.upper()}</td></tr>
+        </table>
+      </td>
+      <td style="width:50%;padding-left:8px;">
+        <table width="100%" cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:8px;">
+          <tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Primary Driver</td></tr>
+          <tr><td style="font-size:14px;font-weight:700;color:#e2e8f0;">{content.get("exec_primary_driver", "Stable market conditions")}</td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+    <tr><td style="background:#1e293b;border-left:3px solid {risk_color};padding:10px 14px;border-radius:0 6px 6px 0;">
+      <p style="margin:0 0 2px;font-size:9px;color:#64748b;text-transform:uppercase;">Recommended Action</p>
+      <p style="margin:0;font-size:14px;font-weight:700;color:#e2e8f0;">{content.get("exec_recommendation","No action required.")}</p>
+    </td></tr>
+    <tr><td style="padding-top:8px;">
+      <p style="margin:0;font-size:12px;color:#64748b;"><strong style="color:#94a3b8;">Expected Outlook:</strong> {content.get("exec_expected_outlook","Stable over the next 24-72 hours.")}</p>
+    </td></tr>
+  </table>
+</td></tr>
 
-  <!-- What Changed -->
-  <tr><td style="background:#0f172a;padding:24px 32px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">What Changed This Week</p>
-    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">{content.get("what_changed", "")}</p>
-  </td></tr>
+<!-- SECTION 2: WHAT CHANGED -->
+<tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
+  <p style="margin:0 0 12px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 2 · What Changed This Week</p>
+  <table width="100%" cellpadding="0" cellspacing="0">{changes_html}</table>
+  <p style="margin:12px 0 0;font-size:12px;color:#94a3b8;line-height:1.6;font-style:italic;">{content.get("what_changed_explanation","Conditions were broadly stable this week relative to prior period.")}</p>
+</td></tr>
 
-  <!-- Watch This Week -->
-  <tr><td style="background:#0f172a;padding:24px 32px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">What to Watch This Week</p>
-    <table width="100%" cellpadding="0" cellspacing="0">{watch_items_html}</table>
-  </td></tr>
+<!-- SECTION 3: EARLY WARNING -->
+<tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
+  <p style="margin:0 0 12px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 3 · Early Warning Signals</p>
+  <table width="100%" cellpadding="0" cellspacing="0">{ew_html}</table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;background:#1e293b;border-radius:6px;">
+    <tr><td style="padding:10px 14px;">
+      <p style="margin:0 0 2px;font-size:9px;color:#64748b;text-transform:uppercase;">Escalation Probability</p>
+      <p style="margin:0;font-size:18px;font-weight:900;color:{"#ef4444" if ew_esc_pct >= 50 else "#f59e0b" if ew_esc_pct >= 25 else "#10b981"};">{ew_esc_pct}%</p>
+    </td>
+    <td style="padding:10px 14px;text-align:right;vertical-align:middle;">
+      <p style="margin:0;font-size:11px;color:#64748b;">{content.get("ew_explanation","All signals within normal operating parameters.")}</p>
+    </td></tr>
+  </table>
+</td></tr>
 
-  <!-- Operational Outlook -->
-  <tr><td style="background:#0f172a;padding:24px 32px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Operational Outlook</p>
-    <table width="100%" cellpadding="0" cellspacing="0">
-      {"".join(f'<tr><td style="padding:4px 0;font-size:12px;color:#94a3b8;"><strong style="color:#e2e8f0;">{label}:</strong> {val}</td></tr>' for label, val in [
-          ("Operational Exposure", content.get("operational_exposure", "")),
-          ("Monitoring Focus",     content.get("monitoring_focus", "")),
-          ("Escalation Triggers",  content.get("escalation_triggers", "")),
-          ("Week Outlook",         content.get("outlook_note", "")),
-      ] if val)}
-    </table>
-  </td></tr>
+<!-- SECTION 4: TEXAS THREAT CENTER -->
+<tr><td style="background:#0a0f1a;padding:20px 28px;border-bottom:1px solid #1e293b;">
+  <p style="margin:0 0 12px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 4 · Texas Threat Center</p>
+  <table width="100%" cellpadding="0" cellspacing="0">{threat_html}</table>
+</td></tr>
 
-  <!-- Regional Snapshot -->
-  <tr><td style="background:#0f172a;padding:24px 32px;border-bottom:1px solid #1e293b;">
-    <p style="margin:0 0 8px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Regional Snapshot</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e293b;border-radius:8px;">
-      {region_rows}
-    </table>
-  </td></tr>
+<!-- SECTION 5: ERCOT OUTLOOK -->
+<tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
+  <p style="margin:0 0 12px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 5 · ERCOT Outlook</p>
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      {"".join(f'''<td style="padding:8px;text-align:center;"><table cellpadding="6" cellspacing="0" style="background:#1e293b;border-radius:6px;width:100%;"><tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;">{lbl}</td></tr><tr><td style="font-size:13px;font-weight:700;color:#e2e8f0;">{val}</td></tr></table></td>''' for lbl, val in [("Current", content.get("ercot_current", ercot_str)), ("24-Hour", content.get("ercot_24h","Stable")), ("72-Hour", content.get("ercot_72h","Stable")), ("Risk", content.get("ercot_risk",risk.capitalize())), (f"Confidence", f"{ercot_conf}%")])}
+    </tr>
+  </table>
+  <p style="margin:10px 0 0;font-size:12px;color:#64748b;font-style:italic;">{content.get("ercot_comment","ERCOT conditions are within normal operating parameters.")}</p>
+  <p style="margin:8px 0 0;font-size:11px;"><a href="{fe_url}/dashboard" style="color:#f97316;text-decoration:underline;font-weight:600;">View real-time ERCOT dashboard → texasgridintel.com/dashboard</a></p>
+</td></tr>
 
-  <!-- CTA -->
-  <tr><td style="background:#0f172a;padding:24px 32px;border-bottom:1px solid #1e293b;text-align:center;">
-    <p style="margin:0 0 4px;font-size:13px;color:#94a3b8;">Want live monitoring instead of weekly updates?</p>
-    <p style="margin:0 0 16px;font-size:12px;color:#64748b;">TX Energy Risk monitors ERCOT pricing, weather demand, and gas supply conditions continuously.</p>
-    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-      <tr>
-        <td style="padding-right:8px;">
-          <a href="{os.getenv('FRONTEND_URL', 'https://texas-energy-risk.vercel.app')}/dashboard"
-             style="display:inline-block;padding:10px 20px;background:#f97316;border-radius:8px;font-size:13px;font-weight:700;color:#fff;text-decoration:none;">
-            View Live Conditions
-          </a>
-        </td>
-        <td>
-          <a href="{os.getenv('FRONTEND_URL', 'https://texas-energy-risk.vercel.app')}/pricing"
-             style="display:inline-block;padding:10px 20px;background:#1e293b;border:1px solid #334155;border-radius:8px;font-size:13px;font-weight:600;color:#e2e8f0;text-decoration:none;">
-            Request Enterprise Demo
-          </a>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
+<!-- SECTION 6: OPERATIONAL RECOMMENDATIONS -->
+<tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
+  <p style="margin:0 0 12px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 6 · Operational Recommendations</p>
+  <table width="100%" cellpadding="0" cellspacing="0">{recs_html}</table>
+  <p style="margin:10px 0 0;font-size:10px;color:#475569;font-style:italic;">Operational awareness only. Not financial, procurement, or operational advice.</p>
+</td></tr>
 
-  <!-- Footer -->
-  <tr><td style="background:#0a0f1a;border-radius:0 0 12px 12px;padding:20px 32px;text-align:center;">
-    <p style="margin:0 0 8px;font-size:11px;color:#334155;line-height:1.6;">
-      TX Energy Risk · Texas Energy Operations Intelligence<br>
-      You are receiving this because you subscribed to the Texas Energy Risk Brief.
-    </p>
-    <p style="margin:0 0 8px;font-size:11px;color:#1e293b;">
-      TX Energy Risk · Houston, TX 77002
-    </p>
-    <p style="margin:0;font-size:11px;color:#475569;">
-      <a href="{unsubscribe_url}" style="color:#475569;">Unsubscribe</a>
-    </p>
-    <p style="margin:12px 0 0;font-size:10px;color:#1e293b;line-height:1.5;">
-      TX Energy Risk provides informational operational intelligence only. This newsletter does not constitute
-      investment, trading, financial, legal, procurement, or operational advice. Users are responsible for
-      their own decisions. Data sourced from ERCOT, NOAA, and EIA public feeds.
-    </p>
-  </td></tr>
+<!-- SECTION 7: FINANCIAL IMPACT -->
+<tr><td style="background:#0a0f1a;padding:20px 28px;border-bottom:1px solid #1e293b;">
+  <p style="margin:0 0 12px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 7 · Financial Impact Reference</p>
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      {"".join(f'''<td style="padding:4px;text-align:center;"><table cellpadding="8" cellspacing="0" style="background:#1e293b;border-radius:6px;width:100%;"><tr><td style="font-size:9px;color:#64748b;text-transform:uppercase;">{lbl}</td></tr><tr><td style="font-size:14px;font-weight:900;color:{clr};">{val}</td></tr></table></td>''' for lbl, val, clr in [("Current Environment", content.get("fin_current_price", ercot_str), "#10b981"), ("Elevated Conditions", content.get("fin_elevated_price","$75/MWh"), "#f59e0b"), ("High-Risk Conditions", content.get("fin_high_price","$150/MWh"), "#ef4444")])}
+    </tr>
+  </table>
+  <p style="margin:10px 0 0;font-size:12px;color:#64748b;font-style:italic;">{content.get("fin_explanation","These are reference price levels only. Actual operational cost impact depends on facility load and contract structure.")}</p>
+</td></tr>
+
+<!-- SECTION 8: INDUSTRY SPOTLIGHT -->
+<tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;border-left:3px solid #3b82f6;">
+  <p style="margin:0 0 4px;font-size:10px;color:#3b82f6;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Section 8 · Industry Spotlight</p>
+  <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#e2e8f0;">{content.get("spotlight_industry","Midstream Operations")}</p>
+  <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">{content.get("spotlight_text","Current conditions support normal operations. No weather-driven disruptions are expected this week.")}</p>
+</td></tr>
+
+<!-- SECTION 9: DEMO CTA -->
+<tr><td style="background:#1e293b;padding:24px 28px;border-bottom:1px solid #0f172a;text-align:center;">
+  <p style="margin:0 0 6px;font-size:12px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:1px;">Want Customized Texas Energy Risk Intelligence?</p>
+  <p style="margin:0 0 4px;font-size:15px;font-weight:700;color:#fff;">Schedule a 15-Minute Executive Briefing</p>
+  <p style="margin:0 0 16px;font-size:12px;color:#94a3b8;">See how Texas Grid Intel helps your organization monitor ERCOT volatility, weather-driven demand risk, natural gas market changes, and early warning signals.</p>
+  <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
+    <td style="padding-right:8px;">
+      <a href="{fe_url}/pricing" style="display:inline-block;padding:12px 22px;border-radius:8px;background:#f97316;font-size:13px;font-weight:700;color:#fff;text-decoration:none;">Schedule Executive Briefing</a>
+    </td>
+    <td>
+      <a href="{fe_url}/dashboard" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#0f172a;border:1px solid #334155;font-size:13px;font-weight:600;color:#e2e8f0;text-decoration:none;">View Live Dashboard</a>
+    </td>
+  </tr></table>
+  <p style="margin:14px 0 0;font-size:11px;color:#475569;">
+    ✓ ERCOT volatility alerts &nbsp; ✓ Weather-driven risk forecasts &nbsp; ✓ Natural gas market changes<br>
+    ✓ Early warning signals &nbsp; ✓ Operational recommendations
+  </p>
+</td></tr>
+
+<!-- FOOTER -->
+<tr><td style="background:#0a0f1a;border-radius:0 0 12px 12px;padding:16px 28px;text-align:center;">
+  <p style="margin:0 0 6px;font-size:10px;color:#334155;line-height:1.5;">Texas Grid Intel · Texas Energy Operations Intelligence<br>You are receiving this because you subscribed to the Texas Energy Risk Brief.</p>
+  <p style="margin:0 0 6px;font-size:10px;color:#1e293b;">Texas Grid Intel · Houston, TX 77002</p>
+  <p style="margin:0 0 8px;"><a href="{unsub_url}" style="font-size:10px;color:#475569;text-decoration:underline;">Unsubscribe</a></p>
+  <p style="margin:0;font-size:9px;color:#1e293b;line-height:1.5;">Texas Grid Intel provides informational operational intelligence only. This newsletter does not constitute investment, trading, financial, legal, procurement, or operational advice. Data sourced from ERCOT, NOAA, and EIA public feeds.</p>
+</td></tr>
 
 </table>
 </td></tr>
@@ -828,34 +595,4 @@ async def generate_and_save_draft() -> str:
     content  = await generate_newsletter_content(current, prior, week, regional)
 
     html_content = build_html_email(content, current, regional, "{{issue_id}}")
-    text_content = build_text_email(content, current)
-
-    sb = get_supabase()
-    result = sb.table("newsletter_issues").insert({
-        "issue_date":        datetime.now(timezone.utc).date().isoformat(),
-        "subject":           content.get("subject", "Texas Energy Risk Brief"),
-        "preview_text":      content.get("preview_text", ""),
-        "risk_level":        current.get("risk_score", "low"),
-        "market_state":      "Stable",
-        "ercot_price":       current.get("ercot_price"),
-        "weather_demand":    current.get("weather_demand_pressure", "low"),
-        "gas_supply":        current.get("gas_supply_pressure", "low"),
-        "executive_summary": content.get("executive_summary", ""),
-        "what_changed":      content.get("what_changed", ""),
-        "watch_items":       json.dumps(content.get("watch_items", [])),
-        "ai_outlook":        json.dumps({
-            "recommended_action":   content.get("recommended_action"),
-            "operational_exposure": content.get("operational_exposure"),
-            "monitoring_focus":     content.get("monitoring_focus"),
-            "escalation_triggers":  content.get("escalation_triggers"),
-            "outlook_note":         content.get("outlook_note"),
-        }),
-        "regional_snapshot": json.dumps(regional),
-        "html_content":      html_content,
-        "text_content":      text_content,
-        "status":            "draft",
-    }).execute()
-
-    issue_id = result.data[0]["id"]
-    log.info(f"[NEWSLETTER] Draft saved — issue_id={issue_id}")
-    return issue_id
+    text_content = build_text_em
