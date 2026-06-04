@@ -12,7 +12,7 @@ from typing import Optional
 
 import httpx
 import anthropic
-from fastapi import APIRouter, Body, Header, HTTPException, Query
+from fastapi import APIRouter, Body, Header, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -834,3 +834,128 @@ async def reveal_email(prospect_id: str):
 
     return {"email": None, "source": "apollo", "credits_used": 1,
             "message": "Apollo has no email on file for this contact"}
+
+
+# ---------------------------------------------------------------------------
+# CSV IMPORT — Apollo.io export format
+# ---------------------------------------------------------------------------
+
+# Apollo CSV column mappings (Apollo uses these exact headers)
+APOLLO_COLUMN_MAP = {
+    # Contact
+    "first name":          "first_name",
+    "last name":           "last_name",
+    "title":               "contact_title",
+    "email":               "contact_email",
+    "linkedin url":        "contact_linkedin",
+    # Company
+    "company":             "company_name",
+    "company name for emails": "company_name",
+    "website":             "website",
+    "industry":            "industry",
+    "# employees":         "employee_count",
+    "number of employees": "employee_count",
+    "employees":           "employee_count",
+    # Location
+    "city":                "city",
+    "state":               "state",
+    "country":             "country",
+}
+
+
+def _parse_apollo_row(row: dict, headers_lower: list[str]) -> dict | None:
+    """Map an Apollo CSV row to our prospect schema."""
+    out: dict = {
+        "source":      "apollo_csv",
+        "status":      "new",
+        "country":     "US",
+        "lead_score":  0,
+        "priority":    "low",
+        "created_at":  datetime.now(timezone.utc).isoformat(),
+        "updated_at":  datetime.now(timezone.utc).isoformat(),
+    }
+
+    for raw_key, value in row.items():
+        key_lower = raw_key.strip().lower()
+        mapped = APOLLO_COLUMN_MAP.get(key_lower)
+        if mapped and value and value.strip():
+            out[mapped] = value.strip()
+
+    # Build contact_name from first + last
+    first = out.pop("first_name", "") or ""
+    last  = out.pop("last_name",  "") or ""
+    name  = f"{first} {last}".strip()
+    if name:
+        out["contact_name"] = name
+
+    # Convert employee_count to int
+    if "employee_count" in out:
+        try:
+            raw = out["employee_count"].replace(",", "").split("-")[0].strip()
+            out["employee_count"] = int(raw)
+        except Exception:
+            del out["employee_count"]
+
+    # Require at minimum company or contact name
+    if not out.get("company_name") and not out.get("contact_name"):
+        return None
+
+    return out
+
+
+@router.post("/import-csv")
+async def import_csv(file: UploadFile = File(...)):
+    """Import prospects from an Apollo.io CSV export."""
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must be a .csv")
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")  # handles BOM from Excel
+    except Exception:
+        text = content.decode("latin-1")
+
+    reader     = csv.DictReader(io.StringIO(text))
+    headers_lc = [h.strip().lower() for h in (reader.fieldnames or [])]
+
+    sb         = get_supabase()
+    imported   = 0
+    skipped    = 0
+    duplicates = 0
+    errors     = []
+
+    for i, row in enumerate(reader):
+        try:
+            prospect = _parse_apollo_row(dict(row), headers_lc)
+            if not prospect:
+                skipped += 1
+                continue
+
+            # Score the lead
+            scores = _score_lead(prospect)
+            prospect.update(scores)
+
+            # Deduplicate by email
+            email = prospect.get("contact_email")
+            if email:
+                existing = sb.table("prospects").select("id").eq("contact_email", email).limit(1).execute()
+                if existing.data:
+                    duplicates += 1
+                    continue
+
+            sb.table("prospects").insert(prospect).execute()
+            imported += 1
+
+        except Exception as e:
+            errors.append(f"Row {i+2}: {str(e)[:80]}")
+            if len(errors) >= 10:
+                break
+
+    return {
+        "status":     "complete",
+        "imported":   imported,
+        "duplicates": duplicates,
+        "skipped":    skipped,
+        "errors":     errors[:5],
+        "total_rows": imported + duplicates + skipped + len(errors),
+    }

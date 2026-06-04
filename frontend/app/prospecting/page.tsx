@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Search, Download, Zap, RefreshCw, Loader2, Trash2, ChevronDown, ChevronUp, Mail, Calendar, Users, BarChart2, Plus, ArrowRight, Linkedin } from "lucide-react";
+import { Search, Download, Zap, RefreshCw, Loader2, Trash2, ChevronDown, ChevronUp, Mail, Calendar, Users, BarChart2, Plus, ArrowRight, Linkedin, Upload } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Link from "next/link";
 
@@ -57,6 +57,7 @@ export default function ProspectingPage() {
   const [audiences,    setAudiences]    = useState<Audience[]>([]);
   const [stats,        setStats]        = useState<Stats | null>(null);
   const [loading,      setLoading]      = useState(false);
+  const [importing,    setImporting]    = useState(false);
   const [enriching,    setEnriching]    = useState<string | null>(null);
   const [actioning,    setActioning]    = useState<string | null>(null);
   const [revealing,    setRevealing]    = useState<string | null>(null);
@@ -108,6 +109,26 @@ export default function ProspectingPage() {
       await fetchAll();
     } catch (e: any) { setMsg(`Error: ${e.message}`); }
     setLoading(false);
+  };
+
+  const importCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true); setMsg("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const r = await fetch(`${API}/api/prospecting/import-csv`, { method: "POST", body: form });
+      const d = await r.json();
+      if (r.ok) {
+        setMsg(`✓ Imported ${d.imported} prospects (${d.duplicates} duplicates skipped, ${d.skipped} rows skipped)`);
+        await fetchAll();
+      } else {
+        setMsg(`Error: ${d.detail}`);
+      }
+    } catch (e: any) { setMsg(`Error: ${e.message}`); }
+    setImporting(false);
+    e.target.value = "";
   };
 
   const enrich = async (id: string) => {
@@ -308,6 +329,19 @@ export default function ProspectingPage() {
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   {loading ? "Searching..." : "Search Apollo"}
                 </button>
+
+                {/* CSV Import */}
+                <div className="border-t border-white/5 pt-3">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Or import Apollo CSV</p>
+                  <label className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${importing ? "bg-white/5 text-gray-500 border-white/8" : "bg-white/3 hover:bg-white/8 border-white/10 text-gray-300"}`}>
+                    {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {importing ? "Importing..." : "Upload Apollo CSV"}
+                    <input type="file" accept=".csv" onChange={importCSV} className="hidden" disabled={importing} />
+                  </label>
+                  <p className="text-[10px] text-gray-600 mt-1.5 leading-snug">
+                    Apollo → People → Export CSV → upload here. Auto-scores and imports all rows.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -359,7 +393,7 @@ export default function ProspectingPage() {
                   {prospects.length === 0 && (
                     <div className="card-glass border border-white/5 rounded-2xl p-12 text-center">
                       <Search className="w-8 h-8 text-gray-600 mx-auto mb-3" />
-                      <p className="text-gray-500 text-sm">No prospects yet. Search Apollo to find leads.</p>
+                      <p className="text-gray-500 text-sm">No prospects yet. Search Apollo or upload a CSV export.</p>
                     </div>
                   )}
 
