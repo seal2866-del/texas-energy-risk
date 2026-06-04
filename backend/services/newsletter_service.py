@@ -400,15 +400,25 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
     </tr></table>
   </td></tr>
 
-  <!-- QUICK LINKS BAR -->
-  <tr><td style="background:#0a0f1a;padding:10px 28px;border-bottom:1px solid #1e293b;">
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td align="center">
-        <a href="{fe_url}/dashboard" style="display:inline-block;margin:0 6px;font-size:11px;font-weight:600;color:#f97316;text-decoration:none;">📊 Live Dashboard</a>
-        <a href="{fe_url}/alerts" style="display:inline-block;margin:0 6px;font-size:11px;font-weight:600;color:#94a3b8;text-decoration:none;">🔔 Alert Settings</a>
-        <a href="{fe_url}/pricing" style="display:inline-block;margin:0 6px;font-size:11px;font-weight:600;color:#94a3b8;text-decoration:none;">⬆ Upgrade</a>
-      </td>
-    </tr></table>
+  <!-- MAIN CTA BUTTON — prominent, right after header -->
+  <tr><td style="background:#0f172a;padding:16px 28px;border-bottom:1px solid #1e293b;text-align:center;">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr>
+        <td style="border-radius:8px;background:#f97316;">
+          <a href="{fe_url}/dashboard"
+             style="display:inline-block;padding:12px 28px;border-radius:8px;background:#f97316;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;">
+            &#8594; View Live Texas Grid Conditions
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:8px 0 0;font-size:11px;color:#475569;">
+      <a href="{fe_url}/dashboard" style="color:#475569;text-decoration:underline;">texasgridintel.com/dashboard</a>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <a href="{fe_url}/alerts" style="color:#475569;text-decoration:underline;">Alert Settings</a>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <a href="{fe_url}/pricing" style="color:#475569;text-decoration:underline;">Upgrade Plan</a>
+    </p>
   </td></tr>
 
   <!-- EXECUTIVE SUMMARY -->
@@ -416,7 +426,7 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
     <p style="margin:0 0 6px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Executive Summary</p>
     <p style="margin:0;font-size:14px;color:#e2e8f0;line-height:1.6;">{content.get("executive_summary", "")}</p>
     <p style="margin:10px 0 0;">
-      <a href="{fe_url}/dashboard" style="font-size:12px;color:#f97316;font-weight:600;text-decoration:none;">View live conditions → texasgridintel.com/dashboard</a>
+      <a href="{fe_url}/dashboard" style="font-size:12px;color:#f97316;font-weight:600;text-decoration:underline;">View live conditions → texasgridintel.com/dashboard</a>
     </p>
   </td></tr>
 
