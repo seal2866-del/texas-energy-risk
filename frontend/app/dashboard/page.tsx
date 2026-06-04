@@ -868,6 +868,25 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* ── Newsletter CTA ───────────────────────────────────── */}
+              <div className="card-glass border border-white/8 rounded-2xl p-6 lg:col-span-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Texas Energy Risk Brief</p>
+                    <p className="text-sm font-bold text-white mb-1">Weekly operational intelligence for Texas energy teams</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      Receive weekly ERCOT market outlook, weather-driven risk forecasts, natural gas updates, and operational recommendations.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <a href="/login?signup=true#newsletter"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold text-sm transition-all">
+                      Subscribe Free
+                    </a>
+                  </div>
+                </div>
+              </div>
+
               {/* 6. Analyst Notes (formerly Executive Brief) — lower position */}
               <CollapsibleAnalystNotes
                 reasoning={aiReasoning}
