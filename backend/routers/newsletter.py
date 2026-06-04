@@ -198,7 +198,7 @@ async def send_test(issue_id: str, test_email: str = Body(..., embed=True), auth
     d           = issue.data
     html        = (d.get("html_content") or "").replace("{{unsubscribe_token}}", "test")
     text        = d.get("text_content") or ""
-    subject     = f"[TEST] {d.get('subject', 'Texas Energy Risk Brief')}"
+    subject     = d.get('subject', 'Texas Energy Risk Brief')
 
     result = await _send_via_resend(test_email, subject, html, text, d.get("preview_text"))
     return {"status": "sent" if result else "failed", "to": test_email}

@@ -400,10 +400,24 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
     </tr></table>
   </td></tr>
 
+  <!-- QUICK LINKS BAR -->
+  <tr><td style="background:#0a0f1a;padding:10px 28px;border-bottom:1px solid #1e293b;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td align="center">
+        <a href="{fe_url}/dashboard" style="display:inline-block;margin:0 6px;font-size:11px;font-weight:600;color:#f97316;text-decoration:none;">📊 Live Dashboard</a>
+        <a href="{fe_url}/alerts" style="display:inline-block;margin:0 6px;font-size:11px;font-weight:600;color:#94a3b8;text-decoration:none;">🔔 Alert Settings</a>
+        <a href="{fe_url}/pricing" style="display:inline-block;margin:0 6px;font-size:11px;font-weight:600;color:#94a3b8;text-decoration:none;">⬆ Upgrade</a>
+      </td>
+    </tr></table>
+  </td></tr>
+
   <!-- EXECUTIVE SUMMARY -->
   <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
     <p style="margin:0 0 6px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">Executive Summary</p>
     <p style="margin:0;font-size:14px;color:#e2e8f0;line-height:1.6;">{content.get("executive_summary", "")}</p>
+    <p style="margin:10px 0 0;">
+      <a href="{fe_url}/dashboard" style="font-size:12px;color:#f97316;font-weight:600;text-decoration:none;">View live conditions → texasgridintel.com/dashboard</a>
+    </p>
   </td></tr>
 
   <!-- EXECUTIVE DECISION BOX -->
@@ -500,6 +514,9 @@ def build_html_email(content: dict, current: dict, regional: dict[str, dict], is
   <tr><td style="background:#0f172a;padding:20px 28px;border-bottom:1px solid #1e293b;">
     <p style="margin:0 0 8px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;">What to Monitor This Week</p>
     <table width="100%" cellpadding="0" cellspacing="0">{watch_html}</table>
+    <p style="margin:12px 0 0;font-size:11px;color:#64748b;">
+      Set custom alert thresholds: <a href="{fe_url}/alerts" style="color:#f97316;text-decoration:none;font-weight:600;">texasgridintel.com/alerts</a>
+    </p>
   </td></tr>
 
   <!-- DATA RELIABILITY -->
