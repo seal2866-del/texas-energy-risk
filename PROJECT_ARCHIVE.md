@@ -362,10 +362,9 @@ Apollo → Prospect → Audience → Resend → Newsletter → Demo → Customer
 - Resend email alerts confirmed working (test email delivered successfully)
 
 ### Twilio Status
-- Account SID: AC865920c971c102e705e94ffd25af6c55
-- FROM number: +12202269998 (set in Railway)
-- Subscriber phone: +18325736665 (verified in Twilio Verified Caller IDs)
-- Auth Token: set in Railway
+- Account SID: [stored in Railway — do not commit]
+- FROM number: [stored in Railway]
+- Auth Token: [stored in Railway]
 - Trial account — can only send to verified numbers
 
 ### Root Cause of Railway Failures
