@@ -563,4 +563,38 @@ export default function ProspectingPage() {
                   {/* Audience list */}
                   {audiences.length === 0 && (
                     <div className="card-glass border border-white/5 rounded-2xl p-8 text-center">
-               
+                      <Users className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">No audiences yet. Create one above.</p>
+                    </div>
+                  )}
+
+                  {audiences.map(aud => (
+                    <div key={aud.id} className="card-glass border border-white/8 rounded-2xl p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-white mb-0.5">{aud.name}</p>
+                          <p className="text-xs text-gray-400">{aud.description || "No description"}</p>
+                          <p className="text-[10px] text-gray-600 mt-1">{aud.member_count} contacts</p>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => pushToResend(aud.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 font-semibold transition-all">
+                            <Mail className="w-3 h-3" /> Push to Resend
+                          </button>
+                          <button onClick={() => exportAudience(aud.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-gray-300 font-semibold transition-all">
+                            <Download className="w-3 h-3" /> Export
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
