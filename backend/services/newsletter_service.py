@@ -595,4 +595,34 @@ async def generate_and_save_draft() -> str:
     content  = await generate_newsletter_content(current, prior, week, regional)
 
     html_content = build_html_email(content, current, regional, "{{issue_id}}")
-    text_content = build_text_em
+    text_content = build_text_email(content, current)
+
+    sb = get_supabase()
+    result = sb.table("newsletter_issues").insert({
+        "issue_date":        datetime.now(timezone.utc).date().isoformat(),
+        "subject":           content.get("subject", "Texas Energy Risk Brief"),
+        "preview_text":      content.get("preview_text", ""),
+        "risk_level":        current.get("risk_score", "low"),
+        "market_state":      "Stable",
+        "ercot_price":       current.get("ercot_price"),
+        "weather_demand":    current.get("weather_demand_pressure", "low"),
+        "gas_supply":        current.get("gas_supply_pressure", "low"),
+        "executive_summary": content.get("executive_summary", ""),
+        "what_changed":      content.get("what_changed", ""),
+        "watch_items":       json.dumps(content.get("watch_items", [])),
+        "ai_outlook":        json.dumps({
+            "recommended_action":   content.get("recommended_action"),
+            "operational_exposure": content.get("operational_exposure"),
+            "monitoring_focus":     content.get("monitoring_focus"),
+            "escalation_triggers":  content.get("escalation_triggers"),
+            "outlook_note":         content.get("outlook_note"),
+        }),
+        "regional_snapshot": json.dumps(regional),
+        "html_content":      html_content,
+        "text_content":      text_content,
+        "status":            "draft",
+    }).execute()
+
+    issue_id = result.data[0]["id"]
+    log.info(f"[NEWSLETTER] Draft saved — issue_id={issue_id}")
+    return issue_id
