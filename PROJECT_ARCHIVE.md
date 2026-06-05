@@ -1,7 +1,7 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 4, 2026 (session 8 — SEO expansion)
-**Current stable tag:** v5.0-stable
-**Next session:** Resubmit sitemap to Google Search Console after deploy
+**Last updated:** June 5, 2026 (session 9 — CRM outreach + Apollo email reveals)
+**Current stable tag:** v5.6-stable
+**Next session:** Monitor newsletter open rates; continue Apollo prospecting for Dallas/Austin cities
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -44,6 +44,44 @@
 - [x] #8  Rewrite AI brief to actionable operational language
 - [x] #21 Transform platform language — advisory to operational awareness
 - [x] #22 Complete language transformation (EscalationPath, ManagementSummary, Phase 2 & 4 engines)
+
+### Prospecting CRM — v5.1 through v5.6 (Session 9)
+- [x] #60 Add LinkedIn search button to every prospect card
+        → Always visible; uses stored contact_linkedin URL or falls back to LinkedIn people search
+        → URL: linkedin.com/search/results/people/?keywords={name}+{company}
+        → Icon: Linkedin from lucide-react
+- [x] #61 Add per-contact "Get Email" button (Apollo reveal)
+        → POST /api/prospecting/prospects/{id}/reveal-email
+        → Strategy 1: /people/{id}/reveal (Apollo ID-based, fastest)
+        → Strategy 2: /people/match with apollo_person_id + reveal flag
+        → Strategy 3: /people/match by name + company (works without stored ID)
+        → On success: saves email + full name + linkedin_url back to DB
+        → Costs 1 Apollo credit per reveal; returns cached if email already known
+- [x] #62 Add select-all + bulk delete to prospect list
+        → Checkbox on every card + "All" checkbox in filter bar
+        → "Delete N" red button appears when any selected
+        → Bulk deletes in parallel via Promise.all
+- [x] #63 Add bulk "Add to Newsletter" button
+        → "Newsletter N" blue button appears alongside Delete when prospects selected
+        → Adds all selected to Resend subscriber list sequentially
+        → Shows count of successfully added contacts
+- [x] #64 Filter Apollo search to verified-email contacts only
+        → contact_email_status_cd: ["verified", "likely to engage"]
+        → Returns full-name contacts (first + last) with real emails
+        → Replaced default titles with senior roles: Energy Manager, Director of Energy,
+           VP Operations, COO, CFO, CEO, Risk Manager, Portfolio Manager etc.
+- [x] #65 Fix newsletter generate_and_save_draft truncation
+        → newsletter_service.py truncated at build_text_em (NTFS write bug)
+        → Restored complete function tail from git history (652b237)
+        → Includes full Supabase insert with html_content, text_content, ai_outlook
+- [x] #66 Fix Apollo CSV import return statement truncation
+        → prospecting.py truncated at "total_rows": imported + duplicates + skipped + l
+        → Restored complete closing brace and return dict
+- [x] #67 First real newsletter send — 71 delivered, 0 failed
+        → 71 Texas energy operations contacts added via bulk Newsletter button
+        → Contacts include: Texas Pipe & Supply, TARA Energy, USA Compression,
+           Butch's Companies, Coterra Energy, Pilot Thomas Logistics, SM Energy etc.
+        → Sent via Newsletter Admin → Generate Draft → Approve → Send Now
 
 ### Prospecting CRM — v4.1
 - [x] #29 Add trading/energy industries to prospecting filters
@@ -182,40 +220,36 @@
         → ALERT_FROM_EMAIL still using temporary address — update once txenergyrisk.com/texasgridintel.com email is configured in Resend
         → Switch to alerts@texasgridintel.com
 
-- [ ] #53 Apollo Basic plan upgrade ($49/mo)
-        → Required to unlock prospecting search API
-        → APOLLO_API_KEY is set in Railway, just needs paid plan
+- [x] #53 Apollo Basic plan upgrade ($49/mo) ✓ DONE
+        → Subscribed — $49/mo, 2,525 credits/month
+        → APOLLO_API_KEY set in Railway
+        → Email reveals working via /people/match + /people/{id}/reveal
 
 ---
 
 ## NEXT SESSION PRIORITIES
 
-## NEXT 30-DAY FOCUS (Starting Next Session)
-
-### Weekly Texas Energy Risk Brief — Every Monday
-Send to email subscribers:
-- ERCOT outlook
-- Weather outlook
-- Hurricane outlook
-- Natural gas outlook
-- Top risks for industrial operators
-
-### Funnel
-Apollo → Prospect → Audience → Resend → Newsletter → Demo → Customer
+### Funnel Status (as of June 5, 2026)
+Apollo → Prospect → Newsletter → Demo → Customer
+- **71 prospects** added to Resend and emailed (June 5, 2026)
+- **0 demos** booked yet — monitor open rates in Resend dashboard
+- Next step: expand search to Dallas, Austin, San Antonio cities
 
 ### Priority Task List
-1. **Newsletter automation (Resend)** — automate weekly brief delivery
-2. **Apollo prospect import** — bulk import and enrich leads
-3. **Prospect analytics** — conversion funnel dashboard
-4. **Email capture** — improve signup rate on homepage/landing
-5. **Demo request workflow** — automate demo booking and follow-up
-6. **Stripe subscriptions (#6)** — verify Pro/Business checkout end-to-end (test card: 4242 4242 4242 4242)
-7. **Executive brief generation** — AI-generated weekly executive summary
+1. **Monitor newsletter open rates** — check Resend dashboard for opens/clicks from the 71 sent
+2. **Expand Apollo search to more cities** — Dallas, Austin, San Antonio, Corpus Christi
+3. **Apollo CSV import** — export from Apollo web UI for contacts API misses; import via Import button
+4. **Demo request workflow** — automate demo booking and follow-up email
+5. **Stripe subscriptions (#6)** — verify Pro/Business checkout end-to-end (test card: 4242 4242 4242 4242)
+6. **Alert email** (#7) → switch to alerts@texasgridintel.com once domain email configured in Resend
+7. **Search Console** → check pages discovered (sitemap submitted May 31)
 
-### Backlog (lower priority)
-- Alert email test (#7) → switch to alerts@texasgridintel.com in Resend
-- Apollo Basic plan (#53) → upgrade at apollo.io ($49/mo)
-- Search Console → check pages discovered (submitted May 31)
+### Known Issues / Watchlist
+- NTFS truncation bug: All Python/TSX files >~9KB get silently truncated when written via MCP tools on Windows.
+  Fix: always restore from git + append via Python binary write. Run ast.parse() after every backend edit.
+- Apollo data quality: Smaller TX companies (ATNV Energy, Solea Energy etc.) have no last names or emails in Apollo DB.
+  Fix: filter on contact_email_status_cd: ["verified"] — returns full-profile contacts.
+- SMS (Twilio) test still pending — Twilio vars set in Railway but not verified end-to-end.
 
 ---
 
@@ -249,255 +283,4 @@ Apollo → Prospect → Audience → Resend → Newsletter → Demo → Customer
 ## EMAIL ADDRESSES
 
 ### Active (temporary)
-- alerts@investorlens.capital — alert emails (temp, verified in Resend)
-
-### Configure in Resend when ready
-- alerts@texasgridintel.com
-- support@texasgridintel.com
-- sales@texasgridintel.com
-- contact@texasgridintel.com
-- admin@texasgridintel.com
-
----
-
-## VERSION HISTORY
-- v1.0-stable — Initial platform
-- v1.1-stable — NOAA fix, city data
-- v1.2-stable — Recommended Actions + Impact Assessment
-- v1.3-stable — Operations Center AI format
-- v2.0-stable — EscalationTriggers, WatchList, CostExposure, hierarchy
-- v2.1-stable — Phase 2 Executive Mode complete
-- v2.2-stable — Analyst Mode — attribution, timeline, escalation drivers
-- v2.3-stable — Executive Mode complete
-- v2.4-stable — Homepage conversion optimization
-- v2.5-stable — Homepage final
-- v2.6-stable — Homepage conversion + consequence cards
-- v2.7-stable — Newsletter system live
-- v2.8-stable — Newsletter V3 fixes
-- v2.9-stable — Operational intelligence transformation
-- v3.0-stable — Full operational intelligence transformation
-- v3.1-stable — Executive Mode optimization
-- v3.2-stable — Analyst Mode redesign
-- v3.3-stable — Analyst Mode Phase 2
-- v3.4-stable — Analyst Mode final layout
-- v3.5-stable — Newsletter V3 executive briefing format
-- v3.6-stable — Newsletter V3 fixes
-- v3.7-stable — Superuser access, alert settings verified
-- v3.8-stable — Apollo prospecting integration
-- v3.9-stable — Prospecting CRM full pipeline
-- v4.0-stable — Supabase grants, CRM complete
-- v4.1-stable — Trading industries + job titles + lead scoring
-- v4.2-stable — Domain migration to texasgridintel.com + full SEO + footer rebrand
-- v4.3-stable — Google Search Console verified + sitemap submitted
-- v4.4-stable — Account settings, forgot/reset password, login rebrand
-- v4.5-stable — Henry Hub: live EIA price, 10-day chart, signal engine integration, ERCOT font match
-- v4.6-stable — Operational Cost Impact card (Small/Midstream/Large facility estimates)
-- v4.7-stable — Scenario Modeling panel (6 stress scenarios, cost/risk/escalation per facility)
-- v4.8-stable — (see previous session notes)
-- v4.9-stable — (see previous session notes)
-- v5.0-stable — SEO expansion: 5 city pages, 4 industry pages, 20 blog articles, FAQ schema, sitemap updated
-
----
-
-## KEY PAGES
-- /dashboard — Main operational intelligence dashboard
-- /analytics — Historical analytics + city selector
-- /alerts — Alert center + settings
-- /pricing — Pricing tiers ($0 / $499 / $1,199)
-- /prospecting — Apollo CRM + audience builder
-- /prospecting/analytics — Conversion funnel dashboard
-- /admin/newsletter — Newsletter issue management
-- /admin/subscribers — Newsletter subscriber management
-- /unsubscribe — One-click unsubscribe
-
----
-
-## SESSION 7 — June 1, 2026 (Data Source Audit + Predictive Intelligence)
-
-### Phase 9 — Predictive Intelligence Engine (completed)
-- [x] `frontend/lib/riskTrajectory.ts` — OLS slope, acceleration, volatility index, trajectory labels
-- [x] `frontend/lib/stateTransitionEngine.ts` — state transition analysis, instability score, loop/failure detection
-- [x] `frontend/lib/patternMemory.ts` — fingerprint similarity matching, top-N historical pattern lookup
-- [x] `frontend/lib/predictiveOutlook.ts` — 3-horizon forecast (0-6h, 6-24h, 24-48h) + executive layer
-- [x] `frontend/components/widgets/PredictiveOutlook.tsx` — 3-horizon cards + exec summary panel
-- [x] `frontend/components/widgets/RiskMomentumChart.tsx` — Recharts area chart with OLS trend line
-- [x] `frontend/app/analytics/page.tsx` — 4-tab analytics: Predictive / Historical / Transitions / Patterns
-- [x] Dashboard wired: `PredictiveOutlook` after `RiskHistoryChart` when ≥6 snapshots available
-
-### Multi-City Grid Poller (completed)
-- [x] `backend/main.py` — Added `_grid_signal_loop()`: polls all 8 cities every 5 min (was 30 min)
-- [x] 15-second startup delay (was 60s) for faster first-pass after backend restart
-- [x] Fixes: Midland, Odessa, Corpus Christi, Lubbock showing "Unknown" on grid map
-
-### Analytics Resilience (completed)
-- [x] `frontend/app/analytics/page.tsx` — Switched `Promise.all` → `Promise.allSettled`
-- [x] Historical tab shows graceful empty state instead of blocking entire page for new cities
-- [x] Error banner only shown when ALL three fetches fail
-
-### Data Source Audit — All 6 Issues Fixed (completed)
-- [x] **NOAA negative latency** — `signal_engine.py`: use `fetched_at` not `forecast_time` for age calc
-- [x] **ERCOT CDR metadata** — `external_apis.py`: added `retrieved_at` field to price records
-- [x] **ERCOT source enrichment** — `signal_engine.py`: exposes `cdr_updated`, `retrieved_at`, `price_mwh` in `data_sources.ercot`
-- [x] **ERCOT Verified badge** — `DataSources.tsx`: green badge showing Price / Source Timestamp / Retrieved / Age
-- [x] **CDT hardcode fixed** — `DataSources.tsx`: dynamic `timeZoneName: "short"` (CDT/CST by season)
-- [x] **History chart sort** — `RiskHistoryChart.tsx`: client-side `.sort()` by `computed_at` before render
-- [x] **Console logging** — `dashboard/page.tsx` + `DataSources.tsx`: logs raw ERCOT data on every fetch
-- [x] **Pre-existing TS errors fixed** — `henry_hub` in EMPTY_SIGNALS, `aiError` bool/string, `escalation_probability.pct`
-- [x] `frontend/lib/api.ts` — Added `price_mwh`, `cdr_updated`, `retrieved_at` to `DataSourceStatus` type
-
-### ERCOT Price Verification — Confirmed Live
-- Verified $47.27/MWh is real: Strategy1 (td cell) from `real_time_spp.html` (status=200, len=26808)
-- ERCOT CDR page updates on 15-min settlement intervals; same price across consecutive 5-min polls is expected
-- Cache holds 48 real readings; `ercot_enabled=true`; no mock contamination
-
-### Backup
-- `texas-energy-risk-backup-datasource-audit.zip` — 1.5MB, June 1, 2026
-
----
-
-## SESSION 7 CONTINUED — SMS Alert Setup
-
-### What was done
-- Added `POST /api/alerts/send-test-sms` endpoint to `backend/routers/alerts.py`
-- Added **Send test SMS** button to `frontend/app/alerts/page.tsx`
-- Added Twilio API Key support to `alert_service.py` (SK key pair takes priority over master Auth Token)
-- Added E.164 phone normalization (strips spaces, adds `+` prefix) for both FROM and TO numbers
-- Resend email alerts confirmed working (test email delivered successfully)
-
-### Twilio Status
-- Account SID: [stored in Railway — do not commit]
-- FROM number: [stored in Railway]
-- Auth Token: [stored in Railway]
-- Trial account — can only send to verified numbers
-
-### Root Cause of Railway Failures
-- NTFS write limitation (~9KB) caused `alert_service.py` to be truncated mid-function
-- Truncation left an unclosed `log_alert(` parenthesis → Python SyntaxError → Railway healthcheck failure
-- All SMS-related deploys failed due to this syntax error
-- Fixed by restoring from git `5c3edd1` baseline + re-applying Twilio changes cleanly
-
-### SMS Status
-- Commit `f7f5de8` fixed Python syntax error in alert_service.py (unclosed parenthesis)
-- SMS endpoint `/api/alerts/send-test-sms` added to alerts.py
-- All Twilio vars set in Railway: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER (+12202269998)
-- Subscriber +18325736665 verified in Twilio Verified Caller IDs
-- Railway deployment `99b58103` active — SMS test pending final verification
-- E.164 normalization added (strips spaces, adds + prefix automatically)
-
-### SEO — Completed June 1, 2026
-- **Homepage** — H1: "Real-Time ERCOT Energy Intelligence for Texas Operations", subheadline with ERCOT/Henry Hub/SMS keywords, trust bullets updated
-- **layout.tsx** — 21 keywords, SoftwareApplication JSON-LD with 10 features + 3 tiers, FAQPage JSON-LD with 5 Q&As
-- **Per-page metadata** — /pricing, /map, /analytics all have custom titles + descriptions
-- **Blog articles** — 5 publication-ready articles in C:\EngergyLens\blog-articles\
-  - 01: ERCOT Price Spikes — causes and early warning
-  - 02: Texas Summer Energy Risk — the 3 signals
-  - 03: Henry Hub vs ERCOT — gas drives electricity
-  - 04: Permian Basin Energy Risk — Midland, Odessa guide
-  - 05: How to Set Up Texas Energy Alerts — facility guide
-- **Google Search Console** — sitemap submitted, 4 pages indexed
-
-### Email Alerts — Working
-- Resend API key configured in Railway
-- Test email confirmed delivered to seal2866@gmail.com
-- Real alerts fire on risk level change (Low→Medium→High)
-
----
-
-## SESSION 8 — June 4, 2026 (SEO Expansion)
-
-### SEO Pages Built — v5.0
-
-#### City Landing Pages (5 new pages)
-- [x] `/houston-energy-risk` — ERCOT Houston Hub, petrochemical, industrial
-- [x] `/midland-energy-risk` — Permian Basin, ERCOT West zone, compression
-- [x] `/odessa-energy-risk` — Oil production, oilfield services, West Texas
-- [x] `/corpus-christi-energy-risk` — LNG, refineries, export terminals
-- [x] `/dallas-energy-risk` — ERCOT North zone, data centers, commercial
-
-#### Industry Landing Pages (4 new pages)
-- [x] `/oil-gas-energy-risk` — Upstream, downstream, ESP, compression
-- [x] `/midstream-risk-monitoring` — Pipeline, processing, NGL, Henry Hub
-- [x] `/industrial-energy-risk` — Manufacturing, chemical, continuous process
-- [x] `/datacenter-power-risk` — Colocation, hyperscale, ERCOT peak pricing
-
-#### Blog Articles (15 new — total 20)
-- [x] ERCOT Reserve Margin Explained
-- [x] Texas Winter Energy Risk
-- [x] Natural Gas Storage and ERCOT Prices
-- [x] Houston Energy Procurement Guide
-- [x] How to Read the ERCOT Price Forecast
-- [x] Texas Data Center Energy Risk
-- [x] ERCOT Demand Response for Operations
-- [x] Midland-Odessa Energy Outlook
-- [x] How to Monitor Henry Hub Prices
-- [x] ERCOT Congestion Monitoring Guide
-- [x] Texas Grid Reliability Outlook
-- [x] Energy Procurement Best Practices
-- [x] Weather Demand Risk in Texas
-- [x] What Is Operational Energy Intelligence
-- [x] (+ 1 from previous: ercot-reserve-margin-explained)
-
-#### Technical SEO
-- [x] Homepage FAQ section with JSON-LD FAQPage schema (6 Q&As)
-- [x] Sitemap updated — 50+ URLs across all page types
-- [x] CityPageTemplate component with structured FAQ per city page
-- [x] All city/industry pages have unique titles, descriptions, keywords, canonical URLs, Open Graph tags
-
-#### Security
-- [x] Removed Twilio Account SID from PROJECT_ARCHIVE.md (was exposed in commit 2c448be)
-- [x] GitHub push protection bypassed via allow-secret URL
-- [x] All sensitive credentials remain in Railway only
-
-### Next Actions
-1. Resubmit sitemap to Google Search Console: https://texasgridintel.com/sitemap.xml
-2. Monitor Search Console for indexing of new pages (24-48h)
-3. Continue with CRM focus (Apollo upgrade, newsletter automation)
-
-### Backup
-- `texas-energy-risk-backup-seo-complete.zip` — 1.5MB, June 1, 2026 (includes blog articles)
-- `texas-energy-risk-backup-homepage-copy-v2.zip` — 1.5MB, June 2, 2026
-
-### Homepage Copy v2 — June 2, 2026
-Strategic improvements based on positioning audit:
-- Badge: "Texas Energy Early Warning Intelligence" (removed ERCOT-first positioning)
-- H1: "Detect Texas Energy Risk / Before It Hits Your Operations" (outcome-first)
-- Added credibility line: "Operational risk intelligence for energy traders, procurement managers, industrial operators, and Texas energy teams."
-- Subheadline: outcome-focused ("before they become operational constraints")
-- Added trust statement: "Continuously analyzes ERCOT, NOAA, and EIA data streams to identify emerging operational, weather, supply, and market risks before conditions escalate."
-- Primary CTA: "Get Early Warning Alerts" (was "Start Monitoring")
-- Secondary CTA: "View Today's Risk Outlook" (was "View Live Conditions")
-- Bottom CTA: "Start Free Monitoring" (was "Start Monitoring")
-
-### Friday CRM Session — Planned
-- Apollo.io prospecting integration
-- Pipeline tracking
-- Audience builder
-- Resend sync for email sequences
-
----
-
-## SEO FILES (added v4.2)
-- frontend/app/layout.tsx — global metadata, OG, Twitter, JSON-LD structured data
-- frontend/app/sitemap.ts — dynamic sitemap.xml
-- frontend/app/robots.ts — robots.txt
-- frontend/app/opengraph-image.tsx — auto-generated OG image (1200x630)
-- frontend/app/pricing/layout.tsx — pricing page metadata
-- frontend/app/dashboard/layout.tsx — dashboard metadata (noindex)
-- frontend/app/terms/layout.tsx — terms page metadata
-
----
-
-## SUPABASE TABLES
-- users
-- subscriptions
-- signal_snapshots
-- alert_preferences
-- alert_logs
-- newsletter_subscribers
-- newsletter_issues
-- newsletter_sends
-- report_deliveries
-- prospects
-- prospect_audiences
-- prospect_audience_members
-- demo_requests
+- alerts@investorlens.capital — alert emails (
