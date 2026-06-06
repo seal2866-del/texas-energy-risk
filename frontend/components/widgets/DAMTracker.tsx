@@ -71,17 +71,56 @@ export default function DAMTracker() {
       )}
 
       {data && !data.available && (
-        <div className="px-4 pb-4">
-          <div className="rounded-xl bg-gray-500/8 border border-gray-500/15 p-3 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <div className="px-4 pb-4 space-y-3">
+          {/* Waiting state */}
+          <div className="rounded-xl bg-amber-500/8 border border-amber-500/15 p-3 flex items-start gap-2">
+            <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-semibold text-gray-300">DAM Not Yet Posted</p>
-              <p className="text-[10px] text-gray-500">{data.message ?? "Check back after 2:00 PM CT"}</p>
+              <p className="text-xs font-semibold text-amber-300">Awaiting Today's DAM Results</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                ERCOT posts Day-Ahead Market prices daily around 1:30–2:00 PM CT.
+                Check back this afternoon for the lock-in signal.
+              </p>
             </div>
           </div>
-          <p className="text-[10px] text-gray-600 mt-2">
-            ERCOT Day-Ahead Market results post daily around 1:30–2:00 PM CT.
-            Current RT price: ${data.rt_price?.toFixed(2) ?? "—"}/MWh
+
+          {/* RT context while waiting */}
+          <div className="rounded-xl bg-white/3 border border-white/8 p-3">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Current Real-Time Reference</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] text-gray-600 mb-0.5">RT Price Now</p>
+                <p className="text-lg font-black text-orange-400">
+                  ${data.rt_price?.toFixed(2) ?? "—"}
+                  <span className="text-[10px] text-gray-500 font-normal ml-1">/MWh</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-600 mb-0.5">DAM Posts At</p>
+                <p className="text-lg font-black text-white">2:00 PM
+                  <span className="text-[10px] text-gray-500 font-normal ml-1">CT</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* What the signal means */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">How to use this signal</p>
+            {[
+              { signal: "LOCK IN", color: "text-green-400", bg: "bg-green-500/8 border-green-500/15", desc: "RT above DAM by $15+ — index buyers overpaying, lock in forward price" },
+              { signal: "STAY FLOATING", color: "text-red-400", bg: "bg-red-500/8 border-red-500/15", desc: "DAM above RT by $15+ — real-time cheaper, stay on index" },
+              { signal: "MONITOR", color: "text-amber-400", bg: "bg-amber-500/8 border-amber-500/15", desc: "Spread within $15 — no clear advantage either way" },
+            ].map(s => (
+              <div key={s.signal} className={`rounded-xl border p-2.5 flex items-center gap-2 ${s.bg}`}>
+                <span className={`text-[10px] font-black w-24 flex-shrink-0 ${s.color}`}>{s.signal}</span>
+                <p className="text-[10px] text-gray-400">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[10px] text-gray-600 italic">
+            DAM vs RT spread updates automatically once results post · Not financial advice
           </p>
         </div>
       )}
