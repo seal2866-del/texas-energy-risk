@@ -13,7 +13,6 @@ import httpx
 log = logging.getLogger(__name__)
 
 ERCOT_SYS_URL = "https://www.ercot.com/content/cdr/html/real_time_system_conditions.html"
-ERCOT_CDR_URL = "https://www.ercot.com/content/cdr/html/real_time_spp.html"
 
 _CACHE: Dict[str, Any] = {}
 _CACHE_TTL = 300  # 5 minutes
@@ -160,11 +159,7 @@ async def fetch_grid_conditions() -> Dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(timeout=15, headers={"Cache-Control": "no-cache"}) as client:
-            sys_r, spp_r = await __import__("asyncio").gather(
-                client.get(ERCOT_SYS_URL),
-                client.get(ERCOT_CDR_URL),
-                return_exceptions=True,
-            )
+            sys_r = await client.get(ERCOT_SYS_URL)
 
         # System conditions
         sys_data = {}
@@ -173,14 +168,15 @@ async def fetch_grid_conditions() -> Dict[str, Any]:
         else:
             log.warning("[GRID] System conditions fetch failed: %s", sys_r)
 
-        # Hub prices
+        # Hub prices — use existing working fetcher from external_apis
         hub_prices = {}
         spreads    = []
-        if not isinstance(spp_r, Exception) and spp_r.status_code == 200:
-            hub_prices = _parse_hub_prices(spp_r.text)
+        try:
+            from services.external_apis import fetch_all_hub_prices
+            hub_prices = await fetch_all_hub_prices()
             spreads    = _build_spreads(hub_prices)
-        else:
-            log.warning("[GRID] Hub prices fetch failed: %s", spp_r)
+        except Exception as he:
+            log.warning("[GRID] Hub prices fetch failed: %s", he)
 
         result = {
             "computed_at": datetime.now(timezone.utc).isoformat(),
