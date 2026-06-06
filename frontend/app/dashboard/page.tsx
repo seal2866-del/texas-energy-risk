@@ -72,6 +72,7 @@ import RiskModelDebug from "@/components/widgets/RiskModelDebug";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import HenryHubWidget from "@/components/widgets/HenryHubWidget";
 import ForecastRiskOutlook from "@/components/widgets/ForecastRiskOutlook";
+import CustomerROI from "@/components/widgets/CustomerROI";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
 import { supabase } from "@/lib/supabase";
@@ -667,7 +668,10 @@ export default function DashboardPage() {
                 computedAt={signals.computed_at}
               />
 
-              {/* 2. WHAT CHANGED SINCE YESTERDAY */}
+              {/* 2. FORECAST RISK OUTLOOK — customers pay for future awareness */}
+              <ForecastRiskOutlook location={location} />
+
+              {/* 3. WHAT CHANGED SINCE YESTERDAY */}
               <WhatChangedYesterday
                 snapshots={snapshots}
                 currentPrice={prices[prices.length - 1]?.price_mwh ?? 0}
@@ -691,9 +695,6 @@ export default function DashboardPage() {
                 computedAt={signals.computed_at}
               />
 
-              {/* FORECAST RISK OUTLOOK — Priority 1 Feature */}
-              <ForecastRiskOutlook location={location} />
-
               {/* 2. KPI STRIP — single glance */}
               <ExecutiveKPIRow
                 riskScore={signals.risk_score}
@@ -716,7 +717,14 @@ export default function DashboardPage() {
                 riskScore={signals.risk_score ?? "low"}
               />
 
-              {/* 2d. Scenario Modeling */}
+              {/* 2d. Customer Value / ROI */}
+              <CustomerROI
+                ercotPrice={prices[prices.length - 1]?.price_mwh ?? 75}
+                activeSignals={signals.active_signals ?? 0}
+                riskScore={signals.risk_score ?? "low"}
+              />
+
+              {/* 2e. Scenario Modeling */}
               <ScenarioModelingPanel
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
                 henryHub={signals.henry_hub?.price ?? 3.00}
@@ -953,6 +961,13 @@ export default function DashboardPage() {
                     ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
                     henryHub={signals.henry_hub?.price ?? 3.00}
                     demandLevel={signals.demand_pressure?.level ?? "low"}
+                    riskScore={signals.risk_score ?? "low"}
+                  />
+
+                  {/* Customer Value / ROI */}
+                  <CustomerROI
+                    ercotPrice={prices[prices.length - 1]?.price_mwh ?? 75}
+                    activeSignals={signals.active_signals ?? 0}
                     riskScore={signals.risk_score ?? "low"}
                   />
 
