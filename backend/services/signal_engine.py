@@ -24,14 +24,20 @@ _PREV_SIGNALS: Dict[str, Dict[str, Any]] = {}
 
 
 # -- Thresholds ----------------------------------------------------------------
-# ERCOT price tiers — updated to reflect actual Texas market conditions
-PRICE_NORMAL_MAX          = 75.0    # Normal operating range
-PRICE_WATCH_MWH           = 75.0    # Watch tier starts
-PRICE_ELEVATED_MWH        = 150.0   # Elevated operational risk threshold
+# ERCOT price tiers — calibrated to actual Texas market conditions
+# Hysteresis prevents status flapping at tier boundaries:
+#   Enter WATCH  when price rises above PRICE_WATCH_ENTER ($75)
+#   Return NORMAL when price falls below PRICE_WATCH_EXIT  ($70)
+#   Dead band $70–$75 — hold current state, no flip
+PRICE_WATCH_ENTER         = 75.0    # Rising edge: NORMAL → WATCH
+PRICE_WATCH_EXIT          = 70.0    # Falling edge: WATCH → NORMAL
+PRICE_WATCH_MWH           = 75.0    # Alias used for display / reference lines
+PRICE_ELEVATED_MWH        = 150.0   # Elevated operational risk — action required
 PRICE_HIGH_MWH            = 300.0   # High risk
 PRICE_CRITICAL_MWH        = 1000.0  # Critical / extreme event
 PRICE_ABS_HIGH_MWH        = 150.0   # Alias — elevated threshold (used throughout)
-PRICE_SPIKE_THRESHOLD_PCT = 100.0   # % move needed to flag volatility (raised from 50)
+PRICE_SPIKE_THRESHOLD_PCT = 100.0   # % move needed to flag volatility
+PRICE_NORMAL_MAX          = 75.0    # Display reference
 PRICE_LOW_FLOOR           = 10.0
 TEMP_HIGH_THRESHOLD_F     = 100.0
 TEMP_LOW_THRESHOLD_F      = 28.0
@@ -541,6 +547,13 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
     spike_by_abs    = sustained_spike and current >= PRICE_ABS_HIGH_MWH
     single_outlier  = (not sustained_spike) and current >= PRICE_ABS_HIGH_MWH
 
+    # Hysteresis: enter WATCH above $75, exit WATCH below $70
+    # Dead band $70–$75: use prev to decide — prevents flapping at boundary
+    if PRICE_WATCH_EXIT <= current < PRICE_WATCH_ENTER:
+        in_watch = prev >= PRICE_WATCH_EXIT   # was already in watch → stay
+    else:
+        in_watch = current >= PRICE_WATCH_ENTER
+
     if spike_by_abs or spike_by_pct:
         if current >= 1000:
             return _signal(
@@ -579,13 +592,15 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
             "Monitoring for confirmation. Single-interval spikes are filtered to reduce noise.",
         )
 
-    if current >= PRICE_WATCH_MWH:
+    if in_watch:
         pct_note = f" {pct_display} vs previous interval." if pct_change is not None else ""
+        dead_band = PRICE_WATCH_EXIT <= current < PRICE_WATCH_ENTER
+        band_note = f" (holding Watch — price in $70–$75 dead band)" if dead_band else ""
         return _signal(
             "price_volatility", "VOLATILITY", False, "low", None,
             "Price in Watch Range", current, PRICE_ELEVATED_MWH,
-            "Short-term (0-6h): elevated but within normal market range · Near-term (6-24h): monitor for sustained move above $150 · Outlook (24-48h): watch for escalation",
-            f"ERCOT Houston Hub at ${current:.0f}/MWh, within the Watch range ($75–$150/MWh).{pct_note}"
+            "Short-term (0-6h): within Watch range, no action required · Near-term (6-24h): monitor for sustained move above $150 · Outlook (24-48h): watch for escalation",
+            f"ERCOT Houston Hub at ${current:.0f}/MWh, within the Watch range ($75–$150/MWh).{pct_note}{band_note}"
             " Normal market conditions for Texas — no operational action required unless sustained above $150/MWh.",
             "Monitor for price movement above $150/MWh before escalating operational response.",
         )
@@ -2937,7 +2952,6 @@ def run_all_signals(
             "risk_trend":                     risk_trend,
             "gas_power_correlation":          gas_power_correlation,
             "interval_intelligence":          interval_intelligence,
-            "henry_hub":              henry_hub_data,
             "henry_hub_signal":       henry_hub_sig,
             "henry_hub_exposure":     henry_hub_exposure,
             "signals": {
