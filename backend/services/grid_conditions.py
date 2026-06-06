@@ -168,13 +168,19 @@ async def fetch_grid_conditions() -> Dict[str, Any]:
         else:
             log.warning("[GRID] System conditions fetch failed: %s", sys_r)
 
-        # Hub prices — use existing working fetcher from external_apis
+        # Hub prices — use live cache for HB_HOUSTON, fresh CDR for other hubs
         hub_prices = {}
         spreads    = []
         try:
-            from services.external_apis import fetch_all_hub_prices
+            from services.external_apis import fetch_all_hub_prices, _get_cached_prices
             hub_prices = await fetch_all_hub_prices()
-            spreads    = _build_spreads(hub_prices)
+            # Override HB_HOUSTON with the live poller cache (updated every 5 min)
+            cached = _get_cached_prices("HB_HOUSTON")
+            if cached:
+                live_price = float(cached[-1].get("price_mwh", 0))
+                if live_price > 0:
+                    hub_prices["HB_HOUSTON"] = live_price
+            spreads = _build_spreads(hub_prices)
         except Exception as he:
             log.warning("[GRID] Hub prices fetch failed: %s", he)
 
