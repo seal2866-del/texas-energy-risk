@@ -22,10 +22,10 @@ export default function EscalationPath({ ercotPrice, temperature, henryHub, risk
 
   const steps: Step[] = [
     {
-      trigger:  "ERCOT > $35/MWh",
+      trigger:  "ERCOT > $75/MWh",
       action:   "Increased monitoring priority may apply",
       severity: "watch",
-      active:   price >= 35,
+      active:   price >= 75,
     },
     {
       trigger:  "ERCOT > $50/MWh",

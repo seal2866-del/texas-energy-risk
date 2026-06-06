@@ -41,8 +41,8 @@ export default function MonitoringPriorities({
     {
       rank:        1,
       label:       "ERCOT Pricing — 14:00–19:00 CDT",
-      description: `Current: $${price > 0 ? price.toFixed(2) : "N/A"}/MWh · Watch threshold: $35/MWh`,
-      status:      price >= 35 ? "Elevated" : price >= 28 ? "Watching" : "Normal",
+      description: `Current: $${price > 0 ? price.toFixed(2) : "N/A"}/MWh · Watch threshold: $75/MWh`,
+      status:      price >= 75 ? "Elevated" : price >= 60 ? "Watching" : "Normal",
     },
     {
       rank:        2,

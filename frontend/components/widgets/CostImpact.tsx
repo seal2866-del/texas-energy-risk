@@ -48,7 +48,7 @@ export default function CostImpact({ riskScore, ercotPrice, marketReaction }: Pr
         };
 
   const scenarios = [
-    { threshold: "ERCOT > $35/MWh", impact: "Cost sensitivity may increase modestly", severity: "watch" },
+    { threshold: "ERCOT > $75/MWh", impact: "Cost sensitivity may increase modestly", severity: "watch" },
     { threshold: "ERCOT > $50/MWh", impact: "Elevated cost exposure during peak hours",  severity: "elevated" },
     { threshold: "ERCOT > $100/MWh", impact: "High volatility — immediate review required", severity: "critical" },
   ];

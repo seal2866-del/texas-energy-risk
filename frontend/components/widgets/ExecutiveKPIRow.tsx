@@ -32,7 +32,7 @@ function confidenceLabel(c: number | null | undefined): string {
   if (!c) return "MODERATE";
   if (c >= 80) return "HIGH";
   if (c >= 50) return "MODERATE";
-  if (c >= 35) return "ACCEPTABLE";
+  if (c >= 75) return "ACCEPTABLE";
   return "LIMITED";
 }
 

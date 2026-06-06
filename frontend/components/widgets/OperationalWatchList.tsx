@@ -71,7 +71,7 @@ export default function OperationalWatchList({
       status:    tempVal >= 95 ? "Triggered" : tempVal >= 88 ? "Watching" : "Normal",
     },
     {
-      condition: "ERCOT LMP > $35/MWh",
+      condition: "ERCOT LMP > $75/MWh",
       value:     ercotVal > 0 ? `$${ercotVal.toFixed(2)}/MWh current` : "N/A",
       status:    ercotVal >= 35 ? "Triggered" : ercotVal >= 28 ? "Watching" : "Normal",
     },

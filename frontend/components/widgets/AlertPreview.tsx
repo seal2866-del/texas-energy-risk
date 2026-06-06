@@ -45,10 +45,10 @@ export default function AlertPreview({
   }
 
   // ERCOT price alert
-  const priceDist = 35 - price;
+  const priceDist = 75 - price;
   if (price >= 25 || demand === "medium" || demand === "high") {
     alerts.push({
-      condition:   "ERCOT LMP > $35/MWh",
+      condition:   "ERCOT LMP > $75/MWh",
       probability: price >= 30 ? "Moderate" : "Low",
       window:      price >= 30 ? "Peak window (14:00–19:00 CDT)" : "If demand spikes",
       probColor:   price >= 30 ? "text-amber-400" : "text-gray-400",

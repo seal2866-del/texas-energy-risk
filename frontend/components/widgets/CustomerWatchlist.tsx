@@ -114,7 +114,7 @@ export default function CustomerWatchlist({ ercotPrice, temperature, henryHub, r
   function liveValue(item: WatchItem): { current: string; status: WatchItem["status"] } {
     if (item.label.toLowerCase().includes("houston hub") || item.label.toLowerCase().includes("ercot")) {
       const p = ercotPrice ?? 0;
-      return { current: p > 0 ? `$${p.toFixed(2)}/MWh` : "N/A", status: p >= 35 ? "elevated" : p >= 28 ? "watch" : "normal" };
+      return { current: p > 0 ? `$${p.toFixed(2)}/MWh` : "N/A", status: p >= 75 ? "elevated" : p >= 60 ? "watch" : "normal" };
     }
     if (item.label.toLowerCase().includes("henry hub")) {
       const h = henryHub ?? 0;

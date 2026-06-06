@@ -56,7 +56,7 @@ export default function EscalationTriggers({ ercotPrice, temperature, henryHub, 
   const tempVal   = temperature ?? 0;
   const hhVal     = henryHub    ?? 0;
 
-  const ercotStatus = getStatus(ercotVal, 35, 0.85);
+  const ercotStatus = getStatus(ercotVal, 75, 0.85);
   const tempStatus  = getStatus(tempVal,  95, 0.90);
   const hhStatus    = getStatus(hhVal,    3.0, 0.90);
 
@@ -71,7 +71,7 @@ export default function EscalationTriggers({ ercotPrice, temperature, henryHub, 
     {
       label:     "ERCOT LMP",
       current:   ercotVal > 0 ? `$${ercotVal.toFixed(2)}/MWh` : "N/A",
-      threshold: "> $35/MWh",
+      threshold: "> $75/MWh",
       status:    ercotStatus,
       detail:    ercotStatus === "Watching" ? "Approaching watch threshold — monitor closely" : undefined,
     },

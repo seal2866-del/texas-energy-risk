@@ -37,7 +37,7 @@ export default function CostExposure({ riskScore, ercotPrice, marketReaction }: 
 
   const scenarios: Scenario[] = [
     {
-      threshold: `If ERCOT exceeds $35/MWh`,
+      threshold: `If ERCOT exceeds $75/MWh`,
       label:     "Watch",
       exposure:  "Potential cost sensitivity may increase modestly during peak hours.",
       action:    "Monitor",

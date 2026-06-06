@@ -29,11 +29,11 @@ export default function EscalationDrivers({
   const drivers: Driver[] = [
     {
       rank:       1,
-      condition:  "ERCOT > $35/MWh",
+      condition:  "ERCOT > $75/MWh",
       current:    price > 0 ? `$${price.toFixed(2)}/MWh` : "N/A",
-      threshold:  "$35/MWh",
+      threshold:  "$75/MWh",
       probImpact: 24,
-      proximity:  price > 0 ? Math.min(Math.round((price / 35) * 100), 100) : 0,
+      proximity:  price > 0 ? Math.min(Math.round((price / 75) * 100), 100) : 0,
     },
     {
       rank:       2,

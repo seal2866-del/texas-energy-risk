@@ -62,7 +62,7 @@ export default function PotentialImpact({
 
   if (price > 0 && price < 35) {
     scenarios.push({
-      condition: `If ERCOT exceeds $35/MWh`,
+      condition: `If ERCOT exceeds $75/MWh`,
       impact:    "Pricing conditions may reflect increased grid stress — monitoring frequency may warrant review.",
     });
   }

@@ -49,12 +49,12 @@ export default function OperationalSignificance({
     {
       signal: "ERCOT Pricing",
       significance:
-        price >= 35
+        price >= 75
           ? `ERCOT Houston Hub at $${price.toFixed(2)}/MWh is above the watch threshold. Pricing reflects elevated grid conditions.`
-          : price >= 28
+          : price >= 60
           ? `ERCOT at $${price.toFixed(2)}/MWh is approaching the watch threshold. Monitoring during peak demand hours is appropriate.`
           : `ERCOT at $${price.toFixed(2)}/MWh remains within normal operating range. No current indication of elevated market stress.`,
-      priority: price >= 35 ? "Elevated" : price >= 28 ? "Watching" : "Normal",
+      priority: price >= 75 ? "Elevated" : price >= 60 ? "Watching" : "Normal",
     },
     {
       signal: "Natural Gas Supply",

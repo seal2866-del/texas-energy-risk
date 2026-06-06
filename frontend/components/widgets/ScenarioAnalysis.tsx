@@ -34,7 +34,7 @@ export default function ScenarioAnalysis({ riskScore, ercotPrice, temperature, h
       detail:      `Current: ${price > 0 ? "$" + price.toFixed(2) : "N/A"} — needs +$${Math.max(0, 50 - price).toFixed(2)}`,
       result:      "HIGH RISK",
       resultColor: "text-red-400",
-      probability: price >= 35 ? "Elevated" : "Low",
+      probability: price >= 75 ? "Elevated" : "Low",
     },
     {
       condition:   "Henry Hub exceeds $4.00/MMBtu",

@@ -43,7 +43,7 @@ function generateBrief(props: Props): {
     keyObservation = `Temperatures of ${temp > 0 ? temp.toFixed(0) + "°F" : "above normal"} are driving elevated cooling demand across the Texas grid.`;
   } else if (supply === "high" || supply === "medium") {
     keyObservation = `Natural gas supply conditions${hh > 0 ? ` (Henry Hub $${hh.toFixed(2)}/MMBtu)` : ""} indicate reduced supply buffer — monitoring warranted.`;
-  } else if (price >= 35) {
+  } else if (price >= 75) {
     keyObservation = `ERCOT pricing at $${price.toFixed(2)}/MWh has exceeded watch thresholds — conditions may warrant increased operational awareness.`;
   } else {
     keyObservation = `All monitored signals remain within normal operating ranges. Reserve margins are stable and no escalation conditions are active.`;

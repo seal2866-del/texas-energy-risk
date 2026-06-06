@@ -62,7 +62,7 @@ export default function TexasThreatCenter({
     },
     {
       label:  "ERCOT Congestion",
-      level:  market === "high" ? "HIGH" : market === "medium" ? "ELEVATED" : price >= 35 ? "ELEVATED" : "NORMAL",
+      level:  market === "high" ? "HIGH" : market === "medium" ? "ELEVATED" : price >= 75 ? "ELEVATED" : "NORMAL",
       detail: price > 0 ? `HB Houston $${price.toFixed(2)}/MWh` : "Monitoring",
     },
     {
