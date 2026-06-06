@@ -548,6 +548,107 @@ export default function LandingPage() {
           </div>
         </section>
 
+
+        {/* ── Customer Value / ROI ──────────────────────────────────────────── */}
+        <section className="border-t border-white/5 bg-[#050810]">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 mb-4">
+                <DollarSign className="w-3.5 h-3.5 text-green-400" />
+                <span className="text-xs font-semibold text-green-400 uppercase tracking-wide">Potential Monthly Value</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
+                What early warning is <span className="text-green-400">worth</span>
+              </h2>
+              <p className="text-gray-400 max-w-xl mx-auto">
+                Operations and procurement teams use TX Energy Risk to avoid peak exposure,
+                act before volatility hits, and reduce unplanned energy cost.
+              </p>
+            </div>
+
+            {/* Metric cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {[
+                {
+                  icon: <Zap className="w-5 h-5 text-amber-400" />,
+                  label: "Avoided Peak ERCOT Exposure",
+                  value: "$12,500",
+                  sub: "per month",
+                  color: "amber",
+                  bg: "bg-amber-500/8",
+                  border: "border-amber-500/15",
+                  text: "text-amber-400",
+                },
+                {
+                  icon: <Bell className="w-5 h-5 text-orange-400" />,
+                  label: "Early Warning Events Detected",
+                  value: "14",
+                  sub: "actionable alerts",
+                  color: "orange",
+                  bg: "bg-orange-500/8",
+                  border: "border-orange-500/15",
+                  text: "text-orange-400",
+                },
+                {
+                  icon: <Brain className="w-5 h-5 text-purple-400" />,
+                  label: "Operational Recommendations",
+                  value: "22",
+                  sub: "AI-generated actions",
+                  color: "purple",
+                  bg: "bg-purple-500/8",
+                  border: "border-purple-500/15",
+                  text: "text-purple-400",
+                },
+                {
+                  icon: <DollarSign className="w-5 h-5 text-green-400" />,
+                  label: "Potential Cost Avoidance",
+                  value: "$47,000",
+                  sub: "estimated monthly",
+                  color: "green",
+                  bg: "bg-green-500/8",
+                  border: "border-green-500/15",
+                  text: "text-green-400",
+                },
+              ].map((m, i) => (
+                <div key={i} className={`rounded-2xl border p-5 ${m.bg} ${m.border} flex flex-col gap-3`}>
+                  <div className={`w-10 h-10 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center`}>
+                    {m.icon}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 leading-snug mb-2">{m.label}</p>
+                    <p className={`text-3xl font-black ${m.text}`}>{m.value}</p>
+                    <p className="text-[11px] text-gray-600 mt-0.5">{m.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Potential savings bar */}
+            <div className="rounded-2xl border border-green-500/15 bg-green-500/5 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center flex-shrink-0">
+                  <TrendingUp className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Potential Monthly Savings</p>
+                  <p className="text-xs text-gray-400">Based on monitored market conditions and risk signals</p>
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-4xl font-black text-green-400">$47,000</p>
+                <p className="text-xs text-gray-500">estimated cost avoidance</p>
+              </div>
+            </div>
+
+            {/* Disclaimer */}
+            <p className="text-center text-[11px] text-gray-600 mt-5 max-w-2xl mx-auto">
+              Illustrative estimate based on monitored market conditions and risk signals detected over a representative 30-day period.
+              Actual savings vary by facility size, load profile, and energy procurement strategy.
+              Not financial or procurement advice.
+            </p>
+          </div>
+        </section>
+
         {/* ── Final CTA ─────────────────────────────────────────────────────── */}
         <section className="border-t border-white/5 bg-[#050810]">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
