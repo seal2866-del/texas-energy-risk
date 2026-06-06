@@ -197,3 +197,52 @@ async def get_forecast_outlook(
             "narrative":     "Forecast data temporarily unavailable. Current conditions are within normal range.",
             "error":         str(exc),
         }
+
+
+@router.get("/load-optimizer")
+async def get_load_optimizer(
+    location: str = Query(default="Houston"),
+):
+    """
+    Returns optimal load scheduling windows for next 24-48 hours.
+    Identifies cheapest 2h/4h/6h windows based on ERCOT price patterns + temp forecast.
+    Cached 30 minutes.
+    """
+    try:
+        from services.load_optimizer import compute_load_optimizer
+        prices_raw, forecasts_raw = await asyncio.gather(
+            fetch_ercot_prices(hours=6, settlement_point="HB_HOUSTON"),
+            fetch_weather_forecast(location=location, days=2),
+            return_exceptions=True,
+        )
+        prices    = prices_raw    if not isinstance(prices_raw,    Exception) else []
+        forecasts = forecasts_raw if not isinstance(forecasts_raw, Exception) else []
+        price_dicts = [
+            p if isinstance(p, dict) else {"price_mwh": getattr(p, "price_mwh", 0)}
+            for p in (prices or [])
+        ]
+        return await compute_load_optimizer(price_dicts, forecasts, location=location)
+    except Exception as exc:
+        logger.error("[LOAD-OPT] Error: %s", exc)
+        return {"error": str(exc), "recommendation": "Data temporarily unavailable"}
+
+
+@router.get("/dam")
+async def get_dam_comparison(
+    location: str = Query(default="Houston"),
+):
+    """
+    Returns ERCOT Day-Ahead Market prices vs Real-Time.
+    Includes lock-in signal: LOCK IN / STAY FLOATING / MONITOR.
+    DAM posts ~2PM CT daily. Cached 1 hour.
+    """
+    try:
+        from services.dam_tracker import fetch_dam_comparison
+        prices_raw = await fetch_ercot_prices(hours=2, settlement_point="HB_HOUSTON")
+        prices = prices_raw if not isinstance(prices_raw, Exception) else []
+        rt_price = float(prices[-1].get("price_mwh", 50) if isinstance(prices[-1], dict)
+                         else getattr(prices[-1], "price_mwh", 50)) if prices else 50.0
+        return await fetch_dam_comparison(rt_price=rt_price)
+    except Exception as exc:
+        logger.error("[DAM] Error: %s", exc)
+        return {"available": False, "message": str(exc)}
