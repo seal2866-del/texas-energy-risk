@@ -65,7 +65,7 @@ def _parse_dam_html(html: str) -> List[Dict]:
 
 def _dam_summary(rows: List[Dict], rt_price: float) -> Dict[str, Any]:
     if not rows:
-        return {"available": False, "message": "DAM prices not yet posted (posts ~2PM CT)"}
+        return {"available": False, "message": "DAM prices not yet posted (posts ~2PM CT)", "rt_price": rt_price}
 
     prices = [r["price_houston"] for r in rows if r.get("price_houston")]
     avg_dam = sum(prices) / len(prices) if prices else 0
