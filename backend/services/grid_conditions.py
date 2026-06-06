@@ -105,57 +105,47 @@ HUBS = ["HB_HOUSTON", "HB_NORTH", "HB_SOUTH", "HB_WEST", "HB_BUSAVG"]
 
 def _parse_hub_prices_from_table(html: str) -> Dict[str, Optional[float]]:
     """
-    Parse ERCOT CDR SPP HTML table by column position.
-    Works with real HTML <th>/<td> tags — not pipe-separated markdown.
-    Finds the header row, then reads the last data row (most recent interval).
+    Parse ERCOT CDR SPP page by extracting all <td> values from the row
+    that contains HB_HOUSTON, then reading siblings by column offset.
+    CDR column order: Oper Day | Interval | HB_BUSAVG | HB_HOUSTON | HB_HUBAVG | HB_NORTH | HB_PAN | HB_SOUTH | HB_WEST
     """
-    import re as _re
-
-    rows = _re.findall(r'<tr[^>]*>(.*?)</tr>', html, _re.IGNORECASE | _re.DOTALL)
-    if not rows:
-        log.warning("[GRID] No table rows found in SPP HTML")
+    if not html:
         return {h: None for h in HUBS}
 
-    # Find header row containing HB_HOUSTON
-    header_cols: list = []
-    for row in rows:
-        cells = _re.findall(r'<t[hd][^>]*>(.*?)</t[hd]>', row, _re.IGNORECASE | _re.DOTALL)
-        cells = [_re.sub(r'<[^>]+>', '', c).strip() for c in cells]
-        if any('HB_HOUSTON' in c.upper() for c in cells):
-            header_cols = cells
-            break
+    # Find all <td> numbers in the page — extract each row as a list of floats
+    td_pattern = re.compile(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', re.IGNORECASE)
 
-    if not header_cols:
-        log.warning("[GRID] Header row not found in SPP HTML")
+    # Find all <tr> blocks and extract numeric <td> values from each
+    tr_pattern  = re.compile(r'<tr[^>]*>(.*?)</tr>', re.IGNORECASE | re.DOTALL)
+    best_row: list = []
+
+    for tr_match in tr_pattern.finditer(html):
+        row_html  = tr_match.group(1)
+        td_values = td_pattern.findall(row_html)
+        floats    = []
+        for v in td_values:
+            try: floats.append(float(v))
+            except: pass
+        # A valid price row has 7+ numeric cells (all the hub columns)
+        if len(floats) >= 7:
+            best_row = floats  # keep updating — last match = most recent interval
+
+    if not best_row:
+        log.warning("[GRID] No hub price row found in SPP HTML (rows scanned)")
         return {h: None for h in HUBS}
 
-    # Collect all numeric data rows
-    data_rows = []
-    for row in rows:
-        cells = _re.findall(r'<t[hd][^>]*>(.*?)</t[hd]>', row, _re.IGNORECASE | _re.DOTALL)
-        cells = [_re.sub(r'<[^>]+>', '', c).strip() for c in cells]
-        if len(cells) >= len(header_cols) and cells != header_cols:
-            try:
-                float(cells[-1])
-                data_rows.append(cells)
-            except (ValueError, IndexError):
-                pass
-
-    if not data_rows:
-        log.warning("[GRID] No numeric data rows in SPP HTML")
-        return {h: None for h in HUBS}
-
-    last_row = data_rows[-1]
+    # Column offsets within the numeric portion of the row:
+    # 0=HB_BUSAVG  1=HB_HOUSTON  2=HB_HUBAVG  3=HB_NORTH  4=HB_PAN  5=HB_SOUTH  6=HB_WEST
+    col_idx = {"HB_BUSAVG": 0, "HB_HOUSTON": 1, "HB_NORTH": 3, "HB_SOUTH": 5, "HB_WEST": 6}
     result: Dict[str, Optional[float]] = {}
     for hub in HUBS:
-        result[hub] = None
-        for i, col in enumerate(header_cols):
-            if hub.upper() in col.upper() and i < len(last_row):
-                try:
-                    result[hub] = float(last_row[i])
-                except (ValueError, IndexError):
-                    pass
-                break
+        idx = col_idx.get(hub)
+        if idx is not None and idx < len(best_row):
+            val = best_row[idx]
+            result[hub] = val if -500 <= val <= 5000 else None
+        else:
+            result[hub] = None
+    log.info("[GRID] Hub prices parsed: %s", {k: v for k,v in result.items() if v})
     return result
 
 
