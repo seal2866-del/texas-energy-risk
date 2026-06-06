@@ -80,3 +80,16 @@ async def debug_cdr():
         "cdr_tests": results,
         "disclaimer": "Informational only.",
     }
+
+
+@router.get("/grid")
+async def get_grid_conditions():
+    """
+    Returns ERCOT real-time system conditions:
+    - Reserve margin + EEA emergency level
+    - All hub prices + spread vs HB_HOUSTON
+    - Wind/solar generation mix
+    Cached 5 minutes.
+    """
+    from services.grid_conditions import fetch_grid_conditions
+    return await fetch_grid_conditions()

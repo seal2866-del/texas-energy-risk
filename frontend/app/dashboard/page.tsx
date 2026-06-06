@@ -72,6 +72,8 @@ import RiskModelDebug from "@/components/widgets/RiskModelDebug";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import HenryHubWidget from "@/components/widgets/HenryHubWidget";
 import ForecastRiskOutlook from "@/components/widgets/ForecastRiskOutlook";
+import EEATracker from "@/components/widgets/EEATracker";
+import MultiHubSpread from "@/components/widgets/MultiHubSpread";
 import CustomerROI from "@/components/widgets/CustomerROI";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
@@ -709,7 +711,11 @@ export default function DashboardPage() {
               {/* 2b. Henry Hub — full widget in Executive Mode */}
               <HenryHubWidget data={signals.henry_hub} />
 
-              {/* 2c. Operational Cost Impact */}
+              {/* 2c. ERCOT Grid Status + Hub Spreads */}
+              <EEATracker />
+              <MultiHubSpread />
+
+              {/* 2d. Operational Cost Impact */}
               <OperationalCostImpact
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
                 henryHub={signals.henry_hub?.price ?? 3.00}
@@ -955,6 +961,10 @@ export default function DashboardPage() {
 
                   {/* Henry Hub — top-level gas price signal */}
                   <HenryHubWidget data={signals.henry_hub} />
+
+                  {/* ERCOT Grid Status + Hub Spreads */}
+                  <EEATracker />
+                  <MultiHubSpread />
 
                   {/* Operational Cost Impact */}
                   <OperationalCostImpact
