@@ -105,44 +105,51 @@ HUBS = ["HB_HOUSTON", "HB_NORTH", "HB_SOUTH", "HB_WEST", "HB_BUSAVG"]
 
 def _parse_hub_prices_from_table(html: str) -> Dict[str, Optional[float]]:
     """
-    Parse ERCOT CDR SPP table by column position.
-    Finds the header row with hub names, then reads the last data row.
+    Parse ERCOT CDR SPP HTML table by column position.
+    Works with real HTML <th>/<td> tags — not pipe-separated markdown.
+    Finds the header row, then reads the last data row (most recent interval).
     """
-    lines = [l.strip() for l in html.splitlines() if '|' in l]
-    if not lines:
+    import re as _re
+
+    rows = _re.findall(r'<tr[^>]*>(.*?)</tr>', html, _re.IGNORECASE | _re.DOTALL)
+    if not rows:
+        log.warning("[GRID] No table rows found in SPP HTML")
         return {h: None for h in HUBS}
 
-    # Find header line containing HB_HOUSTON
-    header_line = None
-    for line in lines:
-        if 'HB_HOUSTON' in line.upper() and 'HB_NORTH' in line.upper():
-            header_line = line
+    # Find header row containing HB_HOUSTON
+    header_cols: list = []
+    for row in rows:
+        cells = _re.findall(r'<t[hd][^>]*>(.*?)</t[hd]>', row, _re.IGNORECASE | _re.DOTALL)
+        cells = [_re.sub(r'<[^>]+>', '', c).strip() for c in cells]
+        if any('HB_HOUSTON' in c.upper() for c in cells):
+            header_cols = cells
             break
-    if not header_line:
+
+    if not header_cols:
+        log.warning("[GRID] Header row not found in SPP HTML")
         return {h: None for h in HUBS}
 
-    # Parse column names
-    cols = [c.strip() for c in header_line.split('|') if c.strip()]
-
-    # Find all numeric data rows (last one = most recent interval)
+    # Collect all numeric data rows
     data_rows = []
-    for line in lines:
-        parts = [p.strip() for p in line.split('|') if p.strip()]
-        if len(parts) >= len(cols):
+    for row in rows:
+        cells = _re.findall(r'<t[hd][^>]*>(.*?)</t[hd]>', row, _re.IGNORECASE | _re.DOTALL)
+        cells = [_re.sub(r'<[^>]+>', '', c).strip() for c in cells]
+        if len(cells) >= len(header_cols) and cells != header_cols:
             try:
-                float(parts[-1])  # last column is numeric = data row
-                data_rows.append(parts)
+                float(cells[-1])
+                data_rows.append(cells)
             except (ValueError, IndexError):
                 pass
 
     if not data_rows:
+        log.warning("[GRID] No numeric data rows in SPP HTML")
         return {h: None for h in HUBS}
 
     last_row = data_rows[-1]
     result: Dict[str, Optional[float]] = {}
     for hub in HUBS:
         result[hub] = None
-        for i, col in enumerate(cols):
+        for i, col in enumerate(header_cols):
             if hub.upper() in col.upper() and i < len(last_row):
                 try:
                     result[hub] = float(last_row[i])
