@@ -215,13 +215,7 @@ async def fetch_grid_conditions() -> Dict[str, Any]:
                 spp_r = await hc.get("https://www.ercot.com/content/cdr/html/real_time_spp.html")
             if spp_r.status_code == 200:
                 hub_prices = _parse_hub_prices_from_table(spp_r.text)
-            # Override HB_HOUSTON with live 5-min poller cache
-            from services.external_apis import _get_cached_prices
-            cached = _get_cached_prices("HB_HOUSTON")
-            if cached:
-                live_price = float(cached[-1].get("price_mwh", 0))
-                if live_price > 0:
-                    hub_prices["HB_HOUSTON"] = live_price
+            # Use CDR table values for ALL hubs — consistent same-interval pricing
             spreads = _build_spreads(hub_prices)
         except Exception as he:
             log.warning("[GRID] Hub prices fetch failed: %s", he)
