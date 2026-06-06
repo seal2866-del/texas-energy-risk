@@ -34,10 +34,10 @@ export default function EscalationPath({ ercotPrice, temperature, henryHub, risk
       active:   price >= 50,
     },
     {
-      trigger:  "Temperature > 95°F",
+      trigger:  "Temperature > 100°F",
       action:   "Demand conditions may warrant increased monitoring frequency",
       severity: "watch",
-      active:   temp >= 95,
+      active:   temp >= 100,
     },
     {
       trigger:  "Temperature > 100°F",
@@ -46,7 +46,7 @@ export default function EscalationPath({ ercotPrice, temperature, henryHub, risk
       active:   temp >= 100,
     },
     {
-      trigger:  "Henry Hub > $3.00/MMBtu",
+      trigger:  "Henry Hub > $4.00/MMBtu",
       action:   "Gas supply conditions may warrant increased awareness",
       severity: "watch",
       active:   hh >= 3.0,

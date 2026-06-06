@@ -33,10 +33,10 @@ export default function AlertPreview({
   const alerts: PotentialAlert[] = [];
 
   // Temperature alert
-  const tempDist = 95 - temp;
+  const tempDist = 100 - temp;
   if (temp >= 88) {
     alerts.push({
-      condition:   "Temperature > 95°F",
+      condition:   "Temperature > 100°F",
       probability: temp >= 92 ? "High" : "Moderate",
       window:      temp >= 92 ? "2–6 hours" : "6–12 hours",
       probColor:   temp >= 92 ? "text-red-400" : "text-amber-400",
@@ -59,7 +59,7 @@ export default function AlertPreview({
   // Henry Hub alert
   if (hh >= 2.7) {
     alerts.push({
-      condition:   "Henry Hub > $3.00/MMBtu",
+      condition:   "Henry Hub > $4.00/MMBtu",
       probability: hh >= 2.85 ? "Moderate" : "Low",
       window:      "Next EIA report",
       probColor:   hh >= 2.85 ? "text-amber-400" : "text-gray-400",

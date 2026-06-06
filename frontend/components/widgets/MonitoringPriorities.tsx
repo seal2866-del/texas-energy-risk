@@ -47,13 +47,13 @@ export default function MonitoringPriorities({
     {
       rank:        2,
       label:       "Temperature Forecast",
-      description: `Current: ${temp > 0 ? temp.toFixed(0) + "°F" : "N/A"} · Watch threshold: 95°F`,
-      status:      temp >= 95 ? "Elevated" : temp >= 88 ? "Watching" : "Normal",
+      description: `Current: ${temp > 0 ? temp.toFixed(0) + "°F" : "N/A"} · Watch threshold: 100°F`,
+      status:      temp >= 100 ? "Elevated" : temp >= 92 ? "Watching" : "Normal",
     },
     {
       rank:        3,
       label:       "Natural Gas Supply Conditions",
-      description: `Henry Hub: ${hh > 0 ? "$" + hh.toFixed(2) + "/MMBtu" : "N/A"} · Watch threshold: $3.00/MMBtu`,
+      description: `Henry Hub: ${hh > 0 ? "$" + hh.toFixed(2) + "/MMBtu" : "N/A"} · Watch threshold: $4.00/MMBtu`,
       status:      hh >= 3.0 ? "Elevated" : hh >= 2.7 ? "Watching" : "Normal",
     },
     {

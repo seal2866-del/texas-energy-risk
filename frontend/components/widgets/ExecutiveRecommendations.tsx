@@ -57,7 +57,7 @@ function buildRecommendations(props: Props): {
       { text: "Assess non-critical load deferral options during peak demand window (14:00–19:00 CDT)." },
       { text: "Confirm backup generation capacity and fuel supply availability." },
     );
-    reasoning = `Multiple risk signals are active simultaneously. ${activeSignals} escalation signal${activeSignals !== 1 ? "s" : ""} detected. ${price >= 75 ? `ERCOT at $${price.toFixed(2)}/MWh exceeds watch threshold. ` : ""}${temp >= 95 ? `Temperature of ${temp.toFixed(0)}°F exceeds demand escalation threshold. ` : ""}Conditions warrant elevated operational awareness.`;
+    reasoning = `Multiple risk signals are active simultaneously. ${activeSignals} escalation signal${activeSignals !== 1 ? "s" : ""} detected. ${price >= 75 ? `ERCOT at $${price.toFixed(2)}/MWh exceeds watch threshold. ` : ""}${temp >= 100 ? `Temperature of ${temp.toFixed(0)}°F exceeds demand escalation threshold. ` : ""}Conditions warrant elevated operational awareness.`;
   } else if (priority === "Elevated") {
     assessment = "Moderate operational risk conditions detected. Enhanced monitoring is recommended.";
     actions.push(

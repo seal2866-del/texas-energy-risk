@@ -48,7 +48,7 @@ export default function TexasThreatCenter({
     {
       label:  "Heat Wave Risk",
       level:  temp >= 100 ? "HIGH" : temp >= 95 ? "ELEVATED" : isSummer && temp >= 88 ? "ELEVATED" : "NORMAL",
-      detail: temp > 0 ? `${temp.toFixed(0)}°F — ${temp >= 95 ? "above escalation threshold" : "within seasonal range"}` : "Monitoring",
+      detail: temp > 0 ? `${temp.toFixed(0)}°F — ${temp >= 100 ? "above escalation threshold" : "within seasonal range"}` : "Monitoring",
     },
     {
       label:  "Cold Weather Risk",

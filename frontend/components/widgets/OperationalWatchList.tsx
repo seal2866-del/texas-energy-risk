@@ -66,9 +66,9 @@ export default function OperationalWatchList({
 
   const items: WatchItem[] = [
     {
-      condition: "Temperature > 95°F",
+      condition: "Temperature > 100°F",
       value:     tempVal > 0 ? `${tempVal.toFixed(0)}°F current` : "N/A",
-      status:    tempVal >= 95 ? "Triggered" : tempVal >= 88 ? "Watching" : "Normal",
+      status:    tempVal >= 100 ? "Triggered" : tempVal >= 92 ? "Watching" : "Normal",
     },
     {
       condition: "ERCOT LMP > $75/MWh",
@@ -76,7 +76,7 @@ export default function OperationalWatchList({
       status:    ercotVal >= 35 ? "Triggered" : ercotVal >= 28 ? "Watching" : "Normal",
     },
     {
-      condition: "Henry Hub > $3.00/MMBtu",
+      condition: "Henry Hub > $4.00/MMBtu",
       value:     hhVal > 0 ? `$${hhVal.toFixed(2)}/MMBtu current` : "N/A",
       status:    hhVal >= 3.0 ? "Triggered" : hhVal >= 2.7 ? "Watching" : "Normal",
     },

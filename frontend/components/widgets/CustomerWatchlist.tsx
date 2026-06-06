@@ -122,7 +122,7 @@ export default function CustomerWatchlist({ ercotPrice, temperature, henryHub, r
     }
     if (item.label.toLowerCase().includes("heat") || item.label.toLowerCase().includes("temp") || item.label.toLowerCase().includes("weather")) {
       const t = temperature ?? 0;
-      return { current: t > 0 ? `${t.toFixed(0)}°F` : "N/A", status: t >= 95 ? "elevated" : t >= 88 ? "watch" : "normal" };
+      return { current: t > 0 ? `${t.toFixed(0)}°F` : "N/A", status: t >= 100 ? "elevated" : t >= 92 ? "watch" : "normal" };
     }
     return { current: "Monitoring", status: riskScore === "high" ? "elevated" : riskScore === "medium" ? "watch" : "normal" };
   }

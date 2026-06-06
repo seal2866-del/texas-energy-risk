@@ -39,12 +39,12 @@ export default function OperationalSignificance({
     {
       signal: "Temperature Conditions",
       significance:
-        temp >= 95
+        temp >= 100
           ? `Forecast temperatures of ${temp.toFixed(0)}°F exceed the watch threshold. Afternoon cooling demand may increase above normal operating ranges.`
           : temp >= 88
           ? `Forecast temperatures of ${temp.toFixed(0)}°F may increase afternoon cooling demand but currently remain below escalation thresholds.`
           : "Temperature forecast remains within normal seasonal ranges and does not currently indicate elevated demand pressure.",
-      priority: temp >= 95 ? "Elevated" : temp >= 88 ? "Watching" : "Normal",
+      priority: temp >= 100 ? "Elevated" : temp >= 92 ? "Watching" : "Normal",
     },
     {
       signal: "ERCOT Pricing",

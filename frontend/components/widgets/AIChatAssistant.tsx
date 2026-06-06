@@ -227,7 +227,7 @@ function generateFallback(question: string, props: Props): string {
   }
 
   if (q.includes("threshold") || q.includes("escalation") || q.includes("trigger")) {
-    return `Current escalation thresholds: ERCOT > $75/MWh (watch), ERCOT > $150/MWh (elevated), Temperature > 95°F (watch), Henry Hub > $3.00/MMBtu (watch). Current values: ERCOT $${price > 0 ? price.toFixed(2) : "N/A"}/MWh, Temperature ${temp > 0 ? temp.toFixed(0) + "°F" : "N/A"}, Henry Hub $${hh > 0 ? hh.toFixed(2) : "N/A"}/MMBtu.`;
+    return `Current escalation thresholds: ERCOT > $75/MWh (watch), ERCOT > $150/MWh (elevated), Temperature > 100°F (watch), Henry Hub > $4.00/MMBtu (watch). Current values: ERCOT $${price > 0 ? price.toFixed(2) : "N/A"}/MWh, Temperature ${temp > 0 ? temp.toFixed(0) + "°F" : "N/A"}, Henry Hub $${hh > 0 ? hh.toFixed(2) : "N/A"}/MMBtu.`;
   }
 
   return `Current Texas Grid Intel conditions: Risk Level ${riskScore.toUpperCase()}${price > 0 ? `, ERCOT $${price.toFixed(2)}/MWh` : ""}${temp > 0 ? `, Temperature ${temp.toFixed(0)}°F` : ""}${hh > 0 ? `, Henry Hub $${hh.toFixed(2)}/MMBtu` : ""}. Is there a specific aspect of current conditions you'd like me to explain?`;

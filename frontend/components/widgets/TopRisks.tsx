@@ -44,7 +44,7 @@ export default function TopRisks({
     {
       name:   "Temperature Forecast",
       score:  levelScore(demandPressure?.level || "low") + (temp >= 90 ? 1 : 0),
-      detail: temp > 0 ? `${temp.toFixed(0)}°F current — watch threshold 95°F` : "No temperature data",
+      detail: temp > 0 ? `${temp.toFixed(0)}°F current — watch threshold 100°F` : "No temperature data",
       impact: "", color: "",
     },
     {
@@ -56,7 +56,7 @@ export default function TopRisks({
     {
       name:   "Gas Supply Pressure",
       score:  levelScore(supplyPressure?.level || "low") + (hh >= 2.8 ? 1 : 0),
-      detail: hh > 0 ? `Henry Hub $${hh.toFixed(2)}/MMBtu — watch $3.00` : "Storage near seasonal avg",
+      detail: hh > 0 ? `Henry Hub $${hh.toFixed(2)}/MMBtu — watch $4.00` : "Storage near seasonal avg",
       impact: "", color: "",
     },
     {

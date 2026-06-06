@@ -79,8 +79,8 @@ export default function CurrentRecommendation({
 
   const watchItems = [
     price > 0 ? `ERCOT > $75/MWh (now $${price.toFixed(2)})` : "ERCOT > $75/MWh",
-    temp  > 0 ? `Temperature > 95°F (now ${temp.toFixed(0)}°F)` : "Temperature > 95°F",
-    hh    > 0 ? `Henry Hub > $3.00/MMBtu (now $${hh.toFixed(2)})` : "Henry Hub > $3.00/MMBtu",
+    temp  > 0 ? `Temperature > 100°F (now ${temp.toFixed(0)}°F)` : "Temperature > 100°F",
+    hh    > 0 ? `Henry Hub > $4.00/MMBtu (now $${hh.toFixed(2)})` : "Henry Hub > $4.00/MMBtu",
   ];
 
   return (

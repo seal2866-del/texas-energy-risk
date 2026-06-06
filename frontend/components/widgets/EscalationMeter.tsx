@@ -29,7 +29,7 @@ function computePosition(
 
   // Adjust for proximity to thresholds
   if (price >= 75) base = Math.min(base + 15, 95);
-  if (temp  >= 95) base = Math.min(base + 10, 95);
+  if (temp >= 100) base = Math.min(base + 10, 95);
 
   return Math.min(Math.max(Math.round(base), 2), 98);
 }

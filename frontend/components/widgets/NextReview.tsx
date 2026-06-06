@@ -24,8 +24,8 @@ export default function NextReview({ riskScore, ercotPrice, temperature, henryHu
 
   const triggers = [
     { condition: `ERCOT exceeds $75/MWh`, current: ercotPrice ?? 0, threshold: 75, met: (ercotPrice ?? 0) >= 35 },
-    { condition: `Temperature exceeds 95°F`, current: temperature ?? 0, threshold: 95, met: (temperature ?? 0) >= 95 },
-    { condition: `Henry Hub exceeds $3.00/MMBtu`, current: henryHub ?? 0, threshold: 3.0, met: (henryHub ?? 0) >= 3.0 },
+    { condition: `Temperature exceeds 100°F`, current: temperature ?? 0, threshold: 100, met: (temperature ?? 0) >= 100 },
+    { condition: `Henry Hub exceeds $4.00/MMBtu`, current: henryHub ?? 0, threshold: 4.0, met: (henryHub ?? 0) >= 4.0 },
     { condition: `ERCOT emergency notice issued`, current: 0, threshold: 1, met: false },
   ];
 

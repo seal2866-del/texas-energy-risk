@@ -57,8 +57,8 @@ export default function EscalationTriggers({ ercotPrice, temperature, henryHub, 
   const hhVal     = henryHub    ?? 0;
 
   const ercotStatus = getStatus(ercotVal, 75, 0.85);
-  const tempStatus  = getStatus(tempVal,  95, 0.90);
-  const hhStatus    = getStatus(hhVal,    3.0, 0.90);
+  const tempStatus  = getStatus(tempVal, 100, 0.90);
+  const hhStatus    = getStatus(hhVal, 4.0, 0.90);
 
   const ercotDs  = dataSourceStatus(dataSources?.ercot);
   const noaaDs   = dataSourceStatus(dataSources?.noaa);
@@ -78,14 +78,14 @@ export default function EscalationTriggers({ ercotPrice, temperature, henryHub, 
     {
       label:     "Temperature",
       current:   tempVal > 0 ? `${tempVal.toFixed(0)}°F` : "N/A",
-      threshold: "> 95°F",
+      threshold: "> 100°F",
       status:    tempStatus,
       detail:    tempStatus === "Watching" ? "Within 5°F of escalation threshold" : undefined,
     },
     {
       label:     "Henry Hub",
       current:   hhVal > 0 ? `$${hhVal.toFixed(2)}/MMBtu` : "N/A",
-      threshold: "> $3.00/MMBtu",
+      threshold: "> $4.00/MMBtu",
       status:    hhStatus,
       detail:    hhStatus === "Watching" ? "Approaching fuel cost sensitivity threshold" : undefined,
     },
