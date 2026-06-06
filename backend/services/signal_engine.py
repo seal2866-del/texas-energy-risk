@@ -24,8 +24,14 @@ _PREV_SIGNALS: Dict[str, Dict[str, Any]] = {}
 
 
 # -- Thresholds ----------------------------------------------------------------
-PRICE_SPIKE_THRESHOLD_PCT = 50.0
-PRICE_ABS_HIGH_MWH        = 150.0
+# ERCOT price tiers — updated to reflect actual Texas market conditions
+PRICE_NORMAL_MAX          = 75.0    # Normal operating range
+PRICE_WATCH_MWH           = 75.0    # Watch tier starts
+PRICE_ELEVATED_MWH        = 150.0   # Elevated operational risk threshold
+PRICE_HIGH_MWH            = 300.0   # High risk
+PRICE_CRITICAL_MWH        = 1000.0  # Critical / extreme event
+PRICE_ABS_HIGH_MWH        = 150.0   # Alias — elevated threshold (used throughout)
+PRICE_SPIKE_THRESHOLD_PCT = 100.0   # % move needed to flag volatility (raised from 50)
 PRICE_LOW_FLOOR           = 10.0
 TEMP_HIGH_THRESHOLD_F     = 100.0
 TEMP_LOW_THRESHOLD_F      = 28.0
@@ -536,7 +542,7 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
     single_outlier  = (not sustained_spike) and current >= PRICE_ABS_HIGH_MWH
 
     if spike_by_abs or spike_by_pct:
-        if current >= 500:
+        if current >= 1000:
             return _signal(
                 "price_volatility", "VOLATILITY", True, "high", None,
                 "Extreme Price Event", current, PRICE_ABS_HIGH_MWH,
@@ -573,15 +579,15 @@ def check_price_volatility(prices: List[Dict]) -> Dict[str, Any]:
             "Monitoring for confirmation. Single-interval spikes are filtered to reduce noise.",
         )
 
-    if current >= PRICE_ABS_HIGH_MWH * 0.7:
+    if current >= PRICE_WATCH_MWH:
         pct_note = f" {pct_display} vs previous interval." if pct_change is not None else ""
         return _signal(
             "price_volatility", "VOLATILITY", False, "low", None,
-            "Price Approaching Threshold", current, PRICE_ABS_HIGH_MWH,
-            "Short-term (0-6h): within range, approaching threshold · Near-term (6-24h): monitor closely · Outlook (24-48h): watch for escalation",
-            f"ERCOT Houston Hub at ${current:.0f}/MWh, approaching the elevated-risk threshold.{pct_note}"
-            " Conditions suggest rising but not yet confirmed volatility.",
-            "Continued price movement may push conditions into an elevated risk zone within the next 6-24 hours.",
+            "Price in Watch Range", current, PRICE_ELEVATED_MWH,
+            "Short-term (0-6h): elevated but within normal market range · Near-term (6-24h): monitor for sustained move above $150 · Outlook (24-48h): watch for escalation",
+            f"ERCOT Houston Hub at ${current:.0f}/MWh, within the Watch range ($75–$150/MWh).{pct_note}"
+            " Normal market conditions for Texas — no operational action required unless sustained above $150/MWh.",
+            "Monitor for price movement above $150/MWh before escalating operational response.",
         )
 
     pct_note = f" {pct_display} vs previous interval." if pct_change is not None else ""
@@ -1098,7 +1104,7 @@ def _compute_market_reaction(price_sig: Dict) -> Dict[str, Any]:
             f"Market reaction is elevated. ERCOT prices moved to ${val:.0f}/MWh, "
             "reflecting increasing pricing uncertainty in the real-time settlement market."
         )
-    elif val >= PRICE_ABS_HIGH_MWH * 0.7 and val > 0:
+    elif val >= PRICE_WATCH_MWH and val > 0:
         level = "low"
         expl  = (
             f"ERCOT at ${val:.0f}/MWh is within range but approaching watch levels. "
@@ -1248,7 +1254,7 @@ def _detect_events(
         if current >= PRICE_ABS_HIGH_MWH:
             events.append({
                 "type":     "ercot_volatility",
-                "severity": "high" if current >= 500 else "medium",
+                "severity": "high" if current >= 1000 else "medium",
                 "message":  (
                     f"ERCOT price volatility detected at ${current:.0f}/MWh. "
                     "Short-term pricing uncertainty may be elevated."
