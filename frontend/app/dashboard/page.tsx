@@ -71,6 +71,7 @@ import OperationalExposure from "@/components/widgets/OperationalExposure";
 import RiskModelDebug from "@/components/widgets/RiskModelDebug";
 import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import HenryHubWidget from "@/components/widgets/HenryHubWidget";
+import ForecastRiskOutlook from "@/components/widgets/ForecastRiskOutlook";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
 import { supabase } from "@/lib/supabase";
@@ -690,6 +691,9 @@ export default function DashboardPage() {
                 computedAt={signals.computed_at}
               />
 
+              {/* FORECAST RISK OUTLOOK — Priority 1 Feature */}
+              <ForecastRiskOutlook location={selectedCity} />
+
               {/* 2. KPI STRIP — single glance */}
               <ExecutiveKPIRow
                 riskScore={signals.risk_score}
@@ -938,6 +942,9 @@ export default function DashboardPage() {
                     panelGlow={riskGlow}
                     earlyWarnings={riskModel?.earlyWarningSignals}
                   />
+                  {/* FORECAST RISK OUTLOOK — Priority 1 Feature */}
+                  <ForecastRiskOutlook location={selectedCity} />
+
                   {/* Henry Hub — top-level gas price signal */}
                   <HenryHubWidget data={signals.henry_hub} />
 

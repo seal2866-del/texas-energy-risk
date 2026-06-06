@@ -12,6 +12,7 @@ import logging
 from fastapi import APIRouter, Query, Header
 from services.external_apis import fetch_ercot_prices, fetch_weather_forecast, fetch_gas_data, fetch_henry_hub_price
 from services.signal_engine import run_all_signals
+from services.forecast_engine import compute_forecast_outlook
 from services.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
@@ -143,3 +144,56 @@ async def get_signal_history(
         "count":    len(data),
         "snapshots": data,
     }
+
+
+@router.get("/forecast")
+async def get_forecast_outlook(
+    location: str = Query(default="Houston"),
+):
+    """
+    Returns 24h / 72h / 7-day probabilistic risk outlook with AI narrative.
+    Cached 15 minutes. Uses ERCOT trends, NOAA forecast, Henry Hub, EIA storage.
+    """
+    try:
+        prices, forecasts, gas_data, henry_hub_data = await asyncio.gather(
+            fetch_ercot_prices(hours=6, settlement_point="HB_HOUSTON"),
+            fetch_weather_forecast(location=location, days=7),
+            fetch_gas_data(weeks=4),
+            fetch_henry_hub_price(),
+            return_exceptions=True,
+        )
+        prices      = prices      if not isinstance(prices,      Exception) else []
+        forecasts   = forecasts   if not isinstance(forecasts,   Exception) else []
+        gas_data    = gas_data    if not isinstance(gas_data,    Exception) else {}
+        henry_hub   = henry_hub_data if not isinstance(henry_hub_data, Exception) else None
+
+        gas_records = gas_data.get("records", []) if isinstance(gas_data, dict) else []
+
+        # Convert ERCOTPrice objects to dicts if needed
+        price_dicts = [
+            p if isinstance(p, dict) else {"price_mwh": getattr(p, "price_mwh", 0),
+                                            "timestamp": str(getattr(p, "timestamp", ""))}
+            for p in (prices or [])
+        ]
+
+        result = await compute_forecast_outlook(
+            prices=price_dicts,
+            forecasts=forecasts if isinstance(forecasts, list) else [],
+            gas_records=gas_records,
+            henry_hub=henry_hub,
+            location=location,
+        )
+        return result
+
+    except Exception as exc:
+        logger.error("[FORECAST] Error: %s", exc)
+        return {
+            "computed_at":   "",
+            "location":      location,
+            "overall_risk":  "low",
+            "overall_label": "LOW",
+            "overall_color": "#22c55e",
+            "horizons":      [],
+            "narrative":     "Forecast data temporarily unavailable. Current conditions are within normal range.",
+            "error":         str(exc),
+        }
