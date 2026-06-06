@@ -73,6 +73,8 @@ import GridPulseBackground from "@/components/ui/GridPulseBackground";
 import HenryHubWidget from "@/components/widgets/HenryHubWidget";
 import ForecastRiskOutlook from "@/components/widgets/ForecastRiskOutlook";
 import EEATracker from "@/components/widgets/EEATracker";
+import LoadOptimizer from "@/components/widgets/LoadOptimizer";
+import DAMTracker from "@/components/widgets/DAMTracker";
 import MultiHubSpread from "@/components/widgets/MultiHubSpread";
 import CustomerROI from "@/components/widgets/CustomerROI";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
@@ -715,7 +717,11 @@ export default function DashboardPage() {
               <EEATracker />
               <MultiHubSpread />
 
-              {/* 2d. Operational Cost Impact */}
+              {/* 2d. Load Optimizer + DAM Tracker */}
+              <LoadOptimizer location={location} />
+              <DAMTracker />
+
+              {/* 2e. Operational Cost Impact */}
               <OperationalCostImpact
                 ercotPrice={prices[prices.length - 1]?.price_mwh ?? 20.83}
                 henryHub={signals.henry_hub?.price ?? 3.00}
@@ -965,6 +971,10 @@ export default function DashboardPage() {
                   {/* ERCOT Grid Status + Hub Spreads */}
                   <EEATracker />
                   <MultiHubSpread />
+
+                  {/* Load Optimizer + DAM Tracker */}
+                  <LoadOptimizer location={location} />
+                  <DAMTracker />
 
                   {/* Operational Cost Impact */}
                   <OperationalCostImpact
