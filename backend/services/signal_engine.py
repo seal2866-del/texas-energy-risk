@@ -2952,6 +2952,7 @@ def run_all_signals(
             "risk_trend":                     risk_trend,
             "gas_power_correlation":          gas_power_correlation,
             "interval_intelligence":          interval_intelligence,
+            "henry_hub":              henry_hub_data,   # raw EIA data — HenryHubWidget
             "henry_hub_signal":       henry_hub_sig,
             "henry_hub_exposure":     henry_hub_exposure,
             "signals": {
