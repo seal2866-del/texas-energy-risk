@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 ERCOT_SYS_URL = "https://www.ercot.com/content/cdr/html/real_time_system_conditions.html"
 
 _CACHE: Dict[str, Any] = {}
-_CACHE_TTL = 60   # 1 minute (reduced to force fresh data after fix)
+_CACHE_TTL = 300  # 5 minutes
 
 def _fresh(key: str) -> bool:
     entry = _CACHE.get(key)
