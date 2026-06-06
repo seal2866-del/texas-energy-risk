@@ -692,7 +692,7 @@ export default function DashboardPage() {
               />
 
               {/* FORECAST RISK OUTLOOK — Priority 1 Feature */}
-              <ForecastRiskOutlook location={selectedCity} />
+              <ForecastRiskOutlook location={location} />
 
               {/* 2. KPI STRIP — single glance */}
               <ExecutiveKPIRow
@@ -943,7 +943,7 @@ export default function DashboardPage() {
                     earlyWarnings={riskModel?.earlyWarningSignals}
                   />
                   {/* FORECAST RISK OUTLOOK — Priority 1 Feature */}
-                  <ForecastRiskOutlook location={selectedCity} />
+                  <ForecastRiskOutlook location={location} />
 
                   {/* Henry Hub — top-level gas price signal */}
                   <HenryHubWidget data={signals.henry_hub} />
