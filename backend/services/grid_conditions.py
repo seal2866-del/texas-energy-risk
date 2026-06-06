@@ -103,21 +103,53 @@ def _parse_system_conditions(html: str) -> Dict[str, Any]:
 
 HUBS = ["HB_HOUSTON", "HB_NORTH", "HB_SOUTH", "HB_WEST", "HB_BUSAVG"]
 
-def _parse_hub_prices(html: str) -> Dict[str, Optional[float]]:
-    prices = {}
+def _parse_hub_prices_from_table(html: str) -> Dict[str, Optional[float]]:
+    """
+    Parse ERCOT CDR SPP table by column position.
+    Finds the header row with hub names, then reads the last data row.
+    """
+    lines = [l.strip() for l in html.splitlines() if '|' in l]
+    if not lines:
+        return {h: None for h in HUBS}
+
+    # Find header line containing HB_HOUSTON
+    header_line = None
+    for line in lines:
+        if 'HB_HOUSTON' in line.upper() and 'HB_NORTH' in line.upper():
+            header_line = line
+            break
+    if not header_line:
+        return {h: None for h in HUBS}
+
+    # Parse column names
+    cols = [c.strip() for c in header_line.split('|') if c.strip()]
+
+    # Find all numeric data rows (last one = most recent interval)
+    data_rows = []
+    for line in lines:
+        parts = [p.strip() for p in line.split('|') if p.strip()]
+        if len(parts) >= len(cols):
+            try:
+                float(parts[-1])  # last column is numeric = data row
+                data_rows.append(parts)
+            except (ValueError, IndexError):
+                pass
+
+    if not data_rows:
+        return {h: None for h in HUBS}
+
+    last_row = data_rows[-1]
+    result: Dict[str, Optional[float]] = {}
     for hub in HUBS:
-        idx = html.upper().find(hub.upper())
-        if idx < 0:
-            prices[hub] = None
-            continue
-        snippet = html[idx:idx+200]
-        nums = re.findall(r'>\s*([-]?\d+\.\d+)\s*<', snippet)
-        if nums:
-            try: prices[hub] = float(nums[0])
-            except: prices[hub] = None
-        else:
-            prices[hub] = None
-    return prices
+        result[hub] = None
+        for i, col in enumerate(cols):
+            if hub.upper() in col.upper() and i < len(last_row):
+                try:
+                    result[hub] = float(last_row[i])
+                except (ValueError, IndexError):
+                    pass
+                break
+    return result
 
 
 def _build_spreads(prices: Dict[str, Optional[float]]) -> list:
@@ -168,13 +200,16 @@ async def fetch_grid_conditions() -> Dict[str, Any]:
         else:
             log.warning("[GRID] System conditions fetch failed: %s", sys_r)
 
-        # Hub prices — use live cache for HB_HOUSTON, fresh CDR for other hubs
+        # Hub prices — parse CDR table by column position + override Houston with live cache
         hub_prices = {}
         spreads    = []
         try:
-            from services.external_apis import fetch_all_hub_prices, _get_cached_prices
-            hub_prices = await fetch_all_hub_prices()
-            # Override HB_HOUSTON with the live poller cache (updated every 5 min)
+            async with httpx.AsyncClient(timeout=12, headers={"Cache-Control": "no-cache"}) as hc:
+                spp_r = await hc.get("https://www.ercot.com/content/cdr/html/real_time_spp.html")
+            if spp_r.status_code == 200:
+                hub_prices = _parse_hub_prices_from_table(spp_r.text)
+            # Override HB_HOUSTON with live 5-min poller cache
+            from services.external_apis import _get_cached_prices
             cached = _get_cached_prices("HB_HOUSTON")
             if cached:
                 live_price = float(cached[-1].get("price_mwh", 0))
