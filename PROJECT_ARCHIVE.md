@@ -1,6 +1,6 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 6, 2026 (session 10 — ERCOT price threshold calibration)
-**Current stable tag:** v5.7-stable
+**Last updated:** June 6, 2026 (session 10 — All trader features live + DAM RT price fix)
+**Current stable tag:** v6.3-stable
 **Next session:** Monitor newsletter open rates; continue Apollo prospecting for Dallas/Austin cities
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
@@ -44,6 +44,112 @@
 - [x] #8  Rewrite AI brief to actionable operational language
 - [x] #21 Transform platform language — advisory to operational awareness
 - [x] #22 Complete language transformation (EscalationPath, ManagementSummary, Phase 2 & 4 engines)
+
+### Trader Features — v6.1 (Session 10, in progress)
+- [x] #77 ERCOT Grid Status / EEA Emergency Tracker
+        → backend/services/grid_conditions.py — parses real_time_system_conditions.html
+        → GET /api/ercot/grid — reserve margin, EEA level, wind/solar mix, frequency
+        → EEATracker.tsx — escalation ladder, demand/reserve/capacity GW, generation mix
+        → EEA levels: Normal → Watch → Warning → Emergency 1/2/3
+        → Low wind (<15%) alert, frequency deviation flag
+- [x] #78 Multi-Hub Price Spread Monitor
+        → Uses fetch_all_hub_prices() from external_apis.py (already working)
+        → MultiHubSpread.tsx — HB_NORTH/SOUTH/WEST/BUSAVG vs HB_HOUSTON
+        → WIDE badge when spread >$15, West Hub insight (wind vs congestion)
+        → Fixed: was using broken custom parser → switched to existing working function
+- [x] #79 Optimal Load Window (Load Optimizer)
+        → backend/services/load_optimizer.py — 48h hourly price model
+        → Hour multipliers by CT hour (overnight low, afternoon peak)
+        → Temperature multiplier (100°F→+28%, freeze→+35%)
+        → Finds cheapest 2h/4h/6h consecutive windows
+        → GET /api/signals/load-optimizer
+        → LoadOptimizer.tsx — shows top 4 windows with % savings vs current RT
+- [x] #80 DAM vs Real-Time Spread
+        → backend/services/dam_tracker.py — parses ERCOT DAM SPP page (posts ~2PM CT daily)
+        → Signal: LOCK IN / STAY FLOATING / MONITOR with rationale
+        → GET /api/signals/dam — cached 1 hour
+        → DAMTracker.tsx — lock-in signal, RT vs DAM price comparison, peak/cheap hours
+        → Shows "Not Yet Posted" gracefully before 2PM CT
+- [x] #81 Multi-Hub Spread — 3 parser iterations until correct
+        → v1: broken custom regex (returned Houston price for all hubs)
+        → v2: pipe-based markdown parser (failed on real HTML)
+        → v3: HTML table parser with <tr>/<td> regex (wrong column mapping → $830 bug)
+        → v4 (final): scan all <tr> rows for 7+ numeric <td> cells, read by fixed column offset
+           col 0=HB_BUSAVG, 1=HB_HOUSTON, 3=HB_NORTH, 5=HB_SOUTH, 6=HB_WEST
+        → Verified live: HB_HOUSTON $30.72, South $28.39, West $28.90, North $29.00
+        → WIDE alert triggers when spread >$15 (e.g. wind curtailment events)
+
+### Full Threshold Audit — v6.0 (Session 10)
+- [x] #74 Full data/threshold audit across all backend + frontend components
+        → Backend (signal_engine.py) authoritative thresholds:
+           PRICE: Normal<$70(exit)/$75(enter) · Watch $75-$150 · Elevated $150-$300 · High $300-$1000 · Critical>$1000
+           TEMP:  Watch >=100°F (TEMP_HIGH_THRESHOLD_F)
+           HH:    Normal $3.00 baseline · Watch $4.00 · Elevated $6.00 · Critical >$6.00
+           GAS:   Alert <= -10% vs 5yr avg
+        → Frontend mismatches found and fixed (19 components):
+           - Henry Hub watch threshold: $3.00 → $4.00/MMBtu
+             Files: AIChatAssistant, AlertPreview, CurrentRecommendation, EscalationDrivers,
+             EscalationPath, EscalationTriggers, MonitoringPriorities, NextReview,
+             OperationalSignificance, OperationalWatchList, TopRisks
+           - Temperature watch threshold: 95°F → 100°F
+             Files: AIChatAssistant, AlertPreview, CurrentRecommendation, EscalationDrivers,
+             EscalationMeter, EscalationPath, EscalationTriggers, ExecutiveRecommendations,
+             MonitoringPriorities, NextReview, OperationalSignificance, OperationalWatchList,
+             TexasThreatCenter, TopRisks, CustomerWatchlist
+        → HenryHubWidget tier labels ($3/$4/$6 band display) — CORRECT, intentional, kept
+        → TexasThreatCenter 95°F intermediate ELEVATED tier — intentional, kept
+- [x] #75 Customer Value / ROI panel added to dashboard (Executive + Analyst modes)
+        → Metric cards: Avoided Exposure / Early Warnings / AI Recommendations / Cost Avoidance
+        → Values scale dynamically with live ERCOT price and active signal count
+        → Disclaimer: illustrative estimate, not financial advice
+        → Added to homepage above Final CTA also
+- [x] #76 Forecast Risk Outlook repositioned to #2 on dashboard (after Executive Summary)
+        → Previous position: #4 (after Current Conditions + Recommendation)
+        → New position: #2 — immediately after Executive Summary
+
+### Forecast Risk Outlook — v5.9 (Session 10)
+- [x] #73 Build Forecast Risk Outlook panel — Priority 1 feature
+        → New file: backend/services/forecast_engine.py
+           - _compute_24h(): price momentum + tomorrow temp + Henry Hub
+           - _compute_72h(): 3-day temp forecast + storage trajectory + HH weekly trend
+           - _compute_7d(): 7-day NOAA + EIA storage multi-week + Henry Hub sustained
+           - _generate_narrative(): Claude Haiku 3-sentence "What happens next" AI brief
+           - _fallback_narrative(): rule-based fallback if AI unavailable
+           - 15-minute cache — AI fires only on stale cache
+        → New endpoint: GET /api/signals/forecast?location=Houston
+           - Fetches ERCOT (6h), NOAA (7d), gas (4wk), Henry Hub in parallel
+           - Returns: horizons[24h/72h/7d], narrative, overall_risk, computed_at
+        → New component: frontend/components/widgets/ForecastRiskOutlook.tsx
+           - Summary strip: 24H | 72H | 7D risk tier at a glance
+           - AI narrative box: "What Happens Next" with 3-sentence Claude output
+           - Expandable horizon cards with risk drivers + confidence bar
+           - Auto-refreshes every 15 minutes
+           - Refresh button top-right
+        → Wired into dashboard at TOP of both Executive and Analyst modes
+        → Risk levels: LOW / WATCH / ELEVATED / HIGH (matches new thresholds)
+        → Bug fixed: selectedCity → location variable (caused client crash on deploy)
+
+### ERCOT Thresholds, Hysteresis & Henry Hub Fix — v5.7–v5.8 (Session 10)
+- [x] #69 Remove all legacy $35/MWh threshold references across 21 frontend components
+        → Standardized to $75 Watch, $150 Elevated everywhere
+        → Files: AIChatAssistant, AlertPreview, CostExposure, CostImpact, CurrentRecommendation,
+          CustomerWatchlist, DailyExecutiveBrief, EscalationDrivers, EscalationMeter, EscalationPath,
+          EscalationTriggers, ExecutiveDecisionCard, ExecutiveKPIRow, ExecutiveRecommendations,
+          MonitoringPriorities, NextReview, OperationalSignificance, OperationalWatchList,
+          PotentialImpact, ScenarioAnalysis, TexasThreatCenter
+- [x] #70 Add ERCOT price hysteresis to prevent status flapping
+        → Enter WATCH at $75 (rising edge)
+        → Exit WATCH below $70 (falling edge)
+        → Dead band $70–$75: hold current state, no flip
+        → Implemented in both signal_engine.py and ERCOTPriceMonitor.tsx
+- [x] #71 Restore henry_hub raw data in signals API response
+        → "henry_hub": henry_hub_data was dropped during truncation restore
+        → HenryHubWidget was receiving null and showing blank skeleton
+        → Fixed: re-added "henry_hub": henry_hub_data to run_all_signals return dict
+- [x] #72 Establish truncation prevention rule
+        → All backend Python file writes now use bash shell + Python (never Edit/Write MCP tools)
+        → ast.parse() check runs on ALL backend files before every git commit
+        → Keyword: say "truncation" if Railway crashes after a backend change
 
 ### ERCOT Price Threshold Calibration — v5.7 (Session 10)
 - [x] #68 Recalibrate ERCOT price thresholds to reflect actual Texas market conditions
@@ -245,6 +351,17 @@
 
 ## NEXT SESSION PRIORITIES
 
+### Funnel Status (as of June 6, 2026)
+- 71 prospects emailed via newsletter (June 5)
+- Monitor open rates in Resend dashboard
+- Expand Apollo search to Dallas, Austin, San Antonio
+
+### Trader Features — Next Up
+- **Waha vs Henry Hub basis spread** — Texas-specific gas pipeline constraint signal
+- **Contract lock-in signal** — forward price vs current volatility recommendation
+- **ERCOT hourly load shape** — which hours will spike tomorrow
+- **Renewable curtailment alert** — wind drops below 15% of load → price spike risk
+
 ### Funnel Status (as of June 5, 2026)
 Apollo → Prospect → Newsletter → Demo → Customer
 - **71 prospects** added to Resend and emailed (June 5, 2026)
@@ -353,6 +470,12 @@ Apollo → Prospect → Newsletter → Demo → Customer
 - v5.5-stable — Apollo search filtered to verified-email contacts (full names + real emails)
 - v5.6-stable — Newsletter generate_and_save_draft fix + CSV import fix; 71 contacts emailed successfully
 - v5.7-stable — ERCOT price threshold calibration: Normal<$75, Watch $75-150, Elevated $150-300, High $300-1000, Critical>$1000
+- v5.8-stable — Hysteresis ($70 exit / $75 enter), removed all legacy $35 refs across 21 components, restored henry_hub raw data in signals response
+- v5.9-stable — Forecast Risk Outlook panel: 24h/72h/7-day AI risk outlook, Claude Haiku narrative, Priority 1 feature
+- v6.0-stable — Customer ROI panel on dashboard, full threshold audit (HH $3→$4, Temp 95°F→100°F, 19 components fixed)
+- v6.1-stable — EEA Tracker, Multi-Hub Spread Monitor, Load Optimizer, DAM Tracker (all 4 trader features live)
+- v6.2-stable — Hub spread parser fixed (HTML <td> column offset approach), all hubs showing correct live prices
+- v6.3-stable — DAM Tracker shows live RT price while awaiting 2PM CT DAM results
 
 ---
 
@@ -518,4 +641,43 @@ Apollo → Prospect → Newsletter → Demo → Customer
 Strategic improvements based on positioning audit:
 - Badge: "Texas Energy Early Warning Intelligence" (removed ERCOT-first positioning)
 - H1: "Detect Texas Energy Risk / Before It Hits Your Operations" (outcome-first)
-- Added credibility line: "Operational risk intelligence for energy traders, procurement managers, industrial operators, an
+- Added credibility line: "Operational risk intelligence for energy traders, procurement managers, industrial operators, and Texas energy teams."
+- Subheadline: outcome-focused ("before they become operational constraints")
+- Added trust statement: "Continuously analyzes ERCOT, NOAA, and EIA data streams to identify emerging operational, weather, supply, and market risks before conditions escalate."
+- Primary CTA: "Get Early Warning Alerts" (was "Start Monitoring")
+- Secondary CTA: "View Today's Risk Outlook" (was "View Live Conditions")
+- Bottom CTA: "Start Free Monitoring" (was "Start Monitoring")
+
+### Friday CRM Session — Planned
+- Apollo.io prospecting integration
+- Pipeline tracking
+- Audience builder
+- Resend sync for email sequences
+
+---
+
+## SEO FILES (added v4.2)
+- frontend/app/layout.tsx — global metadata, OG, Twitter, JSON-LD structured data
+- frontend/app/sitemap.ts — dynamic sitemap.xml
+- frontend/app/robots.ts — robots.txt
+- frontend/app/opengraph-image.tsx — auto-generated OG image (1200x630)
+- frontend/app/pricing/layout.tsx — pricing page metadata
+- frontend/app/dashboard/layout.tsx — dashboard metadata (noindex)
+- frontend/app/terms/layout.tsx — terms page metadata
+
+---
+
+## SUPABASE TABLES
+- users
+- subscriptions
+- signal_snapshots
+- alert_preferences
+- alert_logs
+- newsletter_subscribers
+- newsletter_issues
+- newsletter_sends
+- report_deliveries
+- prospects
+- prospect_audiences
+- prospect_audience_members
+- demo_requests

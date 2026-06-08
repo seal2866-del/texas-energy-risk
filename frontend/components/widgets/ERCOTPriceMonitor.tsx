@@ -19,8 +19,13 @@ interface Props {
   priceBehavior?: PriceBehavior | null;
 }
 
-const PRICE_LOW_FLOOR    = 10;
-const PRICE_HIGH_WARNING = 150;
+const PRICE_LOW_FLOOR      = 10;
+const PRICE_WATCH_ENTER    = 75;   // Rising edge: NORMAL → WATCH
+const PRICE_WATCH_EXIT     = 70;   // Falling edge: WATCH → NORMAL (dead band $70–$75)
+const PRICE_WATCH          = 75;   // Display reference
+const PRICE_HIGH_WARNING   = 150;  // Elevated tier — operational risk threshold
+const PRICE_HIGH           = 300;  // High tier
+const PRICE_CRITICAL       = 1000; // Critical / extreme event
 const LOW_VOLATILITY_RANGE = 8;
 
 function safePctChange(current: number, prev: number): { pct: number | null; display: string; reliable: boolean } {
@@ -71,6 +76,11 @@ export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Pr
 
   const isRealSource  = latest?.source === "ercot_cdr";
   const cacheSize     = prices.length;
+  // Hysteresis: enter Watch above $75, exit below $70 — dead band prevents flapping
+  const inWatch = current >= PRICE_HIGH_WARNING ? false
+    : current >= PRICE_WATCH_ENTER ? true
+    : current >= PRICE_WATCH_EXIT  ? prevVal >= PRICE_WATCH_EXIT  // hold state in dead band
+    : false;
   const outsideNormal = current >= PRICE_HIGH_WARNING;
   const ageMinutes    = latest?.timestamp ? getAgeMinutes(latest.timestamp) : 999;
   const freshness     = cacheSize > 0 ? getFreshness(ageMinutes) : "stale";
@@ -81,7 +91,11 @@ export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Pr
   const { pct, display, reliable } = safePctChange(current, prevVal);
   const up = pct !== null ? pct >= 0 : current > prevVal;
 
-  const strokeColor = outsideNormal ? "#ef4444" : "#f97316";
+  const strokeColor = current >= PRICE_CRITICAL ? "#7c3aed"
+                    : current >= PRICE_HIGH     ? "#ef4444"
+                    : outsideNormal             ? "#f97316"
+                    : inWatch                   ? "#f59e0b"
+                    :                             "#f97316";
   const gradientId  = outsideNormal ? "priceGradHigh" : "priceGrad";
 
   const chartData = prices.slice(-hours).map((p) => ({
@@ -176,10 +190,24 @@ export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Pr
               {cacheSize === 0 ? "Awaiting first reading..." : `${cacheSize}/2 readings — building cache`}
             </span>
           )}
-          {outsideNormal && (
+          {current >= PRICE_CRITICAL && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/25 text-purple-400 text-xs font-semibold">
+              <AlertTriangle className="w-3 h-3" /> CRITICAL — Extreme Event
+            </span>
+          )}
+          {current >= PRICE_HIGH && current < PRICE_CRITICAL && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/25 text-red-400 text-xs font-semibold">
-              <AlertTriangle className="w-3 h-3" />
-              Outside normal range
+              <AlertTriangle className="w-3 h-3" /> HIGH — Operational Risk
+            </span>
+          )}
+          {outsideNormal && current < PRICE_HIGH && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/25 text-orange-400 text-xs font-semibold">
+              <AlertTriangle className="w-3 h-3" /> ELEVATED — Monitor Closely
+            </span>
+          )}
+          {inWatch && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-amber-400 text-xs font-semibold">
+              WATCH — Normal Market Range
             </span>
           )}
         </div>
@@ -193,7 +221,7 @@ export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Pr
             </p>
           ) : (
             <>
-              <p className={`text-5xl font-black tracking-tight ${outsideNormal ? "text-red-400" : "text-white"}`}>
+              <p className={`text-5xl font-black tracking-tight ${current >= PRICE_CRITICAL ? "text-purple-400" : current >= PRICE_HIGH ? "text-red-400" : outsideNormal ? "text-orange-400" : inWatch ? "text-amber-400" : "text-white"}`}>
                 {formatPrice(current)}<span className="text-sm font-normal text-gray-400 ml-1">/MWh</span>
               </p>
               {reliable && (
@@ -254,8 +282,14 @@ export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Pr
                 return [Math.max(0, dataMin - pad), dataMax + pad];
               }} />
               <Tooltip content={<CustomTooltip />} />
+              {current >= PRICE_WATCH && (
+                <ReferenceLine y={PRICE_WATCH} stroke="#f59e0b" strokeDasharray="3 3" strokeOpacity={0.35} label={{ value: "Watch $75", position: "insideTopRight", fontSize: 8, fill: "#f59e0b" }} />
+              )}
               {current >= PRICE_HIGH_WARNING * 0.6 && (
-                <ReferenceLine y={PRICE_HIGH_WARNING} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
+                <ReferenceLine y={PRICE_HIGH_WARNING} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: "Elevated $150", position: "insideTopRight", fontSize: 8, fill: "#f97316" }} />
+              )}
+              {current >= PRICE_HIGH * 0.6 && (
+                <ReferenceLine y={PRICE_HIGH} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: "High $300", position: "insideTopRight", fontSize: 8, fill: "#ef4444" }} />
               )}
               <Area type="monotone" dataKey="visualPrice" stroke={strokeColor} strokeWidth={2.5} fill={`url(#${gradientId})`} dot={false} />
             </AreaChart>

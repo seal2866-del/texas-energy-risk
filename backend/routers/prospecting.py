@@ -959,3 +959,92 @@ async def import_csv(file: UploadFile = File(...)):
         "errors":     errors[:5],
         "total_rows": imported + duplicates + skipped + len(errors),
     }
+
+
+# ---------------------------------------------------------------------------
+# CRM — SEND NEWSLETTER CAMPAIGN
+# ---------------------------------------------------------------------------
+
+class SendCampaignRequest(BaseModel):
+    subject:    str
+    html_body:  str
+    from_name:  str  = "Texas Grid Intel"
+    from_email: str  = "alerts@texasgridintel.com"
+    status_filter: str = "newsletter_added"   # which CRM status to target
+
+
+@router.post("/send-newsletter")
+async def send_newsletter_campaign(body: SendCampaignRequest):
+    """
+    Send a one-to-one email via Resend to every prospect whose status matches
+    status_filter (default: newsletter_added).  Each email is personalised with
+    the contact's first name.  Updates each sent prospect status → newsletter_sent.
+    Returns counts for sent / failed / skipped.
+    """
+    if not RESEND_API_KEY:
+        raise HTTPException(status_code=503, detail="RESEND_API_KEY not configured")
+
+    sb       = get_supabase()
+    recs     = sb.table("prospects") \
+                 .select("id,contact_name,contact_email,company_name") \
+                 .eq("status", body.status_filter) \
+                 .execute()
+    prospects = [p for p in (recs.data or []) if p.get("contact_email")]
+
+    if not prospects:
+        return {"sent": 0, "failed": 0, "skipped": 0,
+                "message": f"No prospects with status '{body.status_filter}' and a valid email."}
+
+    sent    = 0
+    failed  = 0
+    skipped = 0
+    errors  = []
+    now     = datetime.now(timezone.utc).isoformat()
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        for p in prospects:
+            email = p["contact_email"]
+            name  = p.get("contact_name") or ""
+            first = name.split()[0] if name.split() else "there"
+
+            # Personalise greeting in body
+            personalised_html = body.html_body.replace("{{first_name}}", first) \
+                                              .replace("{{company}}", p.get("company_name") or "your company")
+
+            payload = {
+                "from":    f"{body.from_name} <{body.from_email}>",
+                "to":      [email],
+                "subject": body.subject,
+                "html":    personalised_html,
+            }
+
+            try:
+                resp = await client.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {RESEND_API_KEY}",
+                             "Content-Type": "application/json"},
+                    json=payload,
+                )
+                if resp.status_code in (200, 201):
+                    sent += 1
+                    sb.table("prospects").update({
+                        "status":             "newsletter_sent",
+                        "newsletter_sent_at": now,
+                        "updated_at":         now,
+                    }).eq("id", p["id"]).execute()
+                else:
+                    failed += 1
+                    errors.append(f"{email}: HTTP {resp.status_code} — {resp.text[:120]}")
+                    log.warning(f"[CRM] Resend send failed for {email}: {resp.status_code} {resp.text[:200]}")
+            except Exception as e:
+                failed += 1
+                errors.append(f"{email}: {str(e)[:80]}")
+                log.error(f"[CRM] Resend exception for {email}: {e}")
+
+    return {
+        "sent":    sent,
+        "failed":  failed,
+        "skipped": skipped,
+        "total":   len(prospects),
+        "errors":  errors[:10],   # cap error list
+    }

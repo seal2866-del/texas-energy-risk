@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Search, Download, Zap, RefreshCw, Loader2, Trash2, ChevronDown, ChevronUp, Mail, Calendar, Users, BarChart2, Plus, ArrowRight, Linkedin, Upload } from "lucide-react";
+import { Search, Download, Zap, RefreshCw, Loader2, Trash2, ChevronDown, ChevronUp, Mail, Calendar, Users, BarChart2, Plus, ArrowRight, Linkedin, Upload, Send, X, Eye } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Link from "next/link";
 
@@ -66,6 +66,30 @@ export default function ProspectingPage() {
   const [bulkAdding,   setBulkAdding]   = useState(false);
   const [expanded,     setExpanded]     = useState<string | null>(null);
   const [msg,          setMsg]          = useState("");
+
+  // Send Campaign modal
+  const [showCampaign,   setShowCampaign]   = useState(false);
+  const [campaignSubject, setCampaignSubject] = useState("");
+  const [campaignBody,    setCampaignBody]    = useState(`<p>Hi {{first_name}},</p>
+
+<p>With ERCOT prices shifting rapidly, I wanted to reach out about how <strong>Texas Grid Intel</strong> can help {{company}} reduce energy costs and manage grid risk.</p>
+
+<p>Our platform gives energy managers real-time ERCOT price alerts, AI-powered risk forecasts, and load optimization recommendations — so you always know when to act.</p>
+
+<p><strong>Key features:</strong></p>
+<ul>
+  <li>Real-time ERCOT price monitoring with SMS/email alerts</li>
+  <li>72-hour AI risk outlook for proactive scheduling</li>
+  <li>Load optimizer: find cheapest 2h, 4h, 6h windows</li>
+  <li>DAM vs RT tracker for power contract decisions</li>
+</ul>
+
+<p>Would you be open to a 15-minute demo this week?</p>
+
+<p>Best,<br/>Texas Grid Intel Team<br/><a href="https://texasgridintel.com">texasgridintel.com</a></p>`);
+  const [campaignSending, setCampaignSending] = useState(false);
+  const [campaignResult,  setCampaignResult]  = useState<{sent:number;failed:number;total:number;errors?:string[]} | null>(null);
+  const [campaignPreview, setCampaignPreview] = useState(false);
 
   // Search filters
   const [locations,    setLocations]    = useState<string[]>(["Houston, TX"]);
@@ -235,6 +259,37 @@ export default function ProspectingPage() {
     setMsg(`Synced ${d.synced} contacts to Resend`);
   };
 
+  const sendCampaign = async () => {
+    if (!campaignSubject.trim() || !campaignBody.trim()) {
+      setMsg("Subject and body are required.");
+      return;
+    }
+    const ready = prospects.filter(p => p.status === "newsletter_added");
+    if (ready.length === 0) {
+      setMsg("No prospects with status 'newsletter_added' to send to.");
+      return;
+    }
+    if (!confirm(`Send to ${ready.length} prospects with 'newsletter_added' status?`)) return;
+    setCampaignSending(true);
+    setCampaignResult(null);
+    try {
+      const r = await fetch(`${API}/api/prospecting/send-newsletter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: campaignSubject, html_body: campaignBody }),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setCampaignResult(d);
+        setMsg(`✓ Campaign sent: ${d.sent} delivered, ${d.failed} failed`);
+        await fetchAll();
+      } else {
+        setMsg(`Error: ${d.detail}`);
+      }
+    } catch (e: any) { setMsg(`Error: ${e.message}`); }
+    setCampaignSending(false);
+  };
+
   const exportAudience = (id: string) => window.open(`${API}/api/prospecting/audiences/${id}/export`, "_blank");
   const exportAll      = ()           => {
     const params = new URLSearchParams();
@@ -265,6 +320,10 @@ export default function ProspectingPage() {
               <button onClick={exportAll}
                 className="flex items-center gap-1.5 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-semibold text-gray-300 hover:bg-white/10 transition-all">
                 <Download className="w-3.5 h-3.5" /> Export CSV
+              </button>
+              <button onClick={() => { setShowCampaign(true); setCampaignResult(null); }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 hover:bg-orange-600 rounded-xl text-xs font-bold text-white transition-all">
+                <Send className="w-3.5 h-3.5" /> Send Campaign
               </button>
             </div>
           </div>
@@ -466,7 +525,7 @@ export default function ProspectingPage() {
                               </button>
                             )}
 
-                            {/* Request Demo */}}
+                            {/* Request Demo */}
                             {!["demo_requested","qualified","opportunity","customer"].includes(p.status) && (
                               <button onClick={() => requestDemo(p.id)} disabled={actioning === p.id}
                                 title="Request Demo"
@@ -595,6 +654,108 @@ export default function ProspectingPage() {
           </div>
         </div>
       </main>
+
+      {/* ── SEND CAMPAIGN MODAL ─────────────────────────────────────────── */}
+      {showCampaign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#0d1526] border border-white/10 rounded-2xl shadow-2xl">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+              <div>
+                <h2 className="text-sm font-black text-white flex items-center gap-2">
+                  <Send className="w-4 h-4 text-orange-400" /> Send Email Campaign
+                </h2>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Sends to all <span className="text-blue-400 font-semibold">newsletter_added</span> prospects
+                  ({prospects.filter(p => p.status === "newsletter_added").length} contacts)
+                </p>
+              </div>
+              <button onClick={() => setShowCampaign(false)}
+                className="p-1.5 hover:bg-white/8 rounded-lg transition-all">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+
+              {/* Result banner */}
+              {campaignResult && (
+                <div className={`p-3 rounded-xl border text-xs font-semibold ${campaignResult.failed === 0 ? "bg-green-500/10 border-green-500/20 text-green-300" : "bg-amber-500/10 border-amber-500/20 text-amber-300"}`}>
+                  ✓ {campaignResult.sent} of {campaignResult.total} emails delivered
+                  {campaignResult.failed > 0 && ` · ${campaignResult.failed} failed`}
+                  {campaignResult.errors && campaignResult.errors.length > 0 && (
+                    <ul className="mt-1 font-normal text-[10px] text-gray-400 list-disc list-inside">
+                      {campaignResult.errors.map((e,i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Subject */}
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase tracking-wide block mb-1.5">Subject Line</label>
+                <input
+                  value={campaignSubject}
+                  onChange={e => setCampaignSubject(e.target.value)}
+                  placeholder="e.g. Real-time ERCOT alerts for your team"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50"
+                />
+              </div>
+
+              {/* From */}
+              <div className="flex gap-2 text-[11px] text-gray-500">
+                <span className="text-gray-600">From:</span>
+                <span className="text-gray-300">Texas Grid Intel &lt;alerts@texasgridintel.com&gt;</span>
+              </div>
+
+              {/* Body + Preview toggle */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-wide">Email Body (HTML)</label>
+                  <button onClick={() => setCampaignPreview(v => !v)}
+                    className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 transition-all">
+                    <Eye className="w-3 h-3" /> {campaignPreview ? "Edit" : "Preview"}
+                  </button>
+                </div>
+
+                {campaignPreview ? (
+                  <div
+                    className="w-full min-h-[280px] bg-white rounded-xl p-4 text-gray-900 text-sm leading-relaxed overflow-y-auto"
+                    dangerouslySetInnerHTML={{ __html: campaignBody.replace("{{first_name}}","Alex").replace("{{company}}","Acme Energy") }}
+                  />
+                ) : (
+                  <textarea
+                    value={campaignBody}
+                    onChange={e => setCampaignBody(e.target.value)}
+                    rows={14}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-gray-300 font-mono placeholder-gray-600 focus:outline-none focus:border-orange-500/50 resize-y"
+                  />
+                )}
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Use <code className="text-orange-400">{"{{first_name}}"}</code> and <code className="text-orange-400">{"{{company}}"}</code> for personalisation.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowCampaign(false)}
+                  className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-semibold text-gray-300 transition-all">
+                  Cancel
+                </button>
+                <button onClick={sendCampaign} disabled={campaignSending || !campaignSubject.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 rounded-xl text-xs font-bold text-white transition-all">
+                  {campaignSending
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
+                    : <><Send className="w-3.5 h-3.5" /> Send to {prospects.filter(p => p.status === "newsletter_added").length} Contacts</>
+                  }
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
