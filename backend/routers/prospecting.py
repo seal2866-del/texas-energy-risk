@@ -10,6 +10,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
+import asyncio
 import httpx
 import anthropic
 from fastapi import APIRouter, Body, Header, HTTPException, Query, UploadFile, File
@@ -465,7 +466,8 @@ async def export_csv(
 # CRM — PIPELINE ACTIONS
 # ---------------------------------------------------------------------------
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_API_KEY   = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "alerts@texasgridintel.com")
 FRONTEND_URL   = os.getenv("FRONTEND_URL", "https://texas-energy-risk.vercel.app")
 
 PIPELINE_STATUSES = [
@@ -969,7 +971,7 @@ class SendCampaignRequest(BaseModel):
     subject:    str
     html_body:  str
     from_name:  str  = "Texas Grid Intel"
-    from_email: str  = "alerts@texasgridintel.com"
+    from_email: str  = ""   # empty = use RESEND_FROM_EMAIL env var
     status_filter: str = "newsletter_added"   # which CRM status to target
 
 
@@ -1001,8 +1003,15 @@ async def send_newsletter_campaign(body: SendCampaignRequest):
     errors  = []
     now     = datetime.now(timezone.utc).isoformat()
 
+    # Resolve sender — prefer env var so domain is always verified
+    resolved_from_email = body.from_email.strip() or RESEND_FROM_EMAIL
+
     async with httpx.AsyncClient(timeout=15) as client:
-        for p in prospects:
+        for idx, p in enumerate(prospects):
+            # Rate limit: Resend allows 5 req/sec — stay at 3/sec to be safe
+            if idx > 0 and idx % 3 == 0:
+                await asyncio.sleep(1.1)
+
             email = p["contact_email"]
             name  = p.get("contact_name") or ""
             first = name.split()[0] if name.split() else "there"
@@ -1012,7 +1021,7 @@ async def send_newsletter_campaign(body: SendCampaignRequest):
                                               .replace("{{company}}", p.get("company_name") or "your company")
 
             payload = {
-                "from":    f"{body.from_name} <{body.from_email}>",
+                "from":    f"{body.from_name} <{resolved_from_email}>",
                 "to":      [email],
                 "subject": body.subject,
                 "html":    personalised_html,
