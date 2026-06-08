@@ -126,12 +126,18 @@ STRICT RULES:
 - NEVER: "interesting", "notable", "potentially", "might be worth"
 - ALWAYS: "No action required", "Monitor", "Watch", "Escalation threshold"
 
-Current Texas Conditions:
+Current Texas Conditions (LIVE — use these exact figures):
 - Risk: {risk.upper()} | Trend: {trend}
-- ERCOT: {_fmt_ercot(ercot)} | Prior: {_fmt_ercot(prior_ercot)} | Change: {price_pct:+.1f}%
+- ERCOT Houston Hub: {_fmt_ercot(ercot)} | Prior week: {_fmt_ercot(prior_ercot)} | Change: {price_pct:+.1f}%
+- ERCOT North Hub: {_fmt_ercot(current.get("hub_prices", {{}}).get("HB_NORTH")) if current.get("hub_prices") else "N/A"}
+- ERCOT West Hub: {_fmt_ercot(current.get("hub_prices", {{}}).get("HB_WEST")) if current.get("hub_prices") else "N/A"}
+- Henry Hub: ${current.get("henry_hub_price", "N/A")}/MMBtu | Change: {current.get("henry_hub_change_pct", 0):+.1f}% | State: {current.get("henry_hub_market_state", "normal").upper()}
+- Grid Demand: {current.get("grid_demand_gw", "N/A")} GW | Reserve: {current.get("grid_reserve_pct", "N/A")}%
+- Wind: {current.get("wind_pct", "N/A")}% of load | Solar: {current.get("solar_pct", "N/A")}% of load
 - Weather Demand: {current.get("weather_demand_pressure", "low").upper()}
 - Gas Supply: {current.get("gas_supply_pressure", "low").upper()}
 - Week avg risk: {avg_score:.1f}/10 | Peak: {peak_score:.1f}/10
+- Week of: {datetime.now(timezone.utc).strftime("%B %d, %Y")}
 
 Regional: {region_lines}
 Industry Spotlight this week: {spotlight_industry}
@@ -579,7 +585,37 @@ async def generate_and_save_draft() -> str:
     week     = _fetch_week_snapshots("Houston")
     regional = _fetch_regional_snapshots()
 
-    # If snapshot has no ERCOT price, fetch it live
+    # ── Pull live data to make each week genuinely different ──────────────
+    # 1. Live ERCOT hub prices
+    try:
+        from services.grid_conditions import fetch_grid_conditions
+        grid = await fetch_grid_conditions()
+        hub_prices = grid.get("hub_prices", {})
+        if hub_prices.get("HB_HOUSTON"):
+            current["ercot_price"] = hub_prices["HB_HOUSTON"]
+        current["hub_prices"] = hub_prices
+        current["grid_demand_gw"]  = grid.get("demand_gw")
+        current["grid_reserve_pct"] = grid.get("reserve_pct")
+        current["wind_pct"]  = grid.get("wind_pct")
+        current["solar_pct"] = grid.get("solar_pct")
+        log.info(f"[NEWSLETTER] Live grid data: ERCOT=${current.get('ercot_price')}, demand={current.get('grid_demand_gw')} GW")
+    except Exception as e:
+        log.warning(f"[NEWSLETTER] Grid conditions fetch failed: {e}")
+
+    # 2. Live Henry Hub price
+    try:
+        from services.signal_engine import run_all_signals
+        signals = await run_all_signals("Houston")
+        hh = signals.get("henry_hub", {})
+        if hh.get("price"):
+            current["henry_hub_price"] = hh["price"]
+            current["henry_hub_change_pct"] = hh.get("change_pct", 0)
+            current["henry_hub_market_state"] = hh.get("market_state", "normal")
+            log.info(f"[NEWSLETTER] Henry Hub: ${hh['price']}/MMBtu")
+    except Exception as e:
+        log.warning(f"[NEWSLETTER] Henry Hub fetch failed: {e}")
+
+    # 3. Fallback: fetch ERCOT price directly if still missing
     if not current.get("ercot_price"):
         try:
             from services.external_apis import fetch_ercot_prices
@@ -588,9 +624,8 @@ async def generate_and_save_draft() -> str:
                 latest_price = prices[-1].get("price_mwh") if isinstance(prices[-1], dict) else getattr(prices[-1], "price_mwh", None)
                 if latest_price and latest_price > 0:
                     current["ercot_price"] = latest_price
-                    log.info(f"[NEWSLETTER] Fetched live ERCOT price: ${latest_price:.2f}/MWh")
         except Exception as e:
-            log.warning(f"[NEWSLETTER] Could not fetch live ERCOT price: {e}")
+            log.warning(f"[NEWSLETTER] ERCOT fallback fetch failed: {e}")
 
     content  = await generate_newsletter_content(current, prior, week, regional)
 
@@ -600,22 +635,24 @@ async def generate_and_save_draft() -> str:
     sb = get_supabase()
     result = sb.table("newsletter_issues").insert({
         "issue_date":        datetime.now(timezone.utc).date().isoformat(),
-        "subject":           content.get("subject", "Texas Energy Risk Brief"),
+        "subject":           content.get("subject", f"Texas Energy Risk Brief — Week of {datetime.now().strftime('%B %d, %Y')}"),
         "preview_text":      content.get("preview_text", ""),
         "risk_level":        current.get("risk_score", "low"),
         "market_state":      "Stable",
         "ercot_price":       current.get("ercot_price"),
         "weather_demand":    current.get("weather_demand_pressure", "low"),
         "gas_supply":        current.get("gas_supply_pressure", "low"),
-        "executive_summary": content.get("executive_summary", ""),
-        "what_changed":      content.get("what_changed", ""),
+        # Fix field mapping: AI returns exec_outlook, save as executive_summary
+        "executive_summary": content.get("exec_outlook") or content.get("executive_summary", ""),
+        "what_changed":      content.get("what_changed_explanation") or content.get("what_changed", ""),
         "watch_items":       json.dumps(content.get("watch_items", [])),
         "ai_outlook":        json.dumps({
-            "recommended_action":   content.get("recommended_action"),
-            "operational_exposure": content.get("operational_exposure"),
-            "monitoring_focus":     content.get("monitoring_focus"),
-            "escalation_triggers":  content.get("escalation_triggers"),
-            "outlook_note":         content.get("outlook_note"),
+            "recommended_action":   content.get("exec_recommendation") or content.get("recommended_action"),
+            "primary_driver":       content.get("exec_primary_driver"),
+            "expected_outlook":     content.get("exec_expected_outlook"),
+            "ercot_24h":            content.get("ercot_24h"),
+            "ercot_72h":            content.get("ercot_72h"),
+            "escalation_pct":       content.get("ew_escalation_pct"),
         }),
         "regional_snapshot": json.dumps(regional),
         "html_content":      html_content,
