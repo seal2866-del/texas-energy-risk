@@ -1,13 +1,37 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 6, 2026 (session 10 — All trader features live + DAM RT price fix)
-**Current stable tag:** v6.3-stable
-**Next session:** Monitor newsletter open rates; continue Apollo prospecting for Dallas/Austin cities
+**Last updated:** June 8, 2026 (session 11 — Send Campaign + Weekly Newsletter automation)
+**Current stable tag:** v6.5-stable
+**Next session:** Monitor newsletter open rates; Resend webhook for auto open/click CRM tracking; expand Apollo to Dallas/Austin; clean up duplicate June 08 test drafts
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
 ---
 
 ## COMPLETED TASKS
+
+### Session 11 — Send Campaign + Newsletter Automation (June 8, 2026)
+- [x] Built `POST /api/prospecting/send-newsletter` endpoint
+  - Sends personalised HTML email to all `newsletter_added` prospects via Resend
+  - Supports `{{first_name}}` and `{{company}}` merge tags
+  - Rate limited: 3 emails/sec with asyncio.sleep to stay under Resend 5 req/sec limit
+  - Updates each sent prospect status → `newsletter_sent`
+  - `RESEND_FROM_EMAIL` env var for configurable sender address
+- [x] Built Send Campaign modal in CRM frontend
+  - Subject line input, HTML body editor, live Preview toggle
+  - Pre-filled default email template with merge tags
+  - Shows live recipient count (newsletter_added prospects)
+  - Result banner with sent/failed counts
+  - Fixed stale `}}` JSX syntax bug on Request Demo block
+- [x] Verified `texasgridintel.com` domain in Resend (DNS + DKIM verified)
+- [x] First successful send: **71 of 71 emails delivered** from `alerts@texasgridintel.com`
+- [x] All 71 prospects auto-updated to `newsletter_sent` status
+- [x] Weekly newsletter auto-generation improved
+  - `generate_and_save_draft()` now pulls live hub prices (HB_HOUSTON/NORTH/WEST), Henry Hub price + change %, grid demand GW, reserve %, wind %, solar %
+  - AI prompt uses live figures so each week's content is genuinely different
+  - Fixed field mapping: `exec_outlook` → `executive_summary`, `what_changed_explanation` → `what_changed`
+  - Industry spotlight rotates by ISO week number (6 industries cycling)
+- [x] Scheduled task: auto-generates draft every Monday 7am, notifies on completion
+- [x] Test email verified in Yahoo inbox — all 8 sections rendering correctly
 
 ### Infrastructure & Backend
 - [x] #1 Write scheduled reporting architecture spec
@@ -636,48 +660,3 @@ Apollo → Prospect → Newsletter → Demo → Customer
 ### Backup
 - `texas-energy-risk-backup-seo-complete.zip` — 1.5MB, June 1, 2026 (includes blog articles)
 - `texas-energy-risk-backup-homepage-copy-v2.zip` — 1.5MB, June 2, 2026
-
-### Homepage Copy v2 — June 2, 2026
-Strategic improvements based on positioning audit:
-- Badge: "Texas Energy Early Warning Intelligence" (removed ERCOT-first positioning)
-- H1: "Detect Texas Energy Risk / Before It Hits Your Operations" (outcome-first)
-- Added credibility line: "Operational risk intelligence for energy traders, procurement managers, industrial operators, and Texas energy teams."
-- Subheadline: outcome-focused ("before they become operational constraints")
-- Added trust statement: "Continuously analyzes ERCOT, NOAA, and EIA data streams to identify emerging operational, weather, supply, and market risks before conditions escalate."
-- Primary CTA: "Get Early Warning Alerts" (was "Start Monitoring")
-- Secondary CTA: "View Today's Risk Outlook" (was "View Live Conditions")
-- Bottom CTA: "Start Free Monitoring" (was "Start Monitoring")
-
-### Friday CRM Session — Planned
-- Apollo.io prospecting integration
-- Pipeline tracking
-- Audience builder
-- Resend sync for email sequences
-
----
-
-## SEO FILES (added v4.2)
-- frontend/app/layout.tsx — global metadata, OG, Twitter, JSON-LD structured data
-- frontend/app/sitemap.ts — dynamic sitemap.xml
-- frontend/app/robots.ts — robots.txt
-- frontend/app/opengraph-image.tsx — auto-generated OG image (1200x630)
-- frontend/app/pricing/layout.tsx — pricing page metadata
-- frontend/app/dashboard/layout.tsx — dashboard metadata (noindex)
-- frontend/app/terms/layout.tsx — terms page metadata
-
----
-
-## SUPABASE TABLES
-- users
-- subscriptions
-- signal_snapshots
-- alert_preferences
-- alert_logs
-- newsletter_subscribers
-- newsletter_issues
-- newsletter_sends
-- report_deliveries
-- prospects
-- prospect_audiences
-- prospect_audience_members
-- demo_requests
