@@ -2760,6 +2760,16 @@ def run_all_signals(
             except Exception as _ve:
                 logger.warning("[VERIFY] Verification error: %s", _ve)
 
+        # ── Inject real Henry Hub price into gas records ──────────────────────
+        # _parse_eia_gas_rows() hardcodes henry_hub_price: 2.80 as a placeholder.
+        # Override it here with the real EIA futures price from henry_hub_data.
+        if henry_hub_data and isinstance(henry_hub_data, dict):
+            _real_hh = henry_hub_data.get("price")
+            if _real_hh:
+                for _rec in gas_records:
+                    if isinstance(_rec, dict):
+                        _rec["henry_hub_price"] = float(_real_hh)
+
         # ── Run the four individual signal checks ─────────────────────────────
         price_sig      = check_price_volatility(prices)
         weather_sig    = check_weather_demand(forecasts)
