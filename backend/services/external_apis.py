@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 _PRICE_CACHE: Dict[str, deque] = {}
 _CACHE_MAXLEN = 48
 _MIN_INTERVAL_SECONDS = 60   # don't add duplicate if fetched within 60s
+_CACHE_WARMED: set = set()   # settlement points already seeded from DB this process lifetime
 
 # ── Weather + Gas TTL caches ─────────────────────────────────────────────────
 # Weather changes slowly — cache 30 min per (location, days).
@@ -96,15 +97,90 @@ def _get_cached_prices(settlement_point: str) -> List[Dict]:
 
 def get_cache_status(settlement_point: str = "HB_HOUSTON") -> Dict[str, Any]:
     """Returns diagnostic info about the real-price cache."""
-    cache = _get_cache(settlement_point)
+    cache     = _get_cache(settlement_point)
+    newest_ts = cache[-1]["timestamp"] if cache else None
+    age_secs: Optional[int] = None
+    if newest_ts:
+        try:
+            newest_dt = datetime.fromisoformat(newest_ts.replace("Z", "+00:00"))
+            age_secs  = int((datetime.now(timezone.utc) - newest_dt).total_seconds())
+        except Exception:
+            pass
     return {
-        "settlement_point": settlement_point,
-        "real_readings":    len(cache),
-        "oldest":           cache[0]["timestamp"]  if cache else None,
-        "newest":           cache[-1]["timestamp"] if cache else None,
-        "latest_price":     cache[-1]["price_mwh"] if cache else None,
-        "source":           cache[-1].get("source") if cache else None,
+        "settlement_point":        settlement_point,
+        "real_readings":           len(cache),
+        "oldest":                  cache[0]["timestamp"]  if cache else None,
+        "newest":                  newest_ts,
+        "latest_price":            cache[-1]["price_mwh"] if cache else None,
+        "source":                  cache[-1].get("source") if cache else None,
+        "last_updated_seconds_ago": age_secs,
     }
+
+
+# ── Supabase persistence helpers ──────────────────────────────────────────────
+
+async def _persist_price_to_db(record: dict) -> None:
+    """
+    Upsert the latest real price to Supabase (table: ercot_price_cache).
+    One row per settlement_point — always the most recent reading.
+    Failures are non-fatal; the in-memory cache is still the source of truth.
+    """
+    try:
+        from services.supabase_client import get_supabase
+        sb = get_supabase()
+        sb.table("ercot_price_cache").upsert({
+            "settlement_point": record["settlement_point"],
+            "price_mwh":        record["price_mwh"],
+            "timestamp":        record["timestamp"],
+            "source":           record.get("source", "ercot_cdr"),
+            "cdr_updated":      record.get("cdr_updated"),
+            "persisted_at":     datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        logger.info("[ERCOT DB] Persisted: sp=%s price=%.2f",
+                    record["settlement_point"], record["price_mwh"])
+    except Exception as exc:
+        logger.warning("[ERCOT DB] Persist failed (non-fatal): %s", exc)
+
+
+async def _warm_cache_from_db(settlement_point: str) -> None:
+    """
+    On first call per settlement_point, read the last known price from Supabase
+    and seed the in-memory cache.  This means a Railway restart recovers instantly
+    (one persisted reading) instead of waiting for the first 5-min poll cycle.
+    Subsequent calls are no-ops (guarded by _CACHE_WARMED).
+    """
+    if settlement_point in _CACHE_WARMED:
+        return
+    _CACHE_WARMED.add(settlement_point)   # mark immediately — prevent concurrent double-warm
+    try:
+        from services.supabase_client import get_supabase
+        sb   = get_supabase()
+        res  = (
+            sb.table("ercot_price_cache")
+            .select("*")
+            .eq("settlement_point", settlement_point)
+            .limit(1)
+            .execute()
+        )
+        rows = res.data or []
+        if rows:
+            row = rows[0]
+            record = {
+                "timestamp":        row["timestamp"],
+                "retrieved_at":     row["timestamp"],
+                "settlement_point": row["settlement_point"],
+                "price_mwh":        float(row["price_mwh"]),
+                "price_type":       "real_time",
+                "source":           (row.get("source") or "ercot_cdr") + "_db_restore",
+                "cdr_updated":      row.get("cdr_updated"),
+            }
+            _cache_price(record)
+            logger.info("[ERCOT DB] Cache warmed from DB: sp=%s price=%.2f ts=%s",
+                        settlement_point, record["price_mwh"], record["timestamp"])
+        else:
+            logger.info("[ERCOT DB] No persisted price found for %s — starting cold", settlement_point)
+    except Exception as exc:
+        logger.warning("[ERCOT DB] Cache warm failed (non-fatal): %s", exc)
 
 
 # ── ERCOT CDR Scraper ─────────────────────────────────────────────────────────
@@ -213,6 +289,10 @@ async def fetch_ercot_prices(
         logger.debug("[ERCOT] API disabled -- returning mock data (dev mode)")
         return mock_data.mock_ercot_prices(hours, settlement_point)
 
+    # Seed the in-memory cache from Supabase on first call after a Railway restart.
+    # No-op if already warmed this process lifetime.
+    await _warm_cache_from_db(settlement_point)
+
     try:
         live_price: Optional[float] = None
         last_ok_response = None
@@ -311,6 +391,9 @@ async def fetch_ercot_prices(
             live_price, cdr_ts_raw, now.isoformat(),
         )
         added = _cache_price(record)
+        # Persist to Supabase so the cache survives Railway restarts
+        if added:
+            await _persist_price_to_db(record)
         cached = _get_cached_prices(settlement_point)
 
         if len(cached) >= 2:
@@ -780,7 +863,7 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
 
     async with httpx.AsyncClient(timeout=12, follow_redirects=True) as client:
 
-        # ── Strategy 1: Truly unfiltered — no facets at all ─────────────────────
+        # ── Strategy 1: Truly unfiltered — no facets at all ─────────────────────────
         # Get all weekly data, keep rows where value looks like total US storage
         try:
             url = _eia_url(api_key, weeks=weeks + 192)  # grab more rows; filter client-side
@@ -819,7 +902,7 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
             except Exception as exc:
                 logger.warning("[EIA] process=%s duoarea=%s error: %s", process, duoarea, exc)
 
-        # ── Strategy 3: EIA v1 API (multiple series IDs) ─────────────────────
+        # ── Strategy 3: EIA v1 API (multiple series IDs) ─────────────────────────────────────────────────────────────────────────────────────────────────
         for series_id in EIA_V1_SERIES_IDS:
             try:
                 r = await client.get(EIA_V1_URL, params={
@@ -844,7 +927,7 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
             except Exception as exc:
                 logger.warning("[EIA] v1 series=%s error: %s", series_id, exc)
 
-    logger.warning("[EIA] All EIA attempts failed — falling back to mock data")
+    logger.warning("[EIA] All EIA attempts failed -- falling back to mock data")
     result = mock_data.mock_gas_data(weeks)
     _set_gas_cache(weeks, result)
     return result

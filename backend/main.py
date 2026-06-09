@@ -12,6 +12,7 @@ import os
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -108,6 +109,73 @@ async def _grid_signal_loop():
         await asyncio.sleep(GRID_POLL_INTERVAL_SECS)
 
 
+async def _price_watchdog_loop():
+    """
+    Watchdog: every 5 minutes, check how old the latest cached ERCOT price is.
+    If stale (>15 min), log CRITICAL so Railway surfaces it immediately in the log stream.
+    A throttled secondary alert fires via alert_service at most once every 30 minutes.
+    Only active when ERCOT_API_ENABLED=true.
+    """
+    from services.external_apis import get_cache_status
+
+    STALE_THRESHOLD_MIN = 15
+    CHECK_INTERVAL_SECS = 300    # 5 min
+    ALERT_THROTTLE_SECS = 1800   # re-alert at most once per 30 min
+
+    # Wait for the first poll cycle to complete before starting checks
+    await asyncio.sleep(90)
+
+    enabled = os.getenv("ERCOT_API_ENABLED", "false").lower() == "true"
+    if not enabled:
+        log.info("[WATCHDOG] ERCOT_API_ENABLED=false — price watchdog idle")
+        return
+
+    log.info("[WATCHDOG] ERCOT price watchdog started (stale_threshold=%d min)", STALE_THRESHOLD_MIN)
+    last_alert_at = None
+
+    while True:
+        try:
+            status      = get_cache_status("HB_HOUSTON")
+            age_secs    = status.get("last_updated_seconds_ago")
+            age_minutes = (age_secs / 60.0) if age_secs is not None else None
+
+            if age_minutes is None:
+                log.critical(
+                    "[WATCHDOG] ERCOT price cache EMPTY — no readings since startup. "
+                    "CDR fetch may be failing. Check /api/ercot/debug."
+                )
+            elif age_minutes > STALE_THRESHOLD_MIN:
+                log.critical(
+                    "[WATCHDOG] ERCOT price STALE: %.1f min since last update "
+                    "(threshold=%d min). Last: $%s/MWh @ %s source=%s",
+                    age_minutes, STALE_THRESHOLD_MIN,
+                    status.get("latest_price"), status.get("newest"), status.get("source"),
+                )
+                now = datetime.now(timezone.utc)
+                if last_alert_at is None or (now - last_alert_at).total_seconds() > ALERT_THROTTLE_SECS:
+                    last_alert_at = now
+                    try:
+                        from services.alert_service import send_admin_alert
+                        await send_admin_alert(
+                            subject="[Texas Grid Intel] ERCOT Price Feed Stale",
+                            message=(
+                                f"ERCOT HB_HOUSTON has not updated in {age_minutes:.0f} min "
+                                f"(threshold {STALE_THRESHOLD_MIN} min).\n"
+                                f"Last: ${status.get('latest_price')}/MWh at {status.get('newest')}.\n"
+                                f"Check Railway logs + /api/ercot/debug."
+                            ),
+                        )
+                    except Exception as ae:
+                        log.warning("[WATCHDOG] Secondary alert failed (non-fatal): %s", ae)
+            else:
+                log.debug("[WATCHDOG] ERCOT price OK — %.1f min old", age_minutes)
+
+        except Exception as exc:
+            log.warning("[WATCHDOG] Check error: %s", exc)
+
+        await asyncio.sleep(CHECK_INTERVAL_SECS)
+
+
 async def _ercot_price_loop():
     """Background task: fetch ERCOT CDR price every POLL_INTERVAL_SECONDS."""
     from services.external_apis import fetch_ercot_prices, get_cache_status
@@ -139,112 +207,13 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(_ercot_price_loop())
     log.info("[STARTUP] Background ERCOT price poller scheduled")
 
+    # ── Staleness watchdog ────────────────────────────────────────
+    watchdog_task = asyncio.create_task(_price_watchdog_loop())
+    log.info("[STARTUP] ERCOT price staleness watchdog scheduled (stale_threshold=15 min)")
+
     # ── Multi-location grid signal poller ─────────────────────────
     grid_task = asyncio.create_task(_grid_signal_loop())
     log.info("[STARTUP] Multi-location grid poller scheduled (%d cities, every %ds)",
              len(GRID_LOCATIONS), GRID_POLL_INTERVAL_SECS)
 
     # ── Morning digest scheduler (7am CT = 12:00 UTC) ────────────
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        _run_morning_digest,
-        CronTrigger(hour=12, minute=0, timezone="UTC"),   # 7am CDT / 8am CST
-        id="morning_digest",
-        replace_existing=True,
-    )
-    scheduler.start()
-    log.info("[STARTUP] Morning digest scheduler started (07:00 CT daily)")
-
-    yield
-
-    scheduler.shutdown(wait=False)
-    for t in (task, grid_task):
-        t.cancel()
-        try:
-            await t
-        except asyncio.CancelledError:
-            pass
-    log.info("[SHUTDOWN] Price poller + grid poller + digest scheduler stopped")
-
-
-async def _run_morning_digest():
-    """Wrapper so APScheduler can call the async digest function."""
-    from services.digest_service import send_morning_digest
-    await send_morning_digest()
-
-
-app = FastAPI(
-    title="Texas Energy Risk Alert Platform API",
-    description=(
-        "Informational energy market risk signals for Texas. "
-        "Not investment, trading, or procurement advice."
-    ),
-    version="1.0.0",
-    docs_url="/docs" if ENVIRONMENT == "development" else None,
-    redoc_url=None,
-    lifespan=lifespan,
-)
-
-# ── CORS ──────────────────────────────────────────────────────
-origins = [
-    FRONTEND_URL,
-    "https://texasgridintel.com",
-    "https://www.texasgridintel.com",
-    "https://texas-energy-risk.vercel.app",
-    "https://texas-energy-risk-production.up.railway.app",
-]
-if ENVIRONMENT == "development":
-    origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # open for now — tighten after admin is working
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ── Routers ───────────────────────────────────────────────────
-app.include_router(ercot.router)
-app.include_router(weather.router)
-app.include_router(gas.router)
-app.include_router(signals.router)
-app.include_router(alerts.router)
-app.include_router(stripe_webhooks.router)
-app.include_router(stripe_checkout.router)
-app.include_router(ai_reasoning.router)
-app.include_router(export.router)
-app.include_router(digest.router)
-app.include_router(grid.router)
-app.include_router(history.router)
-if _has_chatbot:
-    app.include_router(_chatbot_router.router)
-if _has_newsletter:
-    app.include_router(newsletter.router)
-    app.include_router(prospecting.router)
-
-
-# ── Health check ──────────────────────────────────────────────
-@app.get("/health")
-async def health():
-    from services.external_apis import get_cache_status
-    cache = get_cache_status("HB_HOUSTON")
-    return {
-        "status":        "ok",
-        "service":       "texas-energy-risk-api",
-        "version":       "1.0.0",
-        "ercot_cache": cache,
-        "ercot_enabled": os.getenv("ERCOT_API_ENABLED", "false"),
-    }
-
-
-@app.get("/")
-async def root():
-    return {
-        "service":    "Texas Energy Risk Alert Platform API",
-        "version":    "1.0.0",
-        "disclaimer": (
-            "All signals and data are for informational purposes only. "
-            "Not investment, trading, or procurement advice."
-        ),
-    }
