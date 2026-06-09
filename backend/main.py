@@ -296,7 +296,7 @@ if _has_newsletter:
 
 
 # Health check
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     from services.external_apis import get_cache_status
     cache       = get_cache_status("HB_HOUSTON")
