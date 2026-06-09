@@ -86,13 +86,15 @@ async def _grid_signal_loop():
                 forecasts  = wx_r     if not isinstance(wx_r,     Exception) else []
                 gas_data   = gas_r    if not isinstance(gas_r,    Exception) else {}
 
-                gas_records = gas_data.get("records", []) if isinstance(gas_data, dict) else []
-                gas_latest  = gas_data.get("latest",  None) if isinstance(gas_data, dict) else None
+                # fetch_gas_data() returns List[Dict] — treat it directly
+                gas_records = gas_r if isinstance(gas_r, list) else []
+                gas_latest  = gas_records[-1] if gas_records else None
 
-                result = run_all_signals(prices, forecasts, gas_records, location=loc)
+                result = run_all_signals(prices, forecasts, gas_records, location=loc, henry_hub_data=None)
 
-                ercot_latest = prices[-1].price_mwh if prices and hasattr(prices[-1], "price_mwh") else None
-                henry_hub    = gas_latest.henry_hub_price if gas_latest and hasattr(gas_latest, "henry_hub_price") else None
+                # price records are dicts — use .get()
+                ercot_latest = prices[-1].get("price_mwh") if prices and isinstance(prices[-1], dict) else None
+                henry_hub    = gas_latest.get("henry_hub_price") if gas_latest and isinstance(gas_latest, dict) else None
                 await save_snapshot(result, loc, ercot_latest, henry_hub)
                 log.info("[GRID-POLLER] %s → %s", loc, result.get("risk_score", "?"))
 

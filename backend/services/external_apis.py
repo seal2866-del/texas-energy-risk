@@ -252,6 +252,31 @@ async def fetch_ercot_prices(
                 except Exception as url_exc:
                     logger.warning("[ERCOT] URL %s failed: %s", url, url_exc)
 
+        # ── Strategy 4: column-offset parser (mirrors grid_conditions.py row scanner) ─────
+        if live_price is None and last_ok_response is not None:
+            try:
+                _td_re = re.compile(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', re.IGNORECASE)
+                _tr_re = re.compile(r'<tr[^>]*>(.*?)</tr>', re.IGNORECASE | re.DOTALL)
+                _best: list = []
+                for _tr in _tr_re.finditer(last_ok_response.text):
+                    _row = _tr.group(1)
+                    _floats = []
+                    for _v in _td_re.findall(_row):
+                        try: _floats.append(float(_v))
+                        except: pass
+                    if len(_floats) >= 7:
+                        _best = _floats
+                if _best:
+                    _col = {"HB_HOUSTON": 1, "HB_BUSAVG": 0, "HB_NORTH": 3, "HB_SOUTH": 5, "HB_WEST": 6}
+                    _idx = _col.get(settlement_point, 1)
+                    if _idx < len(_best):
+                        _val = _best[_idx]
+                        if -500 <= _val <= 5000 and abs(_val) > 0.01:
+                            live_price = _val
+                            logger.warning("[ERCOT] Strategy4 (column-offset) => %s = %.2f", settlement_point, _val)
+            except Exception as _e4:
+                logger.warning("[ERCOT] Strategy4 failed: %s", _e4)
+
         if live_price is None:
             logger.warning("[ERCOT] All CDR URLs failed to yield a price -- returning cache")
             return _get_cached_prices(settlement_point)
@@ -739,7 +764,7 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
         _set_gas_cache(weeks, result)
         return result
 
-    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=12, follow_redirects=True) as client:
 
         # ── Strategy 1: Truly unfiltered — no facets at all ─────────────────────
         # Get all weekly data, keep rows where value looks like total US storage
@@ -764,22 +789,21 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
         except Exception as exc:
             logger.warning("[EIA] no-facets error: %s", exc)
 
-        # ── Strategy 2: Try explicit process + duoarea codes ──────────────────
-        for process in _EIA_PROCESS_CODES:
-            for duoarea in _EIA_DUOAREAS:
-                try:
-                    url  = _eia_url(api_key, weeks=weeks, duoarea=duoarea, process=process)
-                    r    = await client.get(url)
-                    rows = r.json().get("response", {}).get("data", [])
-                    logger.warning("[EIA] process=%s duoarea=%s status=%d rows=%d",
-                                   process, duoarea, r.status_code, len(rows))
-                    if rows:
-                        parsed = _parse_eia_gas_rows(rows, weeks)
-                        if parsed:
-                            _set_gas_cache(weeks, parsed)
-                            return parsed
-                except Exception as exc:
-                    logger.warning("[EIA] process=%s duoarea=%s error: %s", process, duoarea, exc)
+        # ── Strategy 2: Focused process + duoarea (only top 2 combos, avoid 30-combo timeout) ──
+        for process, duoarea in [("EWG", "NUS"), ("EWG", "US")]:
+            try:
+                url  = _eia_url(api_key, weeks=weeks, duoarea=duoarea, process=process)
+                r    = await client.get(url)
+                rows = r.json().get("response", {}).get("data", [])
+                logger.warning("[EIA] process=%s duoarea=%s status=%d rows=%d",
+                               process, duoarea, r.status_code, len(rows))
+                if rows:
+                    parsed = _parse_eia_gas_rows(rows, weeks)
+                    if parsed:
+                        _set_gas_cache(weeks, parsed)
+                        return parsed
+            except Exception as exc:
+                logger.warning("[EIA] process=%s duoarea=%s error: %s", process, duoarea, exc)
 
         # ── Strategy 3: EIA v1 API (multiple series IDs) ─────────────────────
         for series_id in EIA_V1_SERIES_IDS:

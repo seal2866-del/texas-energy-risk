@@ -70,15 +70,24 @@ async def get_signals(
 ):
     logger.warning("[SIGNALS] Request received for location=%s", location)
     try:
-        prices, forecasts, gas_data, henry_hub_data = await asyncio.gather(
+        _results = await asyncio.gather(
             fetch_ercot_prices(hours=4),
             fetch_weather_forecast(location=location, days=3),
             fetch_gas_data(weeks=4),
             fetch_henry_hub_price(),
+            return_exceptions=True,
         )
+        prices         = _results[0] if not isinstance(_results[0], Exception) else []
+        forecasts      = _results[1] if not isinstance(_results[1], Exception) else []
+        gas_data       = _results[2] if not isinstance(_results[2], Exception) else []
+        henry_hub_data = _results[3] if not isinstance(_results[3], Exception) else {}
+        if isinstance(_results[0], Exception):
+            logger.warning("[SIGNALS] ERCOT fetch error: %s", _results[0])
+        if isinstance(_results[2], Exception):
+            logger.warning("[SIGNALS] Gas fetch error: %s", _results[2])
         logger.warning("[SIGNALS] Data fetched: prices=%d forecasts=%d gas=%d henry_hub=%.3f",
                        len(prices), len(forecasts), len(gas_data),
-                       henry_hub_data.get("price", 0) if henry_hub_data else 0)
+                       henry_hub_data.get("price", 0) if isinstance(henry_hub_data, dict) else 0)
 
         result = run_all_signals(prices, forecasts, gas_data, location=location, henry_hub_data=henry_hub_data)
 
@@ -105,11 +114,15 @@ async def get_signals(
 @router.get("/risk-score")
 async def get_risk_score(location: str = Query(default="Houston")):
     """Returns just the Texas Energy Risk Score (Low / Medium / High)."""
-    prices, forecasts, gas_data = await asyncio.gather(
+    _r = await asyncio.gather(
         fetch_ercot_prices(hours=4),
         fetch_weather_forecast(location=location, days=1),
         fetch_gas_data(weeks=2),
+        return_exceptions=True,
     )
+    prices    = _r[0] if not isinstance(_r[0], Exception) else []
+    forecasts = _r[1] if not isinstance(_r[1], Exception) else []
+    gas_data  = _r[2] if not isinstance(_r[2], Exception) else []
     result = run_all_signals(prices, forecasts, gas_data, location=location)
     return {
         "risk_score":     result["risk_score"],

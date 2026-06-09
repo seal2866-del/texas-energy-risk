@@ -61,10 +61,17 @@ def _eea_level(reserve_pct: float, freq: float) -> Dict[str, Any]:
 
 def _parse_system_conditions(html: str) -> Dict[str, Any]:
     def _val(label: str) -> Optional[float]:
-        pattern = rf"{re.escape(label)}\s*\|?\s*\|?\s*([\d,\.]+)"
-        m = re.search(pattern, html, re.IGNORECASE)
+        # ERCOT HTML has <td>label</td><td>value</td> structure — regex must cross tag boundary
+        pattern = rf'<td[^>]*>[^<]*{re.escape(label)}[^<]*</td>\s*<td[^>]*>\s*(-?[\d,\.]+)\s*</td>'
+        m = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
         if m:
             try: return float(m.group(1).replace(",", ""))
+            except: return None
+        # Fallback: label anywhere followed by value in same or next cell
+        pattern2 = rf'{re.escape(label)}[^<]{{0,30}}</td>\s*<td[^>]*>\s*(-?[\d,\.]+)\s*</td>'
+        m2 = re.search(pattern2, html, re.IGNORECASE | re.DOTALL)
+        if m2:
+            try: return float(m2.group(1).replace(",", ""))
             except: return None
         return None
 
