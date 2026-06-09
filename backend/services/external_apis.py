@@ -932,4 +932,14 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
             except Exception as exc:
                 logger.warning("[EIA] v1 series=%s error: %s", series_id, exc)
 
-    logger.warni
+    logger.warning("[EIA] All EIA attempts failed -- falling back to mock data")
+    result = mock_data.mock_gas_data(weeks)
+    _set_gas_cache(weeks, result)
+    return result
+
+
+def _safe_float(val) -> float:
+    try:
+        return float(val or 0)
+    except (TypeError, ValueError):
+        return 0.0
