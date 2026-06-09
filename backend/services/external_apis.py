@@ -277,8 +277,22 @@ async def fetch_ercot_prices(
             except Exception as _e4:
                 logger.warning("[ERCOT] Strategy4 failed: %s", _e4)
 
+        # ── Strategy 5: cross-feed from grid_conditions (independent parser, never fails) ──
         if live_price is None:
-            logger.warning("[ERCOT] All CDR URLs failed to yield a price -- returning cache")
+            try:
+                from services.grid_conditions import fetch_grid_conditions
+                import asyncio as _aio
+                grid = await fetch_grid_conditions()
+                fallback_price = grid.get("hub_prices", {}).get(settlement_point)
+                if fallback_price is not None and -500 <= fallback_price <= 5000:
+                    live_price = fallback_price
+                    logger.warning("[ERCOT] Strategy5 (grid_conditions cross-feed) => %s = %.2f",
+                                   settlement_point, live_price)
+            except Exception as _e5:
+                logger.warning("[ERCOT] Strategy5 failed: %s", _e5)
+
+        if live_price is None:
+            logger.warning("[ERCOT] All strategies failed to yield a price -- returning cache")
             return _get_cached_prices(settlement_point)
 
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)

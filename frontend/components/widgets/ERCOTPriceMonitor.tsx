@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { TrendingUp, TrendingDown, Clock, WifiOff, AlertTriangle } from "lucide-react";
 import type { ERCOTPrice } from "@/lib/api";
@@ -55,9 +55,10 @@ function formatTimestamp(timestamp: string): string {
 type Freshness = "realtime" | "delayed" | "stale";
 
 function getFreshness(age: number): Freshness {
-  if (age < 1)  return "realtime";
-  if (age < 15) return "delayed";
-  return "stale";
+  // ERCOT CDR updates every ~5 min; green up to 8 min covers normal polling lag
+  if (age < 8)  return "realtime";
+  if (age < 20) return "delayed";  // yellow: something is slow
+  return "stale";                  // red: >20 min — feed interrupted
 }
 
 const F = {
@@ -68,6 +69,12 @@ const F = {
 
 export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Props) {
   const [hours, setHours] = useState<12 | 24>(12);
+  // Live clock — re-renders every 30s so 'X min ago' stays accurate between fetches
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const latest  = prices[prices.length - 1];
   const prev    = prices[prices.length - 2];
@@ -82,11 +89,17 @@ export default function ERCOTPriceMonitor({ prices, loading, priceBehavior }: Pr
     : current >= PRICE_WATCH_EXIT  ? prevVal >= PRICE_WATCH_EXIT  // hold state in dead band
     : false;
   const outsideNormal = current >= PRICE_HIGH_WARNING;
-  const ageMinutes    = latest?.timestamp ? getAgeMinutes(latest.timestamp) : 999;
+  // Use live `now` state so the label ticks in real-time without waiting for a data re-fetch
+  const ageMinutes    = latest?.timestamp
+    ? (now - new Date(latest.timestamp).getTime()) / 60_000
+    : 999;
   const freshness     = cacheSize > 0 ? getFreshness(ageMinutes) : "stale";
   const fc            = F[freshness];
   const lastUpdate    = latest?.timestamp ? formatTimestamp(latest.timestamp) : null;
-  const ageLabel      = ageMinutes < 1 ? "< 1 min ago" : `${Math.floor(ageMinutes)} min ago`;
+  const ageLabel = ageMinutes < 0.5 ? "just now"
+    : ageMinutes < 1   ? "< 1 min ago"
+    : ageMinutes < 2   ? "1 min ago"
+    : `${Math.floor(ageMinutes)} min ago`;
 
   const { pct, display, reliable } = safePctChange(current, prevVal);
   const up = pct !== null ? pct >= 0 : current > prevVal;

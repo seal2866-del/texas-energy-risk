@@ -123,7 +123,7 @@ def _assess_data_sources(
             return {"status": "unavailable", "last_updated": None, "age_minutes": None}
 
     ercot_status = _source_status(prices,      "timestamp",    15,    "ercot_cdr")
-    noaa_status  = _source_status(forecasts,   "forecast_time", 60,   "noaa")
+    noaa_status  = _source_status(forecasts,   "fetched_at",    60,   "noaa")  # forecast_time is future; fetched_at is when we retrieved it
     eia_status   = _source_status(gas_records, "report_date",   21600, "eia")  # EIA weekly — allow up to 15 days
 
     return {
