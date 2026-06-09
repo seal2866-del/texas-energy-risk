@@ -63,7 +63,7 @@ async def _grid_signal_loop():
     run_all_signals -> save_snapshot, so the grid map and analytics pages
     have fresh data for all 8 locations.
     """
-    from services.external_apis  import fetch_ercot_prices, fetch_weather_forecast, fetch_gas_data
+    from services.external_apis  import fetch_ercot_prices, fetch_weather_forecast, fetch_gas_data, fetch_henry_hub_price
     from services.signal_engine  import run_all_signals
     from services.snapshot_service import save_snapshot
 
@@ -76,25 +76,31 @@ async def _grid_signal_loop():
     while True:
         for loc in GRID_LOCATIONS:
             try:
-                prices_r, wx_r, gas_r = await asyncio.gather(
+                prices_r, wx_r, gas_r, hh_r = await asyncio.gather(
                     fetch_ercot_prices(hours=6, settlement_point="HB_HOUSTON"),
                     fetch_weather_forecast(location=loc, days=3),
                     fetch_gas_data(weeks=4),
+                    fetch_henry_hub_price(),
                     return_exceptions=True,
                 )
-                prices     = prices_r if not isinstance(prices_r, Exception) else []
-                forecasts  = wx_r     if not isinstance(wx_r,     Exception) else []
-                gas_data   = gas_r    if not isinstance(gas_r,    Exception) else {}
+                prices         = prices_r if not isinstance(prices_r, Exception) else []
+                forecasts      = wx_r     if not isinstance(wx_r,     Exception) else []
+                henry_hub_data = hh_r     if not isinstance(hh_r,     Exception) else {}
 
                 # fetch_gas_data() returns List[Dict] -- treat it directly
                 gas_records = gas_r if isinstance(gas_r, list) else []
-                gas_latest  = gas_records[-1] if gas_records else None
 
-                result = run_all_signals(prices, forecasts, gas_records, location=loc, henry_hub_data=None)
+                # Inject real Henry Hub price into gas records (overrides hardcoded $2.80)
+                if isinstance(henry_hub_data, dict) and henry_hub_data.get("price"):
+                    real_hh = henry_hub_data["price"]
+                    for record in gas_records:
+                        record["henry_hub_price"] = real_hh
+
+                result = run_all_signals(prices, forecasts, gas_records, location=loc, henry_hub_data=henry_hub_data)
 
                 # price records are dicts -- use .get()
                 ercot_latest = prices[-1].get("price_mwh") if prices and isinstance(prices[-1], dict) else None
-                henry_hub    = gas_latest.get("henry_hub_price") if gas_latest and isinstance(gas_latest, dict) else None
+                henry_hub    = henry_hub_data.get("price") if isinstance(henry_hub_data, dict) else None
                 await save_snapshot(result, loc, ercot_latest, henry_hub)
                 log.info("[GRID-POLLER] %s -> %s", loc, result.get("risk_score", "?"))
 
