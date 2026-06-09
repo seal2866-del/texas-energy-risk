@@ -128,18 +128,23 @@ async def _persist_price_to_db(record: dict) -> None:
     try:
         from services.supabase_client import get_supabase
         sb = get_supabase()
-        sb.table("ercot_price_cache").upsert({
+        row = {
             "settlement_point": record["settlement_point"],
             "price_mwh":        record["price_mwh"],
             "timestamp":        record["timestamp"],
             "source":           record.get("source", "ercot_cdr"),
             "cdr_updated":      record.get("cdr_updated"),
             "persisted_at":     datetime.now(timezone.utc).isoformat(),
-        }).execute()
-        logger.info("[ERCOT DB] Persisted: sp=%s price=%.2f",
-                    record["settlement_point"], record["price_mwh"])
+        }
+        # on_conflict required in supabase-py 2.x to trigger upsert on primary key
+        res = sb.table("ercot_price_cache").upsert(row, on_conflict="settlement_point").execute()
+        logger.warning("[ERCOT DB] Persisted OK: sp=%s price=%.2f rows=%s",
+                       record["settlement_point"], record["price_mwh"],
+                       len(res.data) if res.data else 0)
     except Exception as exc:
-        logger.warning("[ERCOT DB] Persist failed (non-fatal): %s", exc)
+        import traceback
+        logger.warning("[ERCOT DB] Persist failed (non-fatal): %s\n%s",
+                       exc, traceback.format_exc())
 
 
 async def _warm_cache_from_db(settlement_point: str) -> None:
@@ -927,14 +932,4 @@ async def fetch_gas_data(weeks: int = 8) -> List[Dict[str, Any]]:
             except Exception as exc:
                 logger.warning("[EIA] v1 series=%s error: %s", series_id, exc)
 
-    logger.warning("[EIA] All EIA attempts failed -- falling back to mock data")
-    result = mock_data.mock_gas_data(weeks)
-    _set_gas_cache(weeks, result)
-    return result
-
-
-def _safe_float(val) -> float:
-    try:
-        return float(val or 0)
-    except (TypeError, ValueError):
-        return 0.0
+    logger.warni
