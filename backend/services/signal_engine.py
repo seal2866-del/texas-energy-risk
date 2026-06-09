@@ -690,7 +690,7 @@ def check_weather_demand(forecasts: List[Dict]) -> Dict[str, Any]:
     )
 
 
-def check_gas_supply(gas_records: List[Dict]) -> Dict[str, Any]:
+def check_gas_supply(gas_records: List[Dict], henry_hub_price: Optional[float] = None) -> Dict[str, Any]:
     if not gas_records:
         return _signal(
             "gas_supply", "GAS", False, "low", None,
@@ -703,7 +703,8 @@ def check_gas_supply(gas_records: List[Dict]) -> Dict[str, Any]:
     latest     = gas_records[-1]
     pct        = float(latest.get("storage_pct_vs_avg", 0))
     bcf        = latest.get("storage_bcf", "N/A")
-    price      = latest.get("henry_hub_price")
+    # Use real-time price override if provided, fall back to record value
+    price      = henry_hub_price or latest.get("henry_hub_price")
     price_note = f" Henry Hub at ${price:.2f}/MMBtu." if price else ""
 
     if pct <= GAS_STORAGE_PCT_THRESHOLD:
@@ -1048,19 +1049,19 @@ def _compute_demand_pressure(weather_sig: Dict) -> Dict[str, Any]:
     return {"level": level, "explanation": expl, "score": score}
 
 
-def _compute_supply_pressure(gas_sig: Dict, gas_records: List[Dict]) -> Dict[str, Any]:
+def _compute_supply_pressure(gas_sig: Dict, gas_records: List[Dict], henry_hub_price: Optional[float] = None) -> Dict[str, Any]:
     """Map gas signal → Supply Pressure driver level + explanation including Henry Hub trend."""
     triggered = gas_sig.get("triggered", False)
     severity  = gas_sig.get("severity", "low")
     pct_val   = float(gas_sig.get("value") or 0)
     score     = _driver_score(gas_sig)
 
-    # Henry Hub trend
+    # Henry Hub trend — use real-time override if provided
     henry_hub   = None
     henry_trend = "stable"
     if len(gas_records) >= 2:
-        lp = gas_records[-1].get("henry_hub_price")
-        pp = gas_records[-2].get("henry_hub_price")
+        lp = henry_hub_price or gas_records[-1].get("henry_hub_price")
+        pp = henry_hub_price or gas_records[-2].get("henry_hub_price")
         henry_hub = lp
         if lp and pp and pp > 0:
             pct_chg = ((lp - pp) / pp) * 100
@@ -1144,6 +1145,7 @@ def _compute_gas_to_power_impact(
     gas_sig:     Dict,
     weather_sig: Dict,
     gas_records: List[Dict],
+    henry_hub_price: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Composite intelligence signal: how much does gas supply pressure
@@ -1160,8 +1162,8 @@ def _compute_gas_to_power_impact(
     henry_hub    = None
     henry_rising = False
     if len(gas_records) >= 2:
-        lp = gas_records[-1].get("henry_hub_price")
-        pp = gas_records[-2].get("henry_hub_price")
+        lp = henry_hub_price or gas_records[-1].get("henry_hub_price")
+        pp = henry_hub_price or gas_records[-2].get("henry_hub_price")
         henry_hub = lp
         if lp and pp and pp > 0:
             henry_rising = ((lp - pp) / pp) * 100 > 5
@@ -2153,6 +2155,7 @@ def _compute_risk_trend(
 def _compute_gas_power_correlation(
     gas_records: List[Dict],
     demand: Dict, supply: Dict, market: Dict,
+    henry_hub_price: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Analyze relationship between gas supply, weather demand, and ERCOT pricing."""
     demand_lvl = demand.get("level", "low")
@@ -2160,7 +2163,8 @@ def _compute_gas_power_correlation(
     market_lvl = market.get("level", "low")
 
     latest_gas  = gas_records[-1] if gas_records else {}
-    henry_hub   = float(latest_gas.get("henry_hub_price", 3.0) or 3.0)
+    # Use real-time price override if provided, fall back to record value
+    henry_hub   = float(henry_hub_price or latest_gas.get("henry_hub_price", 3.0) or 3.0)
     storage_pct = float(latest_gas.get("storage_pct_vs_avg", 0) or 0)
 
     high_factors = sum([
@@ -2760,20 +2764,20 @@ def run_all_signals(
             except Exception as _ve:
                 logger.warning("[VERIFY] Verification error: %s", _ve)
 
-        # ── Inject real Henry Hub price into gas records ──────────────────────
+        # ── Extract real Henry Hub price for direct injection into sub-functions ─
         # _parse_eia_gas_rows() hardcodes henry_hub_price: 2.80 as a placeholder.
-        # Override it here with the real EIA futures price from henry_hub_data.
+        # We bypass that by passing the real EIA futures price directly to each
+        # function that needs it, rather than relying on the gas_records cache.
+        _real_hh_price: Optional[float] = None
         if henry_hub_data and isinstance(henry_hub_data, dict):
-            _real_hh = henry_hub_data.get("price")
-            if _real_hh:
-                for _rec in gas_records:
-                    if isinstance(_rec, dict):
-                        _rec["henry_hub_price"] = float(_real_hh)
+            _p = henry_hub_data.get("price")
+            if _p:
+                _real_hh_price = float(_p)
 
         # ── Run the four individual signal checks ─────────────────────────────
         price_sig      = check_price_volatility(prices)
         weather_sig    = check_weather_demand(forecasts)
-        gas_sig        = check_gas_supply(gas_records)
+        gas_sig        = check_gas_supply(gas_records, henry_hub_price=_real_hh_price)
         henry_hub_sig  = check_henry_hub(henry_hub_data)
 
         all_sigs = [price_sig, weather_sig, gas_sig, henry_hub_sig]
@@ -2788,9 +2792,9 @@ def run_all_signals(
 
         # ── Phase 11 driver levels ────────────────────────────────────────────
         demand_pressure    = _compute_demand_pressure(weather_sig)
-        supply_pressure    = _compute_supply_pressure(gas_sig, gas_records)
+        supply_pressure    = _compute_supply_pressure(gas_sig, gas_records, henry_hub_price=_real_hh_price)
         market_reaction    = _compute_market_reaction(price_sig)
-        gas_to_power       = _compute_gas_to_power_impact(gas_sig, weather_sig, gas_records)
+        gas_to_power       = _compute_gas_to_power_impact(gas_sig, weather_sig, gas_records, henry_hub_price=_real_hh_price)
         henry_hub_exposure = _compute_henry_hub_exposure(henry_hub_data, henry_hub_sig, demand_pressure, supply_pressure)
         events             = _detect_events(prices, forecasts, gas_records, data_sources)
 
@@ -2890,6 +2894,7 @@ def run_all_signals(
         )
         gas_power_correlation = _compute_gas_power_correlation(
             gas_records, demand_pressure, supply_pressure, market_reaction,
+            henry_hub_price=_real_hh_price,
         )
         interval_intelligence = _compute_interval_intelligence(
             risk_score, risk_direction,
