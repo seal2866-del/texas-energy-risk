@@ -21,7 +21,7 @@ log    = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/newsletter", tags=["Newsletter"])
 
 RESEND_API_KEY  = os.getenv("RESEND_API_KEY", "")
-FROM_EMAIL      = os.getenv("ALERT_FROM_EMAIL", "alerts@investorlens.capital")
+FROM_EMAIL      = os.getenv("RESEND_FROM_EMAIL", os.getenv("ALERT_FROM_EMAIL", "alerts@texasgridintel.com"))
 NEWSLETTER_FROM = f"Texas Energy Risk Brief <{FROM_EMAIL}>"
 FRONTEND_URL    = os.getenv("FRONTEND_URL", "https://texas-energy-risk.vercel.app")
 ADMIN_SECRET    = os.getenv("NEWSLETTER_ADMIN_SECRET", "")
@@ -32,12 +32,14 @@ ADMIN_SECRET    = os.getenv("NEWSLETTER_ADMIN_SECRET", "")
 # ---------------------------------------------------------------------------
 
 class SubscribeRequest(BaseModel):
-    email:    str
-    company:  Optional[str] = None
-    title:    Optional[str] = None
-    city:     Optional[str] = None
-    industry: Optional[str] = None
-    source:   Optional[str] = "homepage"
+    email:      str
+    first_name: Optional[str] = None
+    last_name:  Optional[str] = None
+    company:    Optional[str] = None
+    title:      Optional[str] = None
+    city:       Optional[str] = None
+    industry:   Optional[str] = None
+    source:     Optional[str] = "homepage"
 
 class IssueUpdate(BaseModel):
     subject:          Optional[str] = None
@@ -86,6 +88,64 @@ async def subscribe(body: SubscribeRequest):
         "source":   body.source or "homepage",
         "status":   "active",
     }).execute()
+
+    # Send welcome email via Resend
+    first = (body.first_name or "").strip() or "there"
+    fe_url = FRONTEND_URL
+    welcome_html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:20px 0;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;">
+<tr><td style="background:#0f172a;border-radius:12px 12px 0 0;padding:24px 28px;border-bottom:3px solid #f97316;">
+  <p style="margin:0 0 2px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:2px;">Texas Grid Intel</p>
+  <p style="margin:0;font-size:20px;font-weight:900;color:#fff;">Texas Energy Risk Brief</p>
+  <p style="margin:4px 0 0;font-size:11px;color:#64748b;">Weekly Operational Intelligence for Texas Energy Markets</p>
+</td></tr>
+<tr><td style="background:#0f172a;padding:28px 28px 20px;">
+  <p style="margin:0 0 16px;font-size:15px;color:#e2e8f0;">Hi {first},</p>
+  <p style="margin:0 0 14px;font-size:14px;color:#94a3b8;line-height:1.7;">
+    You're subscribed to the <strong style="color:#e2e8f0;">Texas Energy Risk Brief</strong> — weekly ERCOT intelligence for Texas energy managers and operations teams.
+  </p>
+  <p style="margin:0 0 20px;font-size:14px;color:#94a3b8;line-height:1.7;">
+    Every Monday morning you'll receive:
+  </p>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+    <tr><td style="padding:6px 0;font-size:13px;color:#e2e8f0;">✅ &nbsp;Weekly ERCOT price outlook &amp; risk level</td></tr>
+    <tr><td style="padding:6px 0;font-size:13px;color:#e2e8f0;">✅ &nbsp;What changed this week — prices, weather, gas supply</td></tr>
+    <tr><td style="padding:6px 0;font-size:13px;color:#e2e8f0;">✅ &nbsp;Early warning signals before conditions escalate</td></tr>
+    <tr><td style="padding:6px 0;font-size:13px;color:#e2e8f0;">✅ &nbsp;Operational recommendations — actionable, not generic</td></tr>
+  </table>
+  <table cellpadding="0" cellspacing="0"><tr>
+    <td style="border-radius:8px;background:#f97316;">
+      <a href="{fe_url}/dashboard" style="display:inline-block;padding:12px 24px;border-radius:8px;background:#f97316;font-size:13px;font-weight:700;color:#fff;text-decoration:none;">View Live Dashboard →</a>
+    </td>
+  </tr></table>
+</td></tr>
+<tr><td style="background:#0a0f1a;border-radius:0 0 12px 12px;padding:16px 28px;text-align:center;">
+  <p style="margin:0;font-size:10px;color:#334155;">Texas Grid Intel · Houston, TX · Operational intelligence only — not financial advice.</p>
+  <p style="margin:6px 0 0;font-size:10px;"><a href="{fe_url}/unsubscribe" style="color:#475569;">Unsubscribe</a></p>
+</td></tr>
+</table></td></tr></table>
+</body></html>"""
+
+    if RESEND_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "from":    f"Texas Energy Risk Brief <{FROM_EMAIL}>",
+                        "to":      [body.email],
+                        "subject": "You're subscribed — Texas Energy Risk Brief",
+                        "html":    welcome_html,
+                    },
+                )
+            log.info(f"[NEWSLETTER] Welcome email sent to {body.email}")
+        except Exception as e:
+            log.warning(f"[NEWSLETTER] Welcome email failed for {body.email}: {e}")
 
     return {"status": "subscribed"}
 
