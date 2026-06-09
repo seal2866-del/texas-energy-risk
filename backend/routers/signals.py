@@ -258,3 +258,9 @@ async def get_dam_comparison(
         from services.dam_tracker import fetch_dam_comparison
         prices_raw = await fetch_ercot_prices(hours=2, settlement_point="HB_HOUSTON")
         prices = prices_raw if not isinstance(prices_raw, Exception) else []
+        rt_price = float(prices[-1].get("price_mwh", 50) if isinstance(prices[-1], dict)
+                         else getattr(prices[-1], "price_mwh", 50)) if prices else 50.0
+        return await fetch_dam_comparison(rt_price=rt_price)
+    except Exception as exc:
+        logger.error("[DAM] Error: %s", exc)
+        return {"available": False, "message": str(exc)}
