@@ -89,6 +89,12 @@ async def get_signals(
                        len(prices), len(forecasts), len(gas_data),
                        henry_hub_data.get("price", 0) if isinstance(henry_hub_data, dict) else 0)
 
+        # Inject real Henry Hub price into gas records (overrides hardcoded $2.80 placeholder)
+        if isinstance(henry_hub_data, dict) and henry_hub_data.get("price"):
+            real_hh = henry_hub_data["price"]
+            for record in gas_data:
+                record["henry_hub_price"] = real_hh
+
         result = run_all_signals(prices, forecasts, gas_data, location=location, henry_hub_data=henry_hub_data)
 
         logger.warning("[SIGNALS] Signal engine done: risk=%s data_valid=%s",
@@ -100,8 +106,7 @@ async def get_signals(
         import asyncio as _asyncio
         ercot_vals = [p.get("price_mwh", 0) for p in prices if (p.get("price_mwh") or 0) > 0]
         ercot_latest = ercot_vals[-1] if ercot_vals else None
-        gas_latest = gas_data[-1] if gas_data else {}
-        henry_hub = gas_latest.get("henry_hub_price") if gas_latest else None
+        henry_hub = henry_hub_data.get("price") if isinstance(henry_hub_data, dict) else None
         _asyncio.create_task(_save_snapshot(result, location, ercot_latest, henry_hub))
 
         return result
@@ -253,9 +258,3 @@ async def get_dam_comparison(
         from services.dam_tracker import fetch_dam_comparison
         prices_raw = await fetch_ercot_prices(hours=2, settlement_point="HB_HOUSTON")
         prices = prices_raw if not isinstance(prices_raw, Exception) else []
-        rt_price = float(prices[-1].get("price_mwh", 50) if isinstance(prices[-1], dict)
-                         else getattr(prices[-1], "price_mwh", 50)) if prices else 50.0
-        return await fetch_dam_comparison(rt_price=rt_price)
-    except Exception as exc:
-        logger.error("[DAM] Error: %s", exc)
-        return {"available": False, "message": str(exc)}
