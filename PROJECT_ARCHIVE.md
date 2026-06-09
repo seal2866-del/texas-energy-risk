@@ -1,7 +1,7 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 8, 2026 (session 11 — Send Campaign + Weekly Newsletter automation)
-**Current stable tag:** v6.5-stable
-**Next session:** Monitor newsletter open rates; Resend webhook for auto open/click CRM tracking; expand Apollo to Dallas/Austin; clean up duplicate June 08 test drafts
+**Last updated:** June 8, 2026 (session 11 — Subscribe page + welcome email live)
+**Current stable tag:** v6.6-stable
+**Next session:** Monitor newsletter open rates; Resend webhook for auto open/click CRM tracking; expand Apollo to Dallas/Austin
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
@@ -32,6 +32,12 @@
   - Industry spotlight rotates by ISO week number (6 industries cycling)
 - [x] Scheduled task: auto-generates draft every Monday 7am, notifies on completion
 - [x] Test email verified in Yahoo inbox — all 8 sections rendering correctly
+- [x] Public subscribe page at texasgridintel.com/subscribe
+  - Name, email, company, title, industry fields
+  - Success state with dashboard link
+  - Welcome email sent immediately on signup via Resend
+  - Fixed FROM_EMAIL default to alerts@texasgridintel.com
+  - Added first_name/last_name to SubscribeRequest model
 
 ### Infrastructure & Backend
 - [x] #1 Write scheduled reporting architecture spec
