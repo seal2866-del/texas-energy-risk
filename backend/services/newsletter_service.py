@@ -663,4 +663,3 @@ async def generate_and_save_draft() -> str:
     issue_id = result.data[0]["id"]
     log.info(f"[NEWSLETTER] Draft saved — issue_id={issue_id}")
     return issue_id
-                    
