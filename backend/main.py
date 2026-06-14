@@ -138,24 +138,55 @@ async def _price_watchdog_loop():
     log.info("[WATCHDOG] ERCOT price watchdog started (stale_threshold=%d min)", STALE_THRESHOLD_MIN)
     last_alert_at = None
 
+    RECOVERY_THRESHOLD_MIN = 120  # force re-fetch if newest reading >2h old
+
     while True:
         try:
-            status      = get_cache_status("HB_HOUSTON")
-            age_secs    = status.get("last_updated_seconds_ago")
-            age_minutes = (age_secs / 60.0) if age_secs is not None else None
+            status = get_cache_status("HB_HOUSTON")
 
-            if age_minutes is None:
+            # ── Check age of NEWEST READING (not last_updated_seconds_ago) ──
+            # last_updated_seconds_ago only tells us when the cache dict was
+            # touched — it stays fresh even when the poller fetches but finds
+            # no new CDR data. We must check the actual newest reading timestamp.
+            newest_str    = status.get("newest")
+            latest_price  = status.get("latest_price")
+            real_readings = status.get("real_readings", 0)
+
+            if not newest_str or not real_readings:
+                reading_age_min = None
+            else:
+                try:
+                    newest_dt       = datetime.fromisoformat(newest_str)
+                    reading_age_min = (datetime.now(timezone.utc) - newest_dt).total_seconds() / 60.0
+                except Exception:
+                    reading_age_min = None
+
+            if reading_age_min is None:
                 log.critical(
                     "[WATCHDOG] ERCOT price cache EMPTY -- no readings since startup. "
                     "CDR fetch may be failing. Check /api/ercot/debug."
                 )
-            elif age_minutes > STALE_THRESHOLD_MIN:
+            elif reading_age_min > STALE_THRESHOLD_MIN:
                 log.critical(
-                    "[WATCHDOG] ERCOT price STALE: %.1f min since last update "
-                    "(threshold=%d min). Last: $%s/MWh @ %s source=%s",
-                    age_minutes, STALE_THRESHOLD_MIN,
-                    status.get("latest_price"), status.get("newest"), status.get("source"),
+                    "[WATCHDOG] ERCOT price STALE: newest reading is %.1f min old "
+                    "(threshold=%d min). Last: $%s/MWh @ %s",
+                    reading_age_min, STALE_THRESHOLD_MIN, latest_price, newest_str,
                 )
+
+                # ── Auto-recovery: force a fresh CDR fetch if >2h stale ──────
+                if reading_age_min > RECOVERY_THRESHOLD_MIN:
+                    log.critical(
+                        "[WATCHDOG] AUTO-RECOVERY: newest reading %.1f min old -- forcing fresh CDR fetch",
+                        reading_age_min,
+                    )
+                    try:
+                        from services.external_apis import fetch_ercot_prices
+                        await fetch_ercot_prices(hours=6, settlement_point="HB_HOUSTON")
+                        log.info("[WATCHDOG] Auto-recovery fetch complete")
+                    except Exception as re:
+                        log.error("[WATCHDOG] Auto-recovery fetch failed: %s", re)
+
+                # ── Throttled email alert ─────────────────────────────────────
                 now = datetime.now(timezone.utc)
                 if last_alert_at is None or (now - last_alert_at).total_seconds() > ALERT_THROTTLE_SECS:
                     last_alert_at = now
@@ -164,16 +195,17 @@ async def _price_watchdog_loop():
                         await send_admin_alert(
                             subject="[Texas Grid Intel] ERCOT Price Feed Stale",
                             message=(
-                                f"ERCOT HB_HOUSTON has not updated in {age_minutes:.0f} min "
+                                f"ERCOT HB_HOUSTON newest reading is {reading_age_min:.0f} min old "
                                 f"(threshold {STALE_THRESHOLD_MIN} min).\n"
-                                f"Last: ${status.get('latest_price')}/MWh at {status.get('newest')}.\n"
-                                f"Check Railway logs + /api/ercot/debug."
+                                f"Last known price: ${latest_price}/MWh at {newest_str}.\n"
+                                f"Auto-recovery attempted if >120 min stale.\n"
+                                f"Check Railway logs + https://texas-energy-risk-production.up.railway.app/api/ercot/debug"
                             ),
                         )
                     except Exception as ae:
-                        log.warning("[WATCHDOG] Secondary alert failed (non-fatal): %s", ae)
+                        log.warning("[WATCHDOG] Email alert failed (non-fatal): %s", ae)
             else:
-                log.debug("[WATCHDOG] ERCOT price OK -- %.1f min old", age_minutes)
+                log.debug("[WATCHDOG] ERCOT price OK -- newest reading %.1f min old", reading_age_min)
 
         except Exception as exc:
             log.warning("[WATCHDOG] Check error: %s", exc)

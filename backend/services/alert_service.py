@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 ALERT_FROM     = os.getenv("ALERT_FROM_EMAIL", "onboarding@resend.dev")
-RESEND_URL     = "https://api.resend.com/emails"
+RESEND_URL          = "https://api.resend.com/emails"
+ADMIN_ALERT_EMAIL   = os.getenv("ADMIN_ALERT_EMAIL", "seal2866@gmail.com")
 DASHBOARD_URL  = "https://texasgridintel.com/dashboard"
 ALERTS_URL     = "https://texasgridintel.com/alerts"
 
@@ -975,3 +976,21 @@ async def send_daily_summary(
         delivery_status="sent" if delivered else "failed",
         delivered_email=delivered,
     )
+
+# ── Admin monitoring alert ────────────────────────────────────────────────────
+
+async def send_admin_alert(subject: str, message: str) -> bool:
+    """Send a plain monitoring alert to the admin email (no user auth required).
+    Called by the staleness watchdog and other system monitors.
+    """
+    html = f"""<!DOCTYPE html>
+<html><body style="font-family:monospace;background:#0f172a;color:#e2e8f0;padding:24px;">
+<h2 style="color:#f97316;margin:0 0 16px;">&#9888; Texas Grid Intel — System Alert</h2>
+<pre style="background:#1e293b;padding:16px;border-radius:8px;font-size:13px;white-space:pre-wrap;">{message}</pre>
+<p style="color:#64748b;font-size:11px;margin-top:16px;">
+  Automated monitor &mdash; {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}<br>
+  Check Railway logs and <a href="https://texas-energy-risk-production.up.railway.app/api/ercot/debug" style="color:#f97316;">
+  /api/ercot/debug</a> for details.
+</p>
+</body></html>"""
+    return await _send_email(ADMIN_ALERT_EMAIL, subject, html)
