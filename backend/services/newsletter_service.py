@@ -129,8 +129,8 @@ STRICT RULES:
 Current Texas Conditions (LIVE — use these exact figures):
 - Risk: {risk.upper()} | Trend: {trend}
 - ERCOT Houston Hub: {_fmt_ercot(ercot)} | Prior week: {_fmt_ercot(prior_ercot)} | Change: {price_pct:+.1f}%
-- ERCOT North Hub: {_fmt_ercot(current.get("hub_prices", {{}}).get("HB_NORTH")) if current.get("hub_prices") else "N/A"}
-- ERCOT West Hub: {_fmt_ercot(current.get("hub_prices", {{}}).get("HB_WEST")) if current.get("hub_prices") else "N/A"}
+- ERCOT North Hub: {_fmt_ercot(current["hub_prices"].get("HB_NORTH")) if current.get("hub_prices") else "N/A"}
+- ERCOT West Hub: {_fmt_ercot(current["hub_prices"].get("HB_WEST")) if current.get("hub_prices") else "N/A"}
 - Henry Hub: ${current.get("henry_hub_price", "N/A")}/MMBtu | Change: {current.get("henry_hub_change_pct", 0):+.1f}% | State: {current.get("henry_hub_market_state", "normal").upper()}
 - Grid Demand: {current.get("grid_demand_gw", "N/A")} GW | Reserve: {current.get("grid_reserve_pct", "N/A")}%
 - Wind: {current.get("wind_pct", "N/A")}% of load | Solar: {current.get("solar_pct", "N/A")}% of load
@@ -663,3 +663,4 @@ async def generate_and_save_draft() -> str:
     issue_id = result.data[0]["id"]
     log.info(f"[NEWSLETTER] Draft saved — issue_id={issue_id}")
     return issue_id
+                    
