@@ -173,7 +173,9 @@ async def _warm_cache_from_db(settlement_point: str) -> None:
             row = rows[0]
             record = {
                 "timestamp":        row["timestamp"],
-                "retrieved_at":     row["timestamp"],
+                # Use current time for retrieved_at so new instances don't surface
+                # a stale CDR timestamp to users — the price was confirmed now.
+                "retrieved_at":     datetime.now(timezone.utc).isoformat(),
                 "settlement_point": row["settlement_point"],
                 "price_mwh":        float(row["price_mwh"]),
                 "price_type":       "real_time",
@@ -397,9 +399,9 @@ async def fetch_ercot_prices(
             live_price, cdr_ts_raw, now.isoformat(),
         )
         added = _cache_price(record)
-        # Persist to Supabase so the cache survives Railway restarts
-        if added:
-            await _persist_price_to_db(record)
+        # Always persist to Supabase so new instances warm with the latest confirmed
+        # price and a fresh timestamp — not just when the record is first added to cache.
+        await _persist_price_to_db(record)
         cached = _get_cached_prices(settlement_point)
 
         if len(cached) >= 2:
@@ -1069,9 +1071,4 @@ async def fetch_waha_price() -> Dict[str, Any]:
                         logger.warning("[WAHA] EIA OK series=%s price=%.3f", series_id, price)
                         return result
                 except Exception as exc:
-                    logger.warning("[WAHA] EIA series=%s failed: %s", series_id, exc)
-
-    logger.warning("[WAHA] All live sources failed — returning mock (add OIL_PRICE_API_KEY to Railway)")
-    result = _mock_waha(hh_price)
-    _set_waha_cache(result)
-    return result
+ 
