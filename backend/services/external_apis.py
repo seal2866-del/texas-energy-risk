@@ -976,87 +976,86 @@ def _mock_waha(hh_price: float = 3.00) -> Dict[str, Any]:
 
 async def fetch_waha_price() -> Dict[str, Any]:
     """
-    Fetch Waha Hub natural gas spot price from EIA.
+    Fetch Waha Hub natural gas spot price.
     Waha Hub = West Texas gas trading hub; key Permian Basin price signal.
-    Falls back to HH-based mock if EIA data unavailable.
+
+    Strategy order:
+      1. OilPriceAPI (oilpriceapi.com) — requires OIL_PRICE_API_KEY in env
+         EIA confirmed they source Waha from NGI (paid); EIA v2 has no Waha series.
+      2. EIA v2 spot endpoint (legacy attempts, kept for future if EIA adds Waha)
+      3. Mock: HH price minus typical Permian basis spread
     Cached 4 hours.
     """
     cached = _get_waha_cache()
     if cached:
         return cached
 
-    api_key = os.getenv("EIA_API_KEY", "")
-
-    # Fetch Henry Hub for fallback spread calculation
-    hh_data = await fetch_henry_hub_price()
+    # Fetch Henry Hub in parallel (needed for fallback spread & basis signal)
+    hh_data  = await fetch_henry_hub_price()
     hh_price = hh_data.get("price", 3.00)
 
-    if not api_key:
-        result = _mock_waha(hh_price)
-        _set_waha_cache(result)
-        return result
-
-    # EIA series codes for Waha / West Texas natural gas spot price
-    # Waha is tracked in EIA's Natural Gas Price series under southwest region
-    WAHA_SERIES = [
-        "RNGWTWNT",   # West Texas Waha (EIA weekly spot)
-        "NG.RNGWTWNT.D",
-        "RNGWTWCU",
-    ]
+    opa_key = os.getenv("OIL_PRICE_API_KEY", "")
+    eia_key = os.getenv("EIA_API_KEY", "")
 
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-        # Strategy 1: EIA v2 spot endpoint — try each Waha series code
-        for series_id in WAHA_SERIES:
-            try:
-                params = (
-                    f"api_key={api_key}&frequency=weekly&data[]=value"
-                    f"&facets[series][]={series_id}"
-                    f"&sort[0][column]=period&sort[0][direction]=desc&length=10"
-                )
-                r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
-                rows = r.json().get("response", {}).get("data", [])
-                valid = [(row["period"], float(row["value"])) for row in rows
-                         if row.get("value") not in (None, "", "NA") and float(row.get("value", 0)) > 0]
-                if valid:
-                    price = round(valid[0][1], 3)
-                    result = {
-                        "price":       price,
-                        "unit":        "$/MMBtu",
-                        "source":      f"eia_v2_spot_{series_id}",
-                        "report_date": valid[0][0],
-                    }
-                    _set_waha_cache(result)
-                    logger.warning("[WAHA] OK series=%s price=%.3f", series_id, price)
-                    return result
-            except Exception as exc:
-                logger.warning("[WAHA] series=%s failed: %s", series_id, exc)
 
-        # Strategy 2: EIA v2 with duoarea filter for Southwest/West Texas
-        try:
-            params = (
-                f"api_key={api_key}&frequency=weekly&data[]=value"
-                f"&facets[duoarea][]=NW2"
-                f"&sort[0][column]=period&sort[0][direction]=desc&length=10"
-            )
-            r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
-            rows = r.json().get("response", {}).get("data", [])
-            valid = [(row["period"], float(row["value"])) for row in rows
-                     if row.get("value") not in (None, "", "NA") and float(row.get("value", 0)) > 0]
-            if valid:
-                price = round(valid[0][1], 3)
-                result = {
-                    "price":       price,
-                    "unit":        "$/MMBtu",
-                    "source":      "eia_v2_duoarea_nw2",
-                    "report_date": valid[0][0],
-                }
-                _set_waha_cache(result)
-                logger.warning("[WAHA] OK via duoarea NW2 price=%.3f", price)
-                return result
-        except Exception as exc:
-            logger.warning("[WAHA] duoarea NW2 failed: %s", exc)
+        # ── Strategy 1: OilPriceAPI — confirmed Waha spot price endpoint ────────
+        # EIA does not publish Waha in their v2 API (sourced from NGI, a paid provider).
+        # OilPriceAPI free tier: 200 req/month (6/day at 4-hr cache = 180/month — fits).
+        if opa_key:
+            WAHA_CODES = ["WAHA_USD", "WAHA_NATGAS_USD", "WAHA_NATURAL_GAS_USD"]
+            for code in WAHA_CODES:
+                try:
+                    r = await client.get(
+                        f"https://api.oilpriceapi.com/v1/prices/latest?by_code={code}",
+                        headers={"Authorization": f"Token {opa_key}"},
+                    )
+                    body = r.json()
+                    logger.warning("[WAHA] OPA code=%s status=%d body=%s", code, r.status_code, str(body)[:200])
+                    if r.status_code == 200 and body.get("status") == "success":
+                        price = float(body["data"]["price"])
+                        if price != 0:
+                            result = {
+                                "price":       round(price, 3),
+                                "unit":        "$/MMBtu",
+                                "source":      f"oilpriceapi_{code}",
+                                "report_date": body["data"].get("created_at", "")[:10],
+                            }
+                            _set_waha_cache(result)
+                            logger.warning("[WAHA] OPA OK code=%s price=%.3f", code, price)
+                            return result
+                except Exception as exc:
+                    logger.warning("[WAHA] OPA code=%s error: %s", code, exc)
 
-    logger.warning("[WAHA] All EIA attempts failed — returning mock")
+        # ── Strategy 2: EIA v2 spot (kept in case EIA adds Waha in future) ─────
+        if eia_key:
+            WAHA_SERIES = ["RNGWTWNT", "NG.RNGWTWNT.D", "RNGWTWCU"]
+            for series_id in WAHA_SERIES:
+                try:
+                    params = (
+                        f"api_key={eia_key}&frequency=weekly&data[]=value"
+                        f"&facets[series][]={series_id}"
+                        f"&sort[0][column]=period&sort[0][direction]=desc&length=10"
+                    )
+                    r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
+                    rows  = r.json().get("response", {}).get("data", [])
+                    valid = [(row["period"], float(row["value"])) for row in rows
+                             if row.get("value") not in (None, "", "NA") and float(row.get("value", 0)) > 0]
+                    if valid:
+                        price = round(valid[0][1], 3)
+                        result = {
+                            "price":       price,
+                            "unit":        "$/MMBtu",
+                            "source":      f"eia_v2_spot_{series_id}",
+                            "report_date": valid[0][0],
+                        }
+                        _set_waha_cache(result)
+                        logger.warning("[WAHA] EIA OK series=%s price=%.3f", series_id, price)
+                        return result
+                except Exception as exc:
+                    logger.warning("[WAHA] EIA series=%s failed: %s", series_id, exc)
+
+    logger.warning("[WAHA] All live sources failed — returning mock (add OIL_PRICE_API_KEY to Railway)")
     result = _mock_waha(hh_price)
     _set_waha_cache(result)
     return result
