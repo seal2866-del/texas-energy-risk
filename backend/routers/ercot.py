@@ -9,10 +9,6 @@ async def get_prices(
     hours: int = Query(default=24, ge=1, le=168),
     settlement_point: str = Query(default="HB_HOUSTON"),
 ):
-    """
-    Returns ERCOT real-time prices for the requested window.
-    Data is informational only and does not constitute trading advice.
-    """
     prices = await fetch_ercot_prices(hours=hours, settlement_point=settlement_point)
     return {
         "settlement_point": settlement_point,
@@ -36,7 +32,6 @@ async def get_current_price(
 
 @router.get("/prices/hubs")
 async def get_all_hub_prices():
-    """Returns current LMP for all Texas trading hubs."""
     hubs = await fetch_all_hub_prices()
     return {
         "hubs":       hubs,
@@ -47,13 +42,19 @@ async def get_all_hub_prices():
 @router.get("/debug")
 async def debug_cdr():
     """
-    Diagnostic endpoint — tests ERCOT CDR connectivity.
-    Returns raw HTTP status, content-type, and first 500 chars.
-    Purely informational; no price data stored.
+    Diagnostic endpoint. Returns CDR connectivity info AND a fresh parsed
+    price bypassing the in-memory cache (cdr_live_price) so the hourly
+    consistency check can catch systematic parser errors (wrong column/row).
     """
     import os, httpx
-    from services.external_apis import ERCOT_CDR_URLS, ERCOT_HOME_URL, _ERCOT_HEADERS, get_cache_status
+    from services.external_apis import (
+        ERCOT_CDR_URLS, ERCOT_HOME_URL, _ERCOT_HEADERS,
+        get_cache_status, _parse_ercot_cdr,
+    )
     results = []
+    cdr_live_price = None
+    cdr_live_source = None
+
     async with httpx.AsyncClient(timeout=20, headers=_ERCOT_HEADERS, follow_redirects=True) as client:
         try:
             pf = await client.get(ERCOT_HOME_URL)
@@ -71,25 +72,35 @@ async def debug_cdr():
                     "len":     len(r.text),
                     "preview": r.text[:500],
                 })
+                if cdr_live_price is None and r.status_code == 200 and len(r.text) > 200:
+                    parsed = _parse_ercot_cdr(r.text, "HB_HOUSTON")
+                    if parsed is not None:
+                        cdr_live_price = parsed
+                        cdr_live_source = url.split("/")[-1]
             except Exception as e:
                 results.append({"url": url, "error": str(e)})
+
     cache = get_cache_status("HB_HOUSTON")
+    cache_price = cache.get("latest_price")
+    drift = None
+    drift_alert = False
+    if cdr_live_price is not None and cache_price is not None:
+        drift = round(cdr_live_price - cache_price, 2)
+        drift_alert = abs(drift) > 3.0
+
     return {
-        "cache":   cache,
-        "enabled": os.getenv("ERCOT_API_ENABLED", "false"),
-        "cdr_tests": results,
-        "disclaimer": "Informational only.",
+        "cache":           cache,
+        "cdr_live_price":  cdr_live_price,
+        "cdr_live_source": cdr_live_source,
+        "drift":           drift,
+        "drift_alert":     drift_alert,
+        "enabled":         os.getenv("ERCOT_API_ENABLED", "false"),
+        "cdr_tests":       results,
+        "disclaimer":      "Informational only.",
     }
 
 
 @router.get("/grid")
 async def get_grid_conditions():
-    """
-    Returns ERCOT real-time system conditions:
-    - Reserve margin + EEA emergency level
-    - All hub prices + spread vs HB_HOUSTON
-    - Wind/solar generation mix
-    Cached 5 minutes.
-    """
     from services.grid_conditions import fetch_grid_conditions
     return await fetch_grid_conditions()
