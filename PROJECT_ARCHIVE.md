@@ -1,11 +1,48 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 8, 2026 (session 11 — Subscribe page + welcome email live)
-**Current stable tag:** v6.6-stable
-**Next session:** Monitor newsletter open rates; Resend webhook for auto open/click CRM tracking; expand Apollo to Dallas/Austin
+**Last updated:** June 14, 2026 (session 14 — Apollo expansion, newsletter campaign, Contact email fix)
+**Current stable tag:** v6.9-stable
+**Next session:** Trader features — Waha vs Henry Hub basis spread + contract lock-in signal; monitor newsletter open rates in Resend; add ADMIN_ALERT_EMAIL=seal2866@gmail.com to Railway env vars; add 2 Railway UptimeRobot monitors manually
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
 ---
+
+## COMPLETED TASKS
+
+### Session 14 — Apollo Expansion + Newsletter Campaign + Contact Fix (June 14, 2026)
+
+**Commits:** `10457b3`, `a8f27ab`, `727c567`, `7f2524b`
+
+**1. Apollo city expansion — Dallas, Austin, San Antonio**
+- Added Dallas, Fort Worth, Austin, San Antonio, Arlington to `TEXAS_ENERGY_CITIES` scoring list in `backend/routers/prospecting.py` (now score 25pts location bonus instead of 15)
+- Wrote `C:\EngergyLens\run_apollo_expansion.py` — searches Apollo for energy contacts in 3 new cities, pages 1–2 per city (up to 100/city), auto-adds high/medium priority leads to newsletter queue
+- Expansion result: 96 new contacts added with `newsletter_added` status (from Dallas, Austin, San Antonio searches)
+- Total prospect count: 422
+
+**2. Newsletter campaign — "Load Latest Newsletter" button**
+- Problem: Send Campaign modal had no way to load the actual newsletter HTML; body defaulted to generic sales template
+- Added `GET /api/newsletter/public/latest` endpoint (no auth) to `backend/routers/newsletter.py` — returns subject + html_content of latest approved issue
+- Bug: endpoint initially queried `html_body` column (doesn't exist); fixed to `html_content` (the actual DB column name in newsletter_issues table)
+- Added `⬇ Load Latest Newsletter` button to Send Campaign modal in `frontend/app/prospecting/page.tsx`
+  - Calls `/api/newsletter/public/latest`, auto-fills subject + body
+  - Disabled state + loading indicator while fetching
+  - Error message if no approved issue found
+- Also added `loadingNewsletter` state + `loadNewsletter()` function
+- **Result:** 96 contacts sent the "Texas Energy Risk Brief — Week of June 15, 2026" newsletter; Resend confirmed Sent → Delivered
+
+**3. Contact email fix**
+- Footer "Contact" link changed from `mailto:support@texasgridintel.com` → `mailto:Wnguyen@Myinfinivue.com`
+- File: `frontend/components/ui/Footer.tsx` line 78
+- Deployed via `vercel --prod` (Vercel auto-deploy not triggering from git push)
+
+**4. Supporting scripts created**
+- `C:\EngergyLens\run_apollo_expansion.py` — Apollo search for Dallas/Austin/San Antonio, auto-newsletter-add
+- `C:\EngergyLens\send_newsletter_to_prospects.py` — fetch latest newsletter from API + send to newsletter_added prospects (fallback: reads `newsletter_draft.html` if no API secret)
+
+**Known issues / pending**
+- Vercel auto-deploy from GitHub push not working — must run `vercel --prod` manually from `C:\EngergyLens\texas-energy-risk` after each frontend change
+- `newsletter_added` prospect count in Send Campaign modal shows 0 when page filters don't include those contacts in the loaded 200 — workaround: set status filter to "newsletter added" before opening modal
+- Executive Summary / What Changed fields appear blank in Newsletter Admin right panel (display-only issue; html_content in DB is populated correctly)
 
 ## COMPLETED TASKS
 
@@ -506,6 +543,8 @@ Apollo → Prospect → Newsletter → Demo → Customer
 - v6.1-stable — EEA Tracker, Multi-Hub Spread Monitor, Load Optimizer, DAM Tracker (all 4 trader features live)
 - v6.2-stable — Hub spread parser fixed (HTML <td> column offset approach), all hubs showing correct live prices
 - v6.3-stable — DAM Tracker shows live RT price while awaiting 2PM CT DAM results
+- v6.7-stable — fix: data integrity — 4 live endpoint issues (grid conditions, ERCOT cache, gas storage, signals timeout)
+- v6.8-stable — fix: newsletter Generate Draft 500 (unhashable type dict in f-string)
 
 ---
 
@@ -666,3 +705,16 @@ Apollo → Prospect → Newsletter → Demo → Customer
 ### Backup
 - `texas-energy-risk-backup-seo-complete.zip` — 1.5MB, June 1, 2026 (includes blog articles)
 - `texas-energy-risk-backup-homepage-copy-v2.zip` — 1.5MB, June 2, 2026
+---
+
+## Session 13 — Newsletter Fix + Staleness Watchdog (June 14, 2026)
+
+### Version: v6.8-stable
+### Commits: `42bc790`, `a9bfb9e`, `427dec8`
+
+### Issues Fixed
+
+#### 1. Newsletter Generate Draft — `Error 500: unhashable type: 'dict'`
+**Root cause**: `_build_newsletter_prompt()` used `{{}}` inside two f-string expressions as an intended empty-dict default. In f-string *expression* context, `{{}}` evaluates as `{ {} }` (a set containing an empty dict), immediately raising `TypeError: unhashable type: 'dict'`.
+
+**Fix**: Since the ternary already guards with `if current.get("hub_prices")`, index directly: `current["h
