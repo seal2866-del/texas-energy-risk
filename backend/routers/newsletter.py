@@ -169,6 +169,27 @@ async def unsubscribe(token: str = Query(...)):
 
 
 # ---------------------------------------------------------------------------
+# PUBLIC: LATEST APPROVED ISSUE (used by prospecting Send Campaign)
+# ---------------------------------------------------------------------------
+
+@router.get("/public/latest")
+async def get_latest_approved():
+    """Return subject + html_body of the latest approved newsletter. No auth required."""
+    sb = get_supabase()
+    r  = sb.table("newsletter_issues")            .select("id, subject, html_body, created_at")            .eq("status", "approved")            .order("created_at", desc=True)            .limit(1)            .execute()
+    if not r.data:
+        raise HTTPException(status_code=404, detail="No approved newsletter issue found")
+    issue = r.data[0]
+    if not issue.get("html_body"):
+        raise HTTPException(status_code=404, detail="Latest approved issue has no HTML body")
+    return {
+        "id":       issue["id"],
+        "subject":  issue.get("subject", "Texas Grid Intel Newsletter"),
+        "html_body": issue["html_body"],
+    }
+
+
+# ---------------------------------------------------------------------------
 # ADMIN: GENERATE DRAFT
 # ---------------------------------------------------------------------------
 

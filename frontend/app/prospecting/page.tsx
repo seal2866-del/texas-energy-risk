@@ -89,6 +89,7 @@ export default function ProspectingPage() {
 <p>Best,<br/>Texas Grid Intel Team<br/><a href="https://texasgridintel.com">texasgridintel.com</a></p>`);
   const [campaignSending, setCampaignSending] = useState(false);
   const [campaignResult,  setCampaignResult]  = useState<{sent:number;failed:number;total:number;errors?:string[]} | null>(null);
+  const [loadingNewsletter, setLoadingNewsletter] = useState(false);
   const [campaignPreview, setCampaignPreview] = useState(false);
 
   // Search filters
@@ -288,6 +289,19 @@ export default function ProspectingPage() {
       }
     } catch (e: any) { setMsg(`Error: ${e.message}`); }
     setCampaignSending(false);
+  };
+
+  const loadNewsletter = async () => {
+    setLoadingNewsletter(true);
+    try {
+      const r = await fetch(`${API}/api/newsletter/public/latest`);
+      if (!r.ok) { setMsg("No approved newsletter found — generate one first at /admin/newsletter."); return; }
+      const d = await r.json();
+      setCampaignSubject(d.subject || "");
+      setCampaignBody(d.html_body || "");
+      setMsg("✓ Newsletter loaded");
+    } catch (e: any) { setMsg(`Error loading newsletter: ${e.message}`); }
+    setLoadingNewsletter(false);
   };
 
   const exportAudience = (id: string) => window.open(`${API}/api/prospecting/audiences/${id}/export`, "_blank");
@@ -712,7 +726,13 @@ export default function ProspectingPage() {
               {/* Body + Preview toggle */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[10px] text-gray-500 uppercase tracking-wide">Email Body (HTML)</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-gray-500 uppercase tracking-wide">Email Body (HTML)</label>
+                    <button onClick={loadNewsletter} disabled={loadingNewsletter}
+                      className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded text-[10px] text-blue-400 font-semibold transition-all disabled:opacity-50">
+                      {loadingNewsletter ? "Loading..." : "⬇ Load Latest Newsletter"}
+                    </button>
+                  </div>
                   <button onClick={() => setCampaignPreview(v => !v)}
                     className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-200 transition-all">
                     <Eye className="w-3 h-3" /> {campaignPreview ? "Edit" : "Preview"}
