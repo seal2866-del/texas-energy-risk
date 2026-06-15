@@ -63,7 +63,7 @@ function buildScenarios(base: BaseInputs): ScenarioDef[] {
     {
       id:          "ercot_50",
       label:       "ERCOT $50/MWh",
-      description:  "ERCOT Houston Hub spikes to $50/MWh",
+      description:  "Scenario: what if ERCOT Houston Hub reaches $50/MWh?",
       icon:        <Zap className="w-3.5 h-3.5" />,
       color:       "text-amber-400",
       border:      "border-amber-500/20",
@@ -73,7 +73,7 @@ function buildScenarios(base: BaseInputs): ScenarioDef[] {
     {
       id:          "ercot_100",
       label:       "ERCOT $100/MWh",
-      description:  "ERCOT Houston Hub spikes to $100/MWh",
+      description:  "Scenario: what if ERCOT Houston Hub reaches $100/MWh?",
       icon:        <Zap className="w-3.5 h-3.5" />,
       color:       "text-red-400",
       border:      "border-red-500/20",
@@ -83,7 +83,7 @@ function buildScenarios(base: BaseInputs): ScenarioDef[] {
     {
       id:          "heat_100f",
       label:       "Temperature >100°F",
-      description:  "Extreme heat — demand pressure elevated",
+      description:  "Scenario: temperatures exceed 100°F, demand pressure elevated",
       icon:        <Thermometer className="w-3.5 h-3.5" />,
       color:       "text-red-400",
       border:      "border-red-500/20",
