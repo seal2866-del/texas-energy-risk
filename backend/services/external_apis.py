@@ -1003,7 +1003,24 @@ async def fetch_waha_price() -> Dict[str, Any]:
         # EIA does not publish Waha in their v2 API (sourced from NGI, a paid provider).
         # OilPriceAPI free tier: 200 req/month (6/day at 4-hr cache = 180/month — fits).
         if opa_key:
-            WAHA_CODES = ["WAHA_USD", "WAHA_NATGAS_USD", "WAHA_NATURAL_GAS_USD"]
+            # One-time discovery call — logs ALL available natural gas codes so we
+            # can identify the correct Waha code from Railway logs.
+            try:
+                disc = await client.get(
+                    "https://api.oilpriceapi.com/v1/commodities?category=natural_gas",
+                    headers={"Authorization": f"Token {opa_key}"},
+                )
+                disc_body = disc.json()
+                codes_found = [c.get("code") for c in disc_body.get("data", {}).get("commodities", [])]
+                logger.warning("[WAHA] OPA available natural_gas codes: %s", codes_found)
+            except Exception as disc_exc:
+                logger.warning("[WAHA] OPA discovery failed: %s", disc_exc)
+
+            WAHA_CODES = [
+                "WAHA_USD", "WAHA_NATGAS_USD", "WAHA_NATURAL_GAS_USD",
+                "WAHA_HUB_USD", "NG_WAHA_USD", "NATGAS_WAHA_USD",
+                "PERMIAN_NATGAS_USD", "WAHA", "WAHA_GAS_USD",
+            ]
             for code in WAHA_CODES:
                 try:
                     r = await client.get(
