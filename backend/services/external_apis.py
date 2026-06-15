@@ -76,13 +76,24 @@ def _cache_price(record: dict) -> bool:
 
     if cache:
         last = cache[-1]
-        try:
-            last_ts = datetime.fromisoformat(last["timestamp"].replace("Z", "+00:00"))
-            new_ts  = datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
-            if abs((new_ts - last_ts).total_seconds()) < _MIN_INTERVAL_SECONDS:
-                return False   # duplicate — skip
-        except Exception:
-            pass
+        # Prefer interval-based dedup (e.g. "1015") over time-based dedup.
+        # ERCOT updates "Last Updated" before appending the new row, so the app
+        # can poll mid-publish and receive the prior interval's data again.
+        # If the CDR interval hasn't changed, there is no new reading — skip.
+        new_interval  = record.get("cdr_interval", "")
+        last_interval = last.get("cdr_interval", "")
+        if new_interval and last_interval and new_interval == last_interval:
+            logger.info("[ERCOT CACHE] Same CDR interval %s — skipping duplicate", new_interval)
+            return False
+        # Fallback: time-based dedup for readings without an interval (e.g. strategy 5)
+        if not new_interval or not last_interval:
+            try:
+                last_ts = datetime.fromisoformat(last["timestamp"].replace("Z", "+00:00"))
+                new_ts  = datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
+                if abs((new_ts - last_ts).total_seconds()) < _MIN_INTERVAL_SECONDS:
+                    return False   # duplicate — skip
+            except Exception:
+                pass
 
     cache.append(record)
     logger.info(
@@ -217,30 +228,27 @@ _ERCOT_HEADERS = {
 }
 
 
-def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
+def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[tuple]:
     """
     Parse the ERCOT CDR real_time_spp.html table to extract the LATEST price
     for the requested settlement point.
+
+    Returns (price: float, interval: str) or None.
+    interval is the 4-digit HHMM string from the CDR row, e.g. "1015".
+    Callers should use the interval as a dedup key so that re-fetching the CDR
+    during ERCOT's publish window (when "Last Updated" ticks before the new row
+    appears) does not overwrite a fresh reading with a stale one.
 
     CDR column order (numeric cells only — date/interval are non-decimal and skipped):
       0=HB_BUSAVG  1=HB_HOUSTON  2=HB_HUBAVG  3=HB_NORTH  4=HB_PAN  5=HB_SOUTH  6=HB_WEST
 
     The table contains one row per 15-min interval for the operating day.
     We scan all rows and keep the LAST one with >=7 numeric cells (= most recent interval).
-
-    Bug fixed: the old implementation searched for "HB_HOUSTON" in the HTML, which hit the
-    column *header* (not a data row), then read the first decimal value in the next 800 chars —
-    that value was HB_BUSAVG from the first interval row, producing the wrong column AND
-    the wrong (oldest) row.
     """
     if not html or len(html) < 100:
         logger.warning("[ERCOT] Response too short (%d chars)", len(html))
         return None
 
-    # Column index within the numeric-only portion of a data row.
-    # Date ("06/15/2026") and interval ("0015") columns contain no decimal point,
-    # so they are not captured by the regex below, making these offsets 0-based
-    # over price columns only.
     COL_IDX: Dict[str, int] = {
         "HB_BUSAVG":  0,
         "HB_HOUSTON": 1,
@@ -251,20 +259,25 @@ def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
         "HB_WEST":    6,
     }
 
-    td_re = re.compile(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', re.IGNORECASE)
-    tr_re = re.compile(r'<tr[^>]*>(.*?)</tr>', re.IGNORECASE | re.DOTALL)
+    td_decimal_re  = re.compile(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', re.IGNORECASE)
+    td_interval_re = re.compile(r'<td[^>]*>\s*(\d{4})\s*</td>', re.IGNORECASE)
+    tr_re          = re.compile(r'<tr[^>]*>(.*?)</tr>', re.IGNORECASE | re.DOTALL)
 
     best_row: list = []
+    best_interval: str = ""
     for tr_match in tr_re.finditer(html):
         row_html = tr_match.group(1)
         floats: list = []
-        for v in td_re.findall(row_html):
+        for v in td_decimal_re.findall(row_html):
             try:
                 floats.append(float(v))
             except Exception:
                 pass
         if len(floats) >= 7:
             best_row = floats   # keep updating — last match = most recent interval
+            intervals = td_interval_re.findall(row_html)
+            if intervals:
+                best_interval = intervals[0]  # first 4-digit int in row = HHMM interval
 
     if not best_row:
         logger.warning("[ERCOT] No data row with >=7 numeric cells found for %s (html=%d chars)",
@@ -279,10 +292,10 @@ def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
 
     val = best_row[idx]
     if -500 <= val <= 5000 and abs(val) > 0.01:
-        logger.warning("[ERCOT] Column-offset parser => %s[col=%d] = %.2f (row=%s)",
-                       settlement_point, idx, val,
+        logger.warning("[ERCOT] Column-offset parser => %s[col=%d] = %.2f interval=%s (row=%s)",
+                       settlement_point, idx, val, best_interval,
                        [round(x, 2) for x in best_row[:8]])
-        return val
+        return (val, best_interval)
 
     logger.warning("[ERCOT] Value %.2f out of plausible range for %s", val, settlement_point)
     return None
@@ -317,6 +330,7 @@ async def fetch_ercot_prices(
 
     try:
         live_price: Optional[float] = None
+        cdr_interval: str = ""
         last_ok_response = None
 
         async with httpx.AsyncClient(
@@ -345,8 +359,9 @@ async def fetch_ercot_prices(
                                 r.headers.get("content-type", "?")[:40], len(r.text))
                     if r.status_code == 200 and len(r.text) > 200:
                         last_ok_response = r
-                        live_price = _parse_ercot_cdr(r.text, settlement_point)
-                        if live_price is not None:
+                        parsed = _parse_ercot_cdr(r.text, settlement_point)
+                        if parsed is not None:
+                            live_price, cdr_interval = parsed
                             break
                     else:
                         logger.warning("[ERCOT] %s returned status=%d — skipping",
@@ -354,30 +369,7 @@ async def fetch_ercot_prices(
                 except Exception as url_exc:
                     logger.warning("[ERCOT] URL %s failed: %s", url, url_exc)
 
-        # ── Strategy 4: column-offset parser (mirrors grid_conditions.py row scanner) ─────
-        if live_price is None and last_ok_response is not None:
-            try:
-                _td_re = re.compile(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', re.IGNORECASE)
-                _tr_re = re.compile(r'<tr[^>]*>(.*?)</tr>', re.IGNORECASE | re.DOTALL)
-                _best: list = []
-                for _tr in _tr_re.finditer(last_ok_response.text):
-                    _row = _tr.group(1)
-                    _floats = []
-                    for _v in _td_re.findall(_row):
-                        try: _floats.append(float(_v))
-                        except: pass
-                    if len(_floats) >= 7:
-                        _best = _floats
-                if _best:
-                    _col = {"HB_HOUSTON": 1, "HB_BUSAVG": 0, "HB_NORTH": 3, "HB_SOUTH": 5, "HB_WEST": 6}
-                    _idx = _col.get(settlement_point, 1)
-                    if _idx < len(_best):
-                        _val = _best[_idx]
-                        if -500 <= _val <= 5000 and abs(_val) > 0.01:
-                            live_price = _val
-                            logger.warning("[ERCOT] Strategy4 (column-offset) => %s = %.2f", settlement_point, _val)
-            except Exception as _e4:
-                logger.warning("[ERCOT] Strategy4 failed: %s", _e4)
+        # ── Strategy 4 (removed — identical to primary parser; _parse_ercot_cdr now handles it) ──
 
         # ── Strategy 5: cross-feed from grid_conditions (independent parser, never fails) ──
         if live_price is None:
@@ -407,6 +399,7 @@ async def fetch_ercot_prices(
             "price_type":       "real_time",
             "source":           "ercot_cdr",
             "cdr_updated":      cdr_ts_raw,        # "Last Updated" string from CDR page
+            "cdr_interval":     cdr_interval,      # HHMM interval from last CDR row, e.g. "1015"
         }
         logger.warning(
             "[ERCOT RECORD] price=%.2f cdr_updated=%r retrieved_at=%s",
@@ -470,7 +463,9 @@ async def fetch_all_hub_prices() -> Dict[str, float]:
             await client.get(ERCOT_HOME_URL)   # cookie pre-flight
             r = await client.get(ERCOT_CDR_URLS[0])
             r.raise_for_status()
-        return {h: (_parse_ercot_cdr(r.text, h) or 0.0) for h in hubs}
+        def _price_only(result):
+            return result[0] if result else 0.0
+        return {h: _price_only(_parse_ercot_cdr(r.text, h)) for h in hubs}
     except Exception:
         return {h: 0.0 for h in hubs}
 
