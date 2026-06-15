@@ -219,58 +219,72 @@ _ERCOT_HEADERS = {
 
 def _parse_ercot_cdr(html: str, settlement_point: str) -> Optional[float]:
     """
-    Robust multi-strategy parser for ERCOT CDR HTML pages.
-    Finds the row/section containing the settlement point and extracts
-    any number that looks like a plausible ERCOT LMP price.
-    ERCOT LMPs range from ~-$500 to $5,000.
+    Parse the ERCOT CDR real_time_spp.html table to extract the LATEST price
+    for the requested settlement point.
+
+    CDR column order (numeric cells only — date/interval are non-decimal and skipped):
+      0=HB_BUSAVG  1=HB_HOUSTON  2=HB_HUBAVG  3=HB_NORTH  4=HB_PAN  5=HB_SOUTH  6=HB_WEST
+
+    The table contains one row per 15-min interval for the operating day.
+    We scan all rows and keep the LAST one with >=7 numeric cells (= most recent interval).
+
+    Bug fixed: the old implementation searched for "HB_HOUSTON" in the HTML, which hit the
+    column *header* (not a data row), then read the first decimal value in the next 800 chars —
+    that value was HB_BUSAVG from the first interval row, producing the wrong column AND
+    the wrong (oldest) row.
     """
     if not html or len(html) < 100:
         logger.warning("[ERCOT] Response too short (%d chars)", len(html))
         return None
 
-    logger.warning("[ERCOT] HTML preview: %s", html[:500].replace("\n", " ").replace("\r", ""))
+    # Column index within the numeric-only portion of a data row.
+    # Date ("06/15/2026") and interval ("0015") columns contain no decimal point,
+    # so they are not captured by the regex below, making these offsets 0-based
+    # over price columns only.
+    COL_IDX: Dict[str, int] = {
+        "HB_BUSAVG":  0,
+        "HB_HOUSTON": 1,
+        "HB_HUBAVG":  2,
+        "HB_NORTH":   3,
+        "HB_PAN":     4,
+        "HB_SOUTH":   5,
+        "HB_WEST":    6,
+    }
 
-    # ── Locate the settlement point in the HTML ────────────────────────────────
-    idx = html.upper().find(settlement_point.upper())
-    if idx == -1:
-        logger.warning("[ERCOT] '%s' not found anywhere in HTML (%d chars total)",
+    td_re = re.compile(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', re.IGNORECASE)
+    tr_re = re.compile(r'<tr[^>]*>(.*?)</tr>', re.IGNORECASE | re.DOTALL)
+
+    best_row: list = []
+    for tr_match in tr_re.finditer(html):
+        row_html = tr_match.group(1)
+        floats: list = []
+        for v in td_re.findall(row_html):
+            try:
+                floats.append(float(v))
+            except Exception:
+                pass
+        if len(floats) >= 7:
+            best_row = floats   # keep updating — last match = most recent interval
+
+    if not best_row:
+        logger.warning("[ERCOT] No data row with >=7 numeric cells found for %s (html=%d chars)",
                        settlement_point, len(html))
         return None
 
-    # Work with the 800 chars after the match — covers the rest of the table row
-    context = html[idx: idx + 800]
-    logger.warning("[ERCOT] Context after %s: %s",
-                settlement_point, context[:300].replace("\n", " ").replace("\r", ""))
+    idx = COL_IDX.get(settlement_point, 1)
+    if idx >= len(best_row):
+        logger.warning("[ERCOT] Column %d out of range (row has %d cells) for %s",
+                       idx, len(best_row), settlement_point)
+        return None
 
-    # ── Strategy 1: numbers inside <td>...</td> cells ─────────────────────────
-    td_nums = re.findall(r'<td[^>]*>\s*(-?[\d]{1,6}\.[\d]{1,4})\s*</td>', context, re.IGNORECASE)
-    for s in td_nums:
-        val = float(s)
-        if -500 <= val <= 5000 and abs(val) > 0.01:
-            logger.warning("[ERCOT] Strategy1 (td cell) => %s = %.2f", settlement_point, val)
-            return val
+    val = best_row[idx]
+    if -500 <= val <= 5000 and abs(val) > 0.01:
+        logger.warning("[ERCOT] Column-offset parser => %s[col=%d] = %.2f (row=%s)",
+                       settlement_point, idx, val,
+                       [round(x, 2) for x in best_row[:8]])
+        return val
 
-    # ── Strategy 2: any decimal in the context that looks like a price ────────
-    all_decimals = re.findall(r'-?[\d]{1,6}\.[\d]{1,2}', context)
-    for s in all_decimals:
-        val = float(s)
-        # Skip numbers that look like dates (2024.01), percentages near 100,
-        # or implausibly small values — but allow negative prices
-        if (1.0 <= val <= 5000) or (-500 <= val < -0.5):
-            logger.warning("[ERCOT] Strategy2 (decimal scan) => %s = %.2f", settlement_point, val)
-            return val
-
-    # ── Strategy 3: JSON value near the settlement point ─────────────────────
-    p3 = r'"(?:price|value|lmp|spp|settlementPointPrice)"[^0-9-]{0,20}(-?[\d]{1,6}\.[\d]{1,4})'
-    m3 = re.search(p3, context, re.IGNORECASE)
-    if m3:
-        val = float(m3.group(1))
-        if -500 <= val <= 5000:
-            logger.warning("[ERCOT] Strategy3 (JSON key) => %s = %.2f", settlement_point, val)
-            return val
-
-    logger.warning("[ERCOT] All strategies failed for %s. Context: %s",
-                   settlement_point, context[:200].replace("\n", " "))
+    logger.warning("[ERCOT] Value %.2f out of plausible range for %s", val, settlement_point)
     return None
 
 
@@ -1071,4 +1085,9 @@ async def fetch_waha_price() -> Dict[str, Any]:
                         logger.warning("[WAHA] EIA OK series=%s price=%.3f", series_id, price)
                         return result
                 except Exception as exc:
- 
+                     logger.warning("[WAHA] EIA series=%s failed: %s", series_id, exc)
+
+    logger.warning("[WAHA] All live sources failed — returning mock (add OIL_PRICE_API_KEY to Railway)")
+    result = _mock_waha(hh_price)
+    _set_waha_cache(result)
+    return result
