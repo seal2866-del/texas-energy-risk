@@ -1,13 +1,44 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 14, 2026 (session 15 — Waha/HH basis spread, gas lock-in signal, newsletter campaign delivered)
-**Current stable tag:** v7.0-stable
-**Next session:** Monitor newsletter open rates in Resend dashboard; add ADMIN_ALERT_EMAIL=seal2866@gmail.com to Railway env vars; add 2 Railway UptimeRobot monitors manually; Waha price live data (EIA series — currently mock, need correct series ID)
+**Last updated:** June 14, 2026 (session 16 — Waha live data via OilPriceAPI, Stripe verified, env vars added)
+**Current stable tag:** v7.1-stable
+**Next session:** Monitor newsletter open rates in Resend dashboard; set up UptimeRobot monitors (ERCOT + risk-score endpoints); review Waha basis signal in production over next few days
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
 ---
 
 ## COMPLETED TASKS
+
+### Session 16 — Waha Live Data + OilPriceAPI Integration (June 14, 2026)
+
+**Commits:** `266527f`, `9169b58`, `e2bd1a9`
+
+**1. Waha Hub live price — root cause found and fixed**
+- Confirmed EIA v2 API has NO Waha spot price series — EIA sources Waha from Natural Gas Intelligence (NGI), a paid provider; it is not in their public v2 API
+- Integrated OilPriceAPI (oilpriceapi.com) as Waha data source
+  - Free tier: 200 req/month; 4-hr cache = 180 req/month — fits within free limit
+  - Correct commodity code discovered via API error suggestions: `NATURAL_GAS_WAHA`
+  - All other guessed codes (WAHA_USD, WAHA_NATGAS_USD, etc.) returned `invalid_code`
+- **Live reading at archive:** Waha -$0.95/MMBtu, HH $3.10, spread -$4.05 → WIDE signal
+  - Permian Basin pipeline congestion confirmed by real data
+- Railway env var added: `OIL_PRICE_API_KEY`
+
+**2. Railway env vars completed**
+- `ADMIN_ALERT_EMAIL=seal2866@gmail.com` added (email alerting for ERCOT staleness)
+- `OIL_PRICE_API_KEY` added (OilPriceAPI for Waha live data)
+
+**3. Stripe checkout verified**
+- Tested Pro/Business checkout with card `4242 4242 4242 4242` — confirmed working
+
+**4. Session 15 archive completed**
+- Full Session 15 entry written to PROJECT_ARCHIVE.md covering Waha/HH basis widget, Gas Lock-In widget, newsletter campaign, Apollo expansion
+
+**Pending / next session**
+- UptimeRobot: add 2 keyword monitors manually
+  - `https://texas-energy-risk-production.up.railway.app/api/ercot/prices/current` keyword: `price_mwh`
+  - `https://texas-energy-risk-production.up.railway.app/api/signals/risk-score` keyword: `risk_score`
+- Check Resend dashboard for newsletter open/click rates
+- Monitor Waha basis signal in production over next few days
 
 ### Session 15 — Trader Features: Waha/HH Basis + Gas Lock-In Signal (June 14, 2026)
 
