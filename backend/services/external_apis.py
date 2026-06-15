@@ -6,6 +6,7 @@ CRITICAL: ERCOT prices use an in-memory cache of REAL readings only.
 """
 import os
 import re
+import time
 import logging
 import httpx
 from collections import deque
