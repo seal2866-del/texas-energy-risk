@@ -943,3 +943,119 @@ def _safe_float(val) -> float:
         return float(val or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+# ── Waha Hub Natural Gas Spot Price ──────────────────────────────────────────
+
+_WAHA_CACHE: Dict[str, Any] = {}
+_WAHA_CACHE_TTL = 4 * 3600  # 4 hours
+
+def _get_waha_cache() -> Optional[Dict]:
+    if _WAHA_CACHE and (time.time() - _WAHA_CACHE.get("_ts", 0)) < _WAHA_CACHE_TTL:
+        return {k: v for k, v in _WAHA_CACHE.items() if k != "_ts"}
+    return None
+
+def _set_waha_cache(data: Dict):
+    _WAHA_CACHE.clear()
+    _WAHA_CACHE.update(data)
+    _WAHA_CACHE["_ts"] = time.time()
+
+def _mock_waha(hh_price: float = 3.00) -> Dict[str, Any]:
+    """Mock Waha price — typically $0.50-$2.00 below Henry Hub."""
+    import random
+    spread = round(random.uniform(0.40, 1.80), 3)
+    price  = round(max(0.50, hh_price - spread), 3)
+    return {
+        "price":  price,
+        "unit":   "$/MMBtu",
+        "source": "mock",
+        "report_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "note": "Mock Waha price — configure EIA_API_KEY for live data",
+    }
+
+async def fetch_waha_price() -> Dict[str, Any]:
+    """
+    Fetch Waha Hub natural gas spot price from EIA.
+    Waha Hub = West Texas gas trading hub; key Permian Basin price signal.
+    Falls back to HH-based mock if EIA data unavailable.
+    Cached 4 hours.
+    """
+    cached = _get_waha_cache()
+    if cached:
+        return cached
+
+    api_key = os.getenv("EIA_API_KEY", "")
+
+    # Fetch Henry Hub for fallback spread calculation
+    hh_data = await fetch_henry_hub_price()
+    hh_price = hh_data.get("price", 3.00)
+
+    if not api_key:
+        result = _mock_waha(hh_price)
+        _set_waha_cache(result)
+        return result
+
+    # EIA series codes for Waha / West Texas natural gas spot price
+    # Waha is tracked in EIA's Natural Gas Price series under southwest region
+    WAHA_SERIES = [
+        "RNGWTWNT",   # West Texas Waha (EIA weekly spot)
+        "NG.RNGWTWNT.D",
+        "RNGWTWCU",
+    ]
+
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        # Strategy 1: EIA v2 spot endpoint — try each Waha series code
+        for series_id in WAHA_SERIES:
+            try:
+                params = (
+                    f"api_key={api_key}&frequency=weekly&data[]=value"
+                    f"&facets[series][]={series_id}"
+                    f"&sort[0][column]=period&sort[0][direction]=desc&length=10"
+                )
+                r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
+                rows = r.json().get("response", {}).get("data", [])
+                valid = [(row["period"], float(row["value"])) for row in rows
+                         if row.get("value") not in (None, "", "NA") and float(row.get("value", 0)) > 0]
+                if valid:
+                    price = round(valid[0][1], 3)
+                    result = {
+                        "price":       price,
+                        "unit":        "$/MMBtu",
+                        "source":      f"eia_v2_spot_{series_id}",
+                        "report_date": valid[0][0],
+                    }
+                    _set_waha_cache(result)
+                    logger.warning("[WAHA] OK series=%s price=%.3f", series_id, price)
+                    return result
+            except Exception as exc:
+                logger.warning("[WAHA] series=%s failed: %s", series_id, exc)
+
+        # Strategy 2: EIA v2 with duoarea filter for Southwest/West Texas
+        try:
+            params = (
+                f"api_key={api_key}&frequency=weekly&data[]=value"
+                f"&facets[duoarea][]=NW2"
+                f"&sort[0][column]=period&sort[0][direction]=desc&length=10"
+            )
+            r = await client.get(f"https://api.eia.gov/v2/natural-gas/pri/spot/data/?{params}")
+            rows = r.json().get("response", {}).get("data", [])
+            valid = [(row["period"], float(row["value"])) for row in rows
+                     if row.get("value") not in (None, "", "NA") and float(row.get("value", 0)) > 0]
+            if valid:
+                price = round(valid[0][1], 3)
+                result = {
+                    "price":       price,
+                    "unit":        "$/MMBtu",
+                    "source":      "eia_v2_duoarea_nw2",
+                    "report_date": valid[0][0],
+                }
+                _set_waha_cache(result)
+                logger.warning("[WAHA] OK via duoarea NW2 price=%.3f", price)
+                return result
+        except Exception as exc:
+            logger.warning("[WAHA] duoarea NW2 failed: %s", exc)
+
+    logger.warning("[WAHA] All EIA attempts failed — returning mock")
+    result = _mock_waha(hh_price)
+    _set_waha_cache(result)
+    return result

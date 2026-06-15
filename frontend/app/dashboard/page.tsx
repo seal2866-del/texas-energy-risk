@@ -76,6 +76,8 @@ import EEATracker from "@/components/widgets/EEATracker";
 import LoadOptimizer from "@/components/widgets/LoadOptimizer";
 import DAMTracker from "@/components/widgets/DAMTracker";
 import MultiHubSpread from "@/components/widgets/MultiHubSpread";
+import WahaBasisSpread from "@/components/widgets/WahaBasisSpread";
+import GasLockIn from "@/components/widgets/GasLockIn";
 import CustomerROI from "@/components/widgets/CustomerROI";
 import { energyRiskEngine, buildEngineInputs, type RiskModel } from "@/lib/energyRiskEngine";
 import { validateInputs, type ValidationResult } from "@/lib/dataValidation";
@@ -716,6 +718,8 @@ export default function DashboardPage() {
               {/* 2c. ERCOT Grid Status + Hub Spreads */}
               <EEATracker />
               <MultiHubSpread />
+              <WahaBasisSpread />
+              <GasLockIn />
 
               {/* 2d. Load Optimizer + DAM Tracker */}
               <LoadOptimizer location={location} />
@@ -971,6 +975,8 @@ export default function DashboardPage() {
                   {/* ERCOT Grid Status + Hub Spreads */}
                   <EEATracker />
                   <MultiHubSpread />
+                  <WahaBasisSpread />
+                  <GasLockIn />
 
                   {/* Load Optimizer + DAM Tracker */}
                   <LoadOptimizer location={location} />

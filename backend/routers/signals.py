@@ -264,3 +264,34 @@ async def get_dam_comparison(
     except Exception as exc:
         logger.error("[DAM] Error: %s", exc)
         return {"available": False, "message": str(exc)}
+
+@router.get("/waha-basis")
+async def get_waha_basis():
+    """
+    Waha Hub vs Henry Hub natural gas basis spread.
+    Signals Permian Basin pipeline takeaway congestion.
+    Cached 15 minutes.
+    """
+    try:
+        from services.waha_basis import fetch_waha_basis
+        return await fetch_waha_basis()
+    except Exception as exc:
+        logger.error("[WAHA_BASIS] Error: %s", exc)
+        return {"error": str(exc), "signal": "UNAVAILABLE"}
+
+
+@router.get("/gas-lock-in")
+async def get_gas_lock_in():
+    """
+    Natural gas contract lock-in signal.
+    Compares HH spot vs near-month futures estimate + volatility.
+    Returns LOCK IN / MONITOR / STAY FLOATING recommendation.
+    Cached 30 minutes.
+    """
+    try:
+        from services.gas_lock_in import fetch_gas_lock_in
+        return await fetch_gas_lock_in()
+    except Exception as exc:
+        logger.error("[GAS_LOCK_IN] Error: %s", exc)
+        return {"error": str(exc), "signal": "UNAVAILABLE"}
+
