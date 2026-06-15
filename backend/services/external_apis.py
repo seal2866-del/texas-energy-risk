@@ -1017,9 +1017,8 @@ async def fetch_waha_price() -> Dict[str, Any]:
                 logger.warning("[WAHA] OPA discovery failed: %s", disc_exc)
 
             WAHA_CODES = [
-                "WAHA_USD", "WAHA_NATGAS_USD", "WAHA_NATURAL_GAS_USD",
-                "WAHA_HUB_USD", "NG_WAHA_USD", "NATGAS_WAHA_USD",
-                "PERMIAN_NATGAS_USD", "WAHA", "WAHA_GAS_USD",
+                "NATURAL_GAS_WAHA",   # confirmed correct OilPriceAPI code
+                "WAHA_USD", "WAHA_NATGAS_USD",
             ]
             for code in WAHA_CODES:
                 try:
