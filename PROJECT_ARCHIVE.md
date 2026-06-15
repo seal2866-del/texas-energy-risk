@@ -1,13 +1,63 @@
 # Texas Grid Intel — Project Archive
-**Last updated:** June 14, 2026 (session 14 — Apollo expansion, newsletter campaign, Contact email fix)
-**Current stable tag:** v6.9-stable
-**Next session:** Trader features — Waha vs Henry Hub basis spread + contract lock-in signal; monitor newsletter open rates in Resend; add ADMIN_ALERT_EMAIL=seal2866@gmail.com to Railway env vars; add 2 Railway UptimeRobot monitors manually
+**Last updated:** June 14, 2026 (session 15 — Waha/HH basis spread, gas lock-in signal, newsletter campaign delivered)
+**Current stable tag:** v7.0-stable
+**Next session:** Monitor newsletter open rates in Resend dashboard; add ADMIN_ALERT_EMAIL=seal2866@gmail.com to Railway env vars; add 2 Railway UptimeRobot monitors manually; Waha price live data (EIA series — currently mock, need correct series ID)
 **Repository:** github.com/seal2866-del/texas-energy-risk
 **Production URL:** https://texasgridintel.com
 
 ---
 
 ## COMPLETED TASKS
+
+### Session 15 — Trader Features: Waha/HH Basis + Gas Lock-In Signal (June 14, 2026)
+
+**Commits:** `0b32b3f`, `7f7d569`
+
+**1. Waha / Henry Hub Basis Spread widget**
+- New service: `backend/services/waha_basis.py`
+  - Fetches HH + Waha prices in parallel via `asyncio.gather`
+  - Spread = HH - Waha (positive = Waha discount, typical for Permian takeaway constraints)
+  - Signals: NORMAL (<$0.50), WIDE ($0.50–$2), BLOWOUT (>$5), PREMIUM (Waha > HH, rare inversion)
+  - 15-minute cache
+- New function: `fetch_waha_price()` in `external_apis.py`
+  - Tries EIA v2 spot API with series RNGWTWNT, NGSPOT_WTX, NG.RNGWTWNT.D
+  - Tries EIA v2 with duoarea=NW2 (West Texas)
+  - Falls back to mock (HH minus $0.40–$1.80 random spread) if EIA series not found
+  - Currently returning mock — EIA Waha series ID needs verification
+  - **Bug fixed:** missing `import time` caused backend crash on startup (commit `7f7d569`)
+- New endpoint: `GET /api/signals/waha-basis`
+- New widget: `frontend/components/widgets/WahaBasisSpread.tsx`
+  - Shows HH price / Waha price / spread in 3 cards
+  - Spread progress bar (0–$6 scale) color-coded by signal
+  - Signal badge + insight text
+- **Live reading:** HH $3.10, Waha $1.75 (mock), spread -$1.35 → NORMAL
+
+**2. Gas Contract Lock-In Signal widget**
+- New service: `backend/services/gas_lock_in.py`
+  - Spot price from `fetch_henry_hub_price()` (existing)
+  - Near-month futures = spot + seasonal curve + storage factor (estimated; clearly labelled)
+  - Annualised volatility from log-return std dev of 10-day HH history × √252
+  - Signal logic:
+    - LOCK IN: futures > spot by $0.30+ OR contango $0.10+ with vol ≥40%
+    - STAY FLOATING: backwardation >$0.20 and low vol
+    - MONITOR: neutral zone (partial hedge recommendation if vol elevated)
+  - 30-minute cache
+- New endpoint: `GET /api/signals/gas-lock-in`
+- New widget: `frontend/components/widgets/GasLockIn.tsx`
+  - Spot / Near-Mo Futures / Annualised Vol in 3 cards
+  - Contango/backwardation bar (centered, green right = contango, blue left = backwardation)
+  - Signal badge (Lock/Unlock/Eye icon) + reason text + recommended action box
+  - 30d avg and vs-30d-avg % stats in footer
+- **Live reading:** Spot $3.10, Futures $3.20, Vol 74% annualised (elevated)
+
+**3. Dashboard integration**
+- Both widgets wired into Analyst Mode and Executive Mode trader sections
+- Position: after MultiHubSpread, before LoadOptimizer
+- ERCOT verified fresh at archive: $27.25/MWh, 24s ago, 5 real readings
+
+**Pending / known issues**
+- Waha price is mock — EIA API returns no data for tried series IDs; need to find correct Waha spot price series from EIA v2
+- Futures price in lock-in signal is estimated via seasonal curve, not live NYMEX data
 
 ### Session 14 — Apollo Expansion + Newsletter Campaign + Contact Fix (June 14, 2026)
 
@@ -717,4 +767,100 @@ Apollo → Prospect → Newsletter → Demo → Customer
 #### 1. Newsletter Generate Draft — `Error 500: unhashable type: 'dict'`
 **Root cause**: `_build_newsletter_prompt()` used `{{}}` inside two f-string expressions as an intended empty-dict default. In f-string *expression* context, `{{}}` evaluates as `{ {} }` (a set containing an empty dict), immediately raising `TypeError: unhashable type: 'dict'`.
 
-**Fix**: Since the ternary already guards with `if current.get("hub_prices")`, index directly: `current["h
+**Fix**: Since the ternary already guards with `if current.get("hub_prices")`, index directly: `current["hub_prices"].get("HB_NORTH")`.
+
+**File**: `backend/services/newsletter_service.py`
+
+#### 2. Null bytes in newsletter_service.py caused backend 404
+**Root cause**: Edit MCP tool wrote null bytes at end of file on Windows/NTFS. Python rejects any file with null bytes at import time → entire backend crashed on startup → all endpoints returned 404.
+
+**Fix**: Strip null bytes via Python binary write; verify with `ast.parse()` before every commit.
+
+**Rule**: All backend Python file edits must use bash + Python binary write, never Edit/Write MCP tools directly.
+
+#### 3. ERCOT staleness watchdog — two silent failures
+**Root cause 1**: `send_admin_alert()` was called by the watchdog but never defined in `alert_service.py`. Every alert silently failed with `except Exception as ae: log.warning(...)`.
+
+**Root cause 2**: Watchdog checked `last_updated_seconds_ago` (when cache dict was last touched) instead of the age of the **newest reading timestamp**. Cache could be touched every 5 min while readings stopped — watchdog reported "fresh" while data was 24h stale.
+
+**Fixes**:
+- `alert_service.py`: added `send_admin_alert(subject, message)` + `ADMIN_ALERT_EMAIL` env var (default: seal2866@gmail.com)
+- `main.py`: watchdog now parses `status["newest"]` timestamp and computes true reading age
+- `main.py`: auto-recovery added — if newest reading >120 min old, forces fresh CDR fetch immediately
+
+**Files**: `backend/main.py`, `backend/services/alert_service.py`
+
+### Monitoring Setup
+- UptimeRobot: 6 existing monitors found; 2 new Railway monitors added manually:
+  - `https://texas-energy-risk-production.up.railway.app/api/ercot/prices/current` (keyword: `price_mwh`)
+  - `https://texas-energy-risk-production.up.railway.app/api/signals/risk-score` (keyword: `risk_score`)
+- Email alerts: watchdog sends to `ADMIN_ALERT_EMAIL` (Railway env var) on staleness >15 min
+- Auto-recovery: forces CDR re-fetch if readings >120 min old
+
+---
+
+## Session 12 — Data Integrity Fixes (June 9, 2026)
+
+### Version: v6.7-stable
+
+### Issues Fixed
+
+#### Task #9 — Grid system conditions all null (`grid_conditions.py`)
+**Root cause**: `_parse_system_conditions()` used regex `rf"{re.escape(label)}\s*\|?\s*\|?\s*([\d,\.]+)"` which can't match across HTML tag boundaries. ERCOT HTML has `<td>Actual System Demand</td><td>55985</td>` — label and value in **separate** `<td>` elements.
+
+**Fix**: Changed to `<td>` pair pattern:
+```python
+pattern = rf'<td[^>]*>[^<]*{re.escape(label)}[^<]*</td>\s*<td[^>]*>\s*(-?[\d,\.]+)\s*</td>'
+m = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
+```
+Added fallback pattern for partial label matches. Now correctly parses demand, capacity, wind, solar, frequency from `real_time_system_conditions.html`.
+
+#### Task #10 — ERCOT price cache stale (`external_apis.py`)
+**Root cause**: `fetch_ercot_prices()` Strategies 1-3 all depend on finding "HB_HOUSTON" text near numeric `<td>` cells or decimals. If the CDR HTML format changes slightly, all 3 strategies return `None` and no new reading is cached.
+
+**Fix**: Added **Strategy 4** — column-offset parser (identical logic to `grid_conditions._parse_hub_prices_from_table`). Scans all `<tr>` rows for 7+ numeric `<td>` cells, reads HB_HOUSTON at column index 1. This is format-resilient since it doesn't depend on finding the hub name near the value.
+
+```python
+# Strategy 4: column-offset parser
+_col = {"HB_HOUSTON": 1, "HB_BUSAVG": 0, "HB_NORTH": 3, "HB_SOUTH": 5, "HB_WEST": 6}
+```
+
+#### Task #11 — Gas storage showing 0.0% (`external_apis.py`)
+**Root cause**: `fetch_gas_data()` Strategy 2 iterated `_EIA_PROCESS_CODES` (6) × `_EIA_DUOAREAS` (5) = **30 sequential HTTP requests**, each with 20s timeout = up to **600 seconds total**. The function would silently time out inside `asyncio.gather()`, causing the exception to be swallowed and mock data returned. Mock data has `storage_pct_vs_avg = 0`.
+
+**Fix**:
+- Reduced Strategy 2 from 30 combos to **2 targeted combos**: `(EWG, NUS)` and `(EWG, US)`
+- Reduced per-request timeout from 20s → 12s
+- Total worst-case fetch time: ~60s → ~12s (Strategy 1 fast-path usually wins)
+
+#### Task #12 — Signals endpoint timeout (`signals.py` + `main.py`)
+**Root cause 1**: `asyncio.gather()` without `return_exceptions=True` — if any of the 4 fetches raised an exception (e.g. gas timeout), the entire gather propagated the exception and the endpoint crashed.
+
+**Root cause 2**: `_grid_signal_loop()` in `main.py` had two bugs:
+- `gas_data.get("records", [])` — `fetch_gas_data()` returns `List[Dict]`, not a dict with a "records" key → always empty
+- `prices[-1].price_mwh` — price records are dicts, not objects → AttributeError, silently caught → `ercot_latest = None`
+
+**Fix signals.py**: Both `GET /api/signals/` and `GET /api/signals/risk-score` now use `return_exceptions=True`. Each result is individually checked; exceptions degrade to empty lists rather than crashing.
+
+**Fix main.py**:
+```python
+# Before (broken):
+gas_records = gas_data.get("records", []) if isinstance(gas_data, dict) else []
+ercot_latest = prices[-1].price_mwh if prices ...
+
+# After (fixed):
+gas_records = gas_r if isinstance(gas_r, list) else []
+ercot_latest = prices[-1].get("price_mwh") if prices and isinstance(prices[-1], dict) else None
+```
+
+### Files Changed
+- `backend/services/grid_conditions.py` — `_parse_system_conditions()` regex → `<td>` pair matching
+- `backend/services/external_apis.py` — Strategy 4 fallback + Strategy 2 reduced to 2 combos + 12s timeout
+- `backend/routers/signals.py` — `return_exceptions=True` on all gather calls
+- `backend/main.py` — `_grid_signal_loop()` dict/object access bugs fixed
+
+### Commit
+`4c3ed93` — fix: data integrity - 4 live endpoint issues
+
+### Backup
+- Session 12 archive pending
