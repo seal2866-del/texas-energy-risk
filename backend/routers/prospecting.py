@@ -165,6 +165,8 @@ TRADING_INDUSTRY_BONUS: dict[str, int] = {
 TEXAS_ENERGY_CITIES = [
     "houston", "midland", "odessa", "corpus christi", "beaumont",
     "port arthur", "pasadena", "baytown", "galveston", "victoria",
+    # Expanded: major metro energy hubs
+    "dallas", "fort worth", "austin", "san antonio", "arlington",
 ]
 
 def _score_lead(prospect: dict) -> dict:
