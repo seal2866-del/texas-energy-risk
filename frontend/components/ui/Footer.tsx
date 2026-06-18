@@ -75,7 +75,7 @@ export default function Footer() {
           <FooterSection title="Legal & Info" links={[
             { label: "Disclaimer & Terms", href: "/terms" },
             { label: "Data Usage Policy",  href: "/terms#data" },
-            { label: "Contact",            href: "mailto:Wnguyen@Myinfinivue.com" },
+            { label: "Contact",            href: "mailto:support@texasgridintel.com" },
             { label: "Status",             href: "/terms#status" },
           ]} />
         </div>
