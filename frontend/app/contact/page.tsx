@@ -26,10 +26,10 @@ export default function ContactPage() {
       const body    = encodeURIComponent(
         `Name: ${name}\nEmail: ${email}\nCompany: ${company}\nTitle: ${title}\n\nMessage:\n${message}`
       );
-      window.location.href = `mailto:wnguyen@myinfinivue.com?subject=${subject}&body=${body}`;
+      window.location.href = `mailto:support@texasgridintel.com?subject=${subject}&body=${body}`;
       setSent(true);
     } catch {
-      setError("Something went wrong. Please email us directly at wnguyen@myinfinivue.com");
+      setError("Something went wrong. Please email us directly at support@texasgridintel.com");
     }
     setLoading(false);
   };
@@ -61,8 +61,8 @@ export default function ContactPage() {
               <p className="text-gray-400 text-sm mb-6">
                 Your email client should have opened with your message. If it didn't, please email us directly:
               </p>
-              <a href="mailto:wnguyen@myinfinivue.com" className="text-orange-400 hover:text-orange-300 font-semibold text-sm underline">
-                wnguyen@myinfinivue.com
+              <a href="mailto:support@texasgridintel.com" className="text-orange-400 hover:text-orange-300 font-semibold text-sm underline">
+                support@texasgridintel.com
               </a>
               <div className="mt-6">
                 <Link href="/pricing" className="text-xs text-gray-500 hover:text-gray-300">← Return to Pricing</Link>
@@ -113,7 +113,7 @@ export default function ContactPage() {
                 </button>
 
                 <p className="text-[11px] text-gray-600 text-center">
-                  Or email us directly: <a href="mailto:wnguyen@myinfinivue.com" className="text-blue-400 hover:text-blue-300">wnguyen@myinfinivue.com</a>
+                  Or email us directly: <a href="mailto:support@texasgridintel.com" className="text-blue-400 hover:text-blue-300">support@texasgridintel.com</a>
                 </p>
               </form>
             </div>

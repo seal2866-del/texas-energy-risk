@@ -79,8 +79,8 @@ Past signal performance does not guarantee future accuracy.`,
           <div className="mt-12 p-6 rounded-xl bg-white/3 border border-white/8 text-center">
             <p className="text-sm text-gray-400">
               Questions? Contact us at{" "}
-              <a href="mailto:support@txenergyrisk.com" className="text-orange-400 hover:underline">
-                support@txenergyrisk.com
+              <a href="mailto:support@texasgridintel.com" className="text-orange-400 hover:underline">
+                support@texasgridintel.com
               </a>
             </p>
           </div>
